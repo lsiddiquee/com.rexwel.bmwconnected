@@ -1,0 +1,12 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Mileage"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/speedometer.svg",
+  "units": "km",
+  "insights": true
+}

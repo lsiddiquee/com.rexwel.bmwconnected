@@ -1,0 +1,32 @@
+{
+  "id": "com.rexwel.bmwconnected",
+  "version": "0.0.1",
+  "compatibility": ">=5.0.0",
+  "sdk": 3,
+  "name": {
+    "en": "BMW Connected"
+  },
+  "description": {
+    "en": "Adds support for BMW Connected Drive services."
+  },
+  "brandColor": "#009ADA",
+  "category": [
+    "tools"
+  ],
+  "permissions": [],
+  "images": {
+    "small": "/assets/images/small.jpeg",
+    "large": "/assets/images/large.jpeg",
+    "xlarge": "/assets/images/xlarge.jpeg"
+  },
+  "author": {
+    "name": "Likhan Siddiquee",
+    "email": "likhan.siddiquee@gmail.com"
+  },
+  "api": {
+    "validateCredentials": {
+      "method": "POST",
+      "path": "/"
+    }
+  }
+}

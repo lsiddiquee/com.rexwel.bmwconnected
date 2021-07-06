@@ -1,0 +1,70 @@
+{
+  "actions": [
+    {
+      "id": "climate_now",
+      "title": {
+        "en": "Climate Now"
+      },
+      "$filter": "capabilities=climate_now_capability"
+    },
+    {
+      "id": "blow_horn",
+      "title": {
+        "en": "Blow Horn"
+      }
+    },
+    {
+      "id": "flash_lights",
+      "title": {
+        "en": "Flash Lights"
+      }
+    },
+    {
+      "id": "send_message",
+      "title": {
+        "en": "Send Message"
+      },
+      "args": [
+        {
+          "type": "text",
+          "name": "subject",
+          "title": {
+            "en": "Subject"
+          },
+          "placeholder": {
+            "en": "Subject"
+          }
+        },
+        {
+          "type": "text",
+          "name": "message",
+          "title": {
+            "en": "Message"
+          },
+          "placeholder": {
+            "en": "Message"
+          }
+        }
+      ]
+    }
+  ],
+  "triggers": [
+    {
+      "id": "charging_status_change",
+      "title": {
+        "en": "Charging Status Changed"
+      },
+      "tokens": [
+        {
+          "name": "charging_status",
+          "type": "string",
+          "title": {
+            "en": "Charging Status"
+          },
+          "example": "NOCHARGING"
+        }
+      ],
+      "$filter": "capabilities=charging_status_capability"
+    }
+  ]
+}

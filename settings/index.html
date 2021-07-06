@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <!-- The '/homey.js' script must be included in your settings view to work -->
+  <script type="text/javascript" src="/homey.js" data-origin="settings"></script>
+</head>
+
+<body>
+  <h1 data-i18n="settings.title">
+    <!-- This will be filled with the translated string with key 'settings.title'. -->
+  </h1>
+  <p data-i18n="settings.subtitle">
+    <!-- This field will also be translated -->
+  </p>
+
+  <fieldset>
+    <legend>BMW ConnectedDrive Settings</legend>
+
+    <div class="field row">
+      <label for="username">Username</label>
+      <input id="username" type="text" value="" />
+    </div>
+    <div class="field row">
+      <label for="password">Password</label>
+      <input id="password" type="password" value="" />
+    </div>
+  </fieldset>
+
+  <p id="error" style="color: red;"></p>
+  <p id="success" style="color: #5fd225;"></p>
+
+  <button id="save" class="right">Save changes</button>
+
+  <script type="text/javascript">
+    // a method named 'onHomeyReady' must be present in your code
+    function onHomeyReady(Homey) {
+      var usernameElement = document.getElementById("username");
+      var passwordElement = document.getElementById("password");
+      var errorElement = document.getElementById("error");
+      var successElement = document.getElementById("success");
+
+      var initializeSettings = function (err, data) {
+        if (err || !data) {
+          errorElement.innerHTML = 'Loading settings failed, please load page again, or check app\'s running status';
+          successElement.innerHTML = '';
+          return;
+        }
+
+        errorElement.innerHTML = '';
+        successElement.innerHTML = '';
+        usernameElement.value = data.username;
+        passwordElement.value = data.password;
+      }
+
+      Homey.get('com.rexwel.bmwconnected', initializeSettings);
+      Homey.on('settings.set', (key, data) => {
+        if (key == 'com.rexwel.bmwconnected') {
+          Homey.get('com.rexwel.bmwconnected', initializeSettings);
+        }
+      });
+      // Tell Homey we're ready to be displayed
+      Homey.ready();
+
+      var saveElement = document.getElementById("save");
+
+      saveElement.addEventListener("click", function (e) {
+        Homey.api("POST", "/", { username: usernameElement.value, password: passwordElement.value }, function (err, result) {
+          if (err) return Homey.alert(err);
+          successElement.innerHTML = "Login Successful";
+        })
+      });
+    }
+  </script>
+</body>
+
+</html>

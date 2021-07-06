@@ -1,0 +1,5 @@
+**/.DS_Store
+
+env.json
+node_modules/
+build/

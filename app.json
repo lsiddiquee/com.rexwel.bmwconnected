@@ -1,0 +1,251 @@
+{
+  "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
+  "id": "com.rexwel.bmwconnected",
+  "version": "0.0.1",
+  "compatibility": ">=5.0.0",
+  "sdk": 3,
+  "name": {
+    "en": "BMW Connected"
+  },
+  "description": {
+    "en": "Adds support for BMW Connected Drive services."
+  },
+  "brandColor": "#009ADA",
+  "category": [
+    "tools"
+  ],
+  "permissions": [],
+  "images": {
+    "small": "/assets/images/small.jpeg",
+    "large": "/assets/images/large.jpeg",
+    "xlarge": "/assets/images/xlarge.jpeg"
+  },
+  "author": {
+    "name": "Likhan Siddiquee",
+    "email": "likhan.siddiquee@gmail.com"
+  },
+  "api": {
+    "validateCredentials": {
+      "method": "POST",
+      "path": "/"
+    }
+  },
+  "flow": {
+    "triggers": [
+      {
+        "id": "charging_status_change",
+        "title": {
+          "en": "Charging Status Changed"
+        },
+        "tokens": [
+          {
+            "name": "charging_status",
+            "type": "string",
+            "title": {
+              "en": "Charging Status"
+            },
+            "example": "NOCHARGING"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw&capabilities=charging_status_capability"
+          }
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "climate_now",
+        "title": {
+          "en": "Climate Now"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw&capabilities=climate_now_capability"
+          }
+        ]
+      },
+      {
+        "id": "blow_horn",
+        "title": {
+          "en": "Blow Horn"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw"
+          }
+        ]
+      },
+      {
+        "id": "flash_lights",
+        "title": {
+          "en": "Flash Lights"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw"
+          }
+        ]
+      },
+      {
+        "id": "send_message",
+        "title": {
+          "en": "Send Message"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw"
+          },
+          {
+            "type": "text",
+            "name": "subject",
+            "title": {
+              "en": "Subject"
+            },
+            "placeholder": {
+              "en": "Subject"
+            }
+          },
+          {
+            "type": "text",
+            "name": "message",
+            "title": {
+              "en": "Message"
+            },
+            "placeholder": {
+              "en": "Message"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "drivers": [
+    {
+      "name": {
+        "en": "BMW"
+      },
+      "class": "other",
+      "capabilities": [
+        "alarm_generic",
+        "locked",
+        "mileage_capability",
+        "range_capability",
+        "climate_now_capability",
+        "measure_battery",
+        "measure_battery.actual",
+        "range_capability.battery",
+        "range_capability.fuel",
+        "charging_status_capability"
+      ],
+      "capabilitiesOptions": {
+        "alarm_generic": {
+          "title": {
+            "en": "Alarm Disarmed"
+          }
+        },
+        "measure_battery.actual": {
+          "title": {
+            "en": "Actual Battery"
+          }
+        }
+      },
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "images": {
+        "small": "/drivers/bmw/assets/images/small.jpeg",
+        "large": "/drivers/bmw/assets/images/large.jpeg",
+        "xlarge": "/drivers/bmw/assets/images/xlarge.jpeg"
+      },
+      "pair": [
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "id": "bmw",
+      "settings": [
+        {
+          "id": "pollingInterval",
+          "type": "number",
+          "label": {
+            "en": "Polling Interval (seconds)"
+          },
+          "value": 60,
+          "min": 5,
+          "max": 3600,
+          "hint": {
+            "en": "The interval at which the app polls to update the state of the vehicle."
+          }
+        }
+      ]
+    }
+  ],
+  "capabilities": {
+    "charging_status_capability": {
+      "type": "string",
+      "title": {
+        "en": "Charging Status"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/evcharging.svg"
+    },
+    "climate_now_capability": {
+      "type": "boolean",
+      "title": {
+        "en": "Climate Now"
+      },
+      "getable": true,
+      "setable": true,
+      "uiComponent": "toggle",
+      "icon": "/assets/airco.svg"
+    },
+    "mileage_capability": {
+      "type": "number",
+      "title": {
+        "en": "Mileage"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/speedometer.svg",
+      "units": "km",
+      "insights": true
+    },
+    "range_capability": {
+      "type": "number",
+      "title": {
+        "en": "Range"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/map-marker-distance.svg",
+      "units": "km",
+      "insights": true
+    }
+  }
+}

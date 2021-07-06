@@ -1,0 +1,12 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Range"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/map-marker-distance.svg",
+  "units": "km",
+  "insights": true
+}

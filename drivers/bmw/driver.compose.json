@@ -1,0 +1,53 @@
+{
+  "name": {
+    "en": "BMW"
+  },
+  "class": "other",
+  "capabilities": [
+    "alarm_generic",
+    "locked",
+    "mileage_capability",
+    "range_capability",
+    "climate_now_capability",
+    "measure_battery",
+    "measure_battery.actual",
+    "range_capability.battery",
+    "range_capability.fuel",
+    "charging_status_capability"
+  ],
+  "capabilitiesOptions": {
+    "alarm_generic": {
+      "title": {
+        "en": "Alarm Disarmed"
+      }
+    },
+    "measure_battery.actual": {
+      "title": {
+        "en": "Actual Battery"
+      }
+    }
+  },
+  "energy": {
+    "batteries": [
+      "OTHER"
+    ]
+  },
+  "images": {
+    "small": "/drivers/bmw/assets/images/small.jpeg",
+    "large": "/drivers/bmw/assets/images/large.jpeg",
+    "xlarge": "/drivers/bmw/assets/images/xlarge.jpeg"
+  },
+  "pair": [
+    {
+      "id": "list_devices",
+      "template": "list_devices",
+      "navigation": {
+        "next": "add_devices"
+      }
+    },
+    {
+      "id": "add_devices",
+      "template": "add_devices"
+    }
+  ]
+}
