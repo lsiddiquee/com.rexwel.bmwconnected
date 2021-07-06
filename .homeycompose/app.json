@@ -28,5 +28,9 @@
       "method": "POST",
       "path": "/"
     }
-  }
+  },
+  "bugs": {
+    "url": "https://github.com/lsiddiquee/com.rexwel.bmwconnected/issues"
+  },
+  "source": "https://github.com/lsiddiquee/com.rexwel.bmwconnected"
 }
