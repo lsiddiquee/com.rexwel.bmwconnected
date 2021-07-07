@@ -1,0 +1,12 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Fuel"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/gas-station.svg",
+  "units": "l",
+  "insights": true
+}

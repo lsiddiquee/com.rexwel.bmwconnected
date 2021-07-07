@@ -28,28 +28,47 @@ class ConnectedDriveDriver extends Driver {
           throw new Error("Cannot list vehicle as vin is empty.");
         }
 
-        let capabilities = [
-          "locked",
-          "mileage_capability",
-          "range_capability"
-        ]
+        const vehicleStatus = await api.getVehicleStatus(vehicle.vin);
 
-        if (vehicle.hasAlarmSystem) {
-          this.log('hasAlarmSystem detected.');
-          capabilities.push("alarm_generic");
+        let capabilities: string[] = [];
+
+        if (vehicleStatus.mileage > 0) {
+          capabilities.push("mileage_capability");
         } else {
-          this.log(`HasAlarmSystem: ${vehicle.hasAlarmSystem}`);
+          this.log(`mileage: ${vehicleStatus.mileage}`);
+        }
+
+        if (vehicleStatus.remainingFuel > 0) {
+          capabilities.push("remanining_fuel_liters_capability");
+        } else {
+          this.log(`remanining_fuel_liters_capability: ${vehicleStatus.remainingFuel}`);
+        }
+
+        if (vehicleStatus.doorLockState) {
+          capabilities.push("locked");
+
+          if (vehicle.hasAlarmSystem) {
+            capabilities.push("alarm_generic");
+          } else {
+            this.log(`HasAlarmSystem: ${vehicle.hasAlarmSystem}`);
+          }
+        } else {
+          this.log(`doorLockState: ${vehicleStatus.doorLockState}`);
+        }
+
+        if (vehicleStatus.remainingRange > 0) {
+          capabilities.push("range_capability");
+        } else {
+          this.log(`remainingRange: ${vehicleStatus.remainingRange}`);
         }
 
         if (vehicle.climateNow === "ACTIVATED") {
-          this.log('climate_now_capability detected.');
           capabilities.push("climate_now_capability");
         } else {
           this.log(`ClimateNow: ${vehicle.climateNow}`);
         }
 
-        if (vehicle.driveTrain === "PHEV") {
-          this.log('PHEV detected.');
+        if (vehicle.driveTrain === "PHEV" || vehicle.driveTrain === "BEV") {
           capabilities.push("measure_battery");
           capabilities.push("measure_battery.actual");
           capabilities.push("range_capability.battery");
@@ -59,7 +78,6 @@ class ConnectedDriveDriver extends Driver {
           this.log(`Drivetrain: ${vehicle.driveTrain}`);
         }
 
-        const vehicleStatus = await api.getVehicleStatus(vehicle.vin);
         const deviceData = new DeviceData();
         deviceData.id = vehicle.vin;
         return {
@@ -90,7 +108,8 @@ class ConnectedDriveDriver extends Driver {
         };
       }));
     }
-    return [];
+
+    throw new Error("Please ensure proper credentials have been provided in the settings page of the application.");
   }
 }
 

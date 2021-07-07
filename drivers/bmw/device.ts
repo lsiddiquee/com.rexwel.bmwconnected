@@ -18,7 +18,9 @@ class Vehicle extends Device {
     this.deviceStatusPollingInterval = (this.getSetting("pollingInterval") as number) * 1000;
 
     // register a capability listener
-    this.registerCapabilityListener("locked", this.onCapabilityLocked.bind(this));
+    if (this.hasCapability("locked")) {
+      this.registerCapabilityListener("locked", this.onCapabilityLocked.bind(this));
+    }
     if (this.hasCapability("climate_now_capability")) {
       this.registerCapabilityListener("climate_now_capability", this.onCapabilityClimateNow.bind(this));
     }
@@ -110,9 +112,21 @@ class Vehicle extends Device {
       this.log(`Polling BMW ConnectedDrive for vehicle status updates for ${this.getName()}.`);
       if (this.api) {
         const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
-        this.setCapabilityValue("locked", vehicle?.doorLockState === "SECURED" || vehicle?.doorLockState === "LOCKED");
-        this.setCapabilityValue("mileage_capability", vehicle?.mileage);
-        this.setCapabilityValue("range_capability", vehicle?.remainingRange);
+        if (this.hasCapability("locked")) {
+          this.setCapabilityValue("locked", vehicle?.doorLockState === "SECURED" || vehicle?.doorLockState === "LOCKED");
+        }
+        if (this.hasCapability("mileage_capability")) {
+          this.setCapabilityValue("mileage_capability", vehicle?.mileage);
+        }
+        if (vehicle?.remainingFuel > 0) {
+          if (!this.hasCapability("remanining_fuel_liters_capability")) {
+            await this.addCapability("remanining_fuel_liters_capability");
+          }
+          this.setCapabilityValue("remanining_fuel_liters_capability", vehicle?.remainingFuel);
+        }
+        if (this.hasCapability("range_capability")) {
+          this.setCapabilityValue("range_capability", vehicle?.remainingRange);
+        }
         if (this.hasCapability("alarm_generic")) {
           this.setCapabilityValue("alarm_generic", vehicle?.doorLockState !== "SECURED");
         }

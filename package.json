@@ -1,12 +1,12 @@
 {
   "name": "com.rexwel.bmwconnected",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "main": "app.ts",
   "scripts": {
     "build": "tsc"
   },
   "dependencies": {
-    "bmw-connected-drive": "^0.0.1",
+    "bmw-connected-drive": "^0.0.3",
     "source-map-support": "^0.5.19"
   },
   "devDependencies": {
@@ -20,8 +20,11 @@
     "type": "git",
     "url": "git+https://github.com/lsiddiquee/com.rexwel.bmwconnected"
   },
-  "author": "",
-  "license": "ISC",
+  "author": {
+    "name": "Likhan Siddiquee",
+    "email": "likhan.siddiquee@gmail.com"
+  },
+  "license": "GPLV3",
   "bugs": {
     "url": "https://github.com/lsiddiquee/com.rexwel.bmwconnected/issues"
   },
