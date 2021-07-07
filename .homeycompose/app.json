@@ -1,6 +1,6 @@
 {
   "id": "com.rexwel.bmwconnected",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -32,5 +32,13 @@
   "bugs": {
     "url": "https://github.com/lsiddiquee/com.rexwel.bmwconnected/issues"
   },
-  "source": "https://github.com/lsiddiquee/com.rexwel.bmwconnected"
+  "source": "https://github.com/lsiddiquee/com.rexwel.bmwconnected",
+  "homeyCommunityTopicId": 49199,
+  "contributing": {
+    "donate": {
+      "paypal": {
+        "username": "LikhanSiddiquee"
+      }
+    }
+  }
 }
