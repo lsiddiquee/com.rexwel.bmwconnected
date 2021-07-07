@@ -4,5 +4,8 @@
   },
   "0.0.2": {
     "en": "Updated app description and readme.txt"
+  },
+  "0.0.4": {
+    "en": "Improved capability detection for older cars. Added Remaining Fuel capability."
   }
 }
