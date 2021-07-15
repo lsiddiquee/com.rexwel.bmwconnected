@@ -11,15 +11,13 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
     }
 
     let app = (homey.app as BMWConnectedDrive);
-    if (app.connectedDriveApi) {
-        app.connectedDriveApi = undefined;
-    }
-    app.connectedDriveApi = new ConnectedDrive(body.username, body.password, Regions.RestOfWorld, app.tokenStore);
+    const api = new ConnectedDrive(body.username, body.password, Regions.RestOfWorld, app.tokenStore);
+
     try {
-        await app.connectedDriveApi.account.getToken();
+        await api.account.getToken();
+        app.connectedDriveApi = api;
     }
     catch (err) {
-        app.connectedDriveApi = undefined;
         homey.app.log(err);
         return false;
     }
