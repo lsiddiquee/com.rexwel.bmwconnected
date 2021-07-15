@@ -53,6 +53,7 @@ class ConnectedDriveDriver extends Driver {
             this.log(`HasAlarmSystem: ${vehicle.hasAlarmSystem}`);
           }
         } else {
+          capabilities.push("only_lock_unlock_flow_capability");
           this.log(`doorLockState: ${vehicleStatus.doorLockState}`);
         }
 

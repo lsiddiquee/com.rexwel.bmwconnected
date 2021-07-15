@@ -1,0 +1,9 @@
+{
+  "type": "boolean",
+  "title": {
+    "en": "only_lock_unlock_flow_capability"
+  },
+  "getable": false,
+  "setable": false,
+  "uiComponent": null
+}
