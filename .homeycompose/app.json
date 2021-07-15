@@ -1,6 +1,6 @@
 {
   "id": "com.rexwel.bmwconnected",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -24,9 +24,13 @@
     "email": "likhan.siddiquee@gmail.com"
   },
   "api": {
-    "validateCredentials": {
+    "saveSettings": {
       "method": "POST",
-      "path": "/"
+      "path": "/saveSettings"
+    },
+    "getLogs": {
+      "method": "GET",
+      "path": "/getLogs"
     }
   },
   "bugs": {

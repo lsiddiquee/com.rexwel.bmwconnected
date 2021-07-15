@@ -4,33 +4,108 @@
 <head>
   <!-- The '/homey.js' script must be included in your settings view to work -->
   <script type="text/javascript" src="/homey.js" data-origin="settings"></script>
+  <style>
+    .tab {
+      overflow: hidden;
+      border: 1px solid #ccc;
+      background-color: #f1f1f1;
+    }
+
+    /* Style the buttons that are used to open the tab content */
+    .tab button {
+      background-color: inherit;
+      float: left;
+      border: none;
+      outline: none;
+      cursor: pointer;
+      padding: 14px 16px;
+      transition: 0.3s;
+    }
+
+    /* Change background color of buttons on hover */
+    .tab button:hover {
+      background-color: #ddd;
+    }
+
+    /* Create an active/current tablink class */
+    .tab button.active {
+      background-color: #ccc;
+    }
+
+    /* Style the tab content */
+    .tabcontent {
+      display: none;
+      padding: 6px 12px;
+      border: 1px solid #ccc;
+      border-top: none;
+    }
+  </style>
 </head>
 
 <body>
-  <h1 data-i18n="settings.title">
-    <!-- This will be filled with the translated string with key 'settings.title'. -->
-  </h1>
-  <p data-i18n="settings.subtitle">
-    <!-- This field will also be translated -->
-  </p>
+  <div class="tab">
+    <button class="tablinks" onclick="openTab(event, 'settings')" data-i18n="settings.title" id="defaultOpen">
+      <!-- Translated -->
+    </button>
+    <button class="tablinks" onclick="openTab(event, 'logs')" data-i18n="settings.logs">
+      <!-- Translated -->
+    </button>
+  </div>
+  <div id="settings" class="tabcontent">
 
-  <fieldset>
-    <legend>BMW ConnectedDrive Settings</legend>
+    <fieldset>
+      <legend data-i18n="settings.loginLabel">
+        <!-- Translated -->
+      </legend>
 
-    <div class="field row">
-      <label for="username">Username</label>
-      <input id="username" type="text" value="" />
-    </div>
-    <div class="field row">
-      <label for="password">Password</label>
-      <input id="password" type="password" value="" />
-    </div>
-  </fieldset>
+      <div class="field row">
+        <label for="username" data-i18n="settings.username"></label>
+        <input id="username" type="text" value="" />
+      </div>
+      <div class="field row">
+        <label for="password" data-i18n="settings.password"></label>
+        <input id="password" type="password" value="" />
+      </div>
+    </fieldset>
 
-  <p id="error" style="color: red;"></p>
-  <p id="success" style="color: #5fd225;"></p>
+    <fieldset>
+      <legend data-i18n="settings.logLabel">
+        <!-- Translated -->
+      </legend>
 
-  <button id="save" class="right">Save changes</button>
+      <div class="field row">
+        <label for="logEnabled" data-i18n="settings.enabled"></label>
+        <input id="logEnabled" type="checkbox" />
+      </div>
+
+      <div class="field row">
+        <label for="logLevel" data-i18n="settings.logLevel"></label>
+        <select name="logLevel" id="logLevel">
+          <option value="0">Trace</option>
+          <option value="1">Debug</option>
+          <option value="2">Information</option>
+          <option value="3">Warning</option>
+          <option value="4">Error</option>
+          <option value="5">Critical</option>
+        </select>
+      </div>
+
+      <div class="field row" style="display: none;">
+        <label for="logRequestCount" data-i18n="settings.logRequestCount"></label>
+        <input id="logRequestCount" type="number" min="5" max="50" />
+      </div>
+    </fieldset>
+
+    <p id="error" style="color: red;"></p>
+    <p id="success" style="color: #5fd225;"></p>
+
+    <button id="save" class="right">Save changes</button>
+  </div>
+  <div id="logs" class="tabcontent">
+    <p id="logMessages"></p>
+    <!-- 
+    <button id="refreshLogs" class="right">Refresh Logs</button> -->
+  </div>
 
   <script type="text/javascript">
     // a method named 'onHomeyReady' must be present in your code
@@ -39,18 +114,22 @@
       var passwordElement = document.getElementById("password");
       var errorElement = document.getElementById("error");
       var successElement = document.getElementById("success");
+      var logEnabledElement = document.getElementById("logEnabled");
+      var logRequestCountElement = document.getElementById("logRequestCount");
+      var logMessagesElement = document.getElementById("logMessages");
+      var logLevelElement = document.getElementById("logLevel");
 
       var initializeSettings = function (err, data) {
         if (err || !data) {
           errorElement.innerHTML = 'Loading settings failed, please load page again, or check app\'s running status';
-          successElement.innerHTML = '';
           return;
         }
 
-        errorElement.innerHTML = '';
-        successElement.innerHTML = '';
         usernameElement.value = data.username;
         passwordElement.value = data.password;
+        logEnabledElement.checked = data.logEnabled;
+        logLevel.value = data.logLevel;
+        logRequestCountElement.value = data.logRequestCount;
       }
 
       Homey.get('com.rexwel.bmwconnected', initializeSettings);
@@ -59,18 +138,51 @@
           Homey.get('com.rexwel.bmwconnected', initializeSettings);
         }
       });
-      // Tell Homey we're ready to be displayed
-      Homey.ready();
 
       var saveElement = document.getElementById("save");
-
       saveElement.addEventListener("click", function (e) {
-        Homey.api("POST", "/", { username: usernameElement.value, password: passwordElement.value }, function (err, result) {
+        successElement.innerHTML = '';
+        errorElement.innerHTML = '';
+        Homey.api("POST", "/saveSettings", { username: usernameElement.value, password: passwordElement.value, logEnabled: logEnabledElement.checked, logLevel: (parseInt(logLevelElement.value) ?? 3)}, function (err, result) {
           if (err) return Homey.alert(err);
-          successElement.innerHTML = "Login Successful";
-        })
+          if (result === true) {
+            successElement.innerHTML = 'Login Successful. Settings saved.';
+          } else {
+            errorElement.innerHTML = 'Login Failed';
+          }
+        });
       });
+
+      Homey.api("GET", "/getLogs", {}, function (err, result) {
+        if (err) return Homey.alert(err);
+        logMessagesElement.innerHTML = result.join('<br/><hr style="border-top: 3px dashed #bbb;">');
+      });
+
+      // Tell Homey we're ready to be displayed
+      Homey.ready();
     }
+
+    function openTab(evt, tabName) {
+      // Declare all variables
+      var i, tabcontent, tablinks;
+
+      // Get all elements with class="tabcontent" and hide them
+      tabcontent = document.getElementsByClassName("tabcontent");
+      for (i = 0; i < tabcontent.length; i++) {
+        tabcontent[i].style.display = "none";
+      }
+
+      // Get all elements with class="tablinks" and remove the class "active"
+      tablinks = document.getElementsByClassName("tablinks");
+      for (i = 0; i < tablinks.length; i++) {
+        tablinks[i].className = tablinks[i].className.replace(" active", "");
+      }
+
+      // Show the current tab, and add an "active" class to the button that opened the tab
+      document.getElementById(tabName).style.display = "block";
+      evt.currentTarget.className += " active";
+    }
+    document.getElementById("defaultOpen").click();
   </script>
 </body>
 

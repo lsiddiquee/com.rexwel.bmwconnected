@@ -4,26 +4,34 @@ import { Configuration } from "./configuration/Configuration";
 import { ConfigurationManager } from "./configuration/ConfigurationManager";
 import { ConnectedDrive, Regions } from "bmw-connected-drive";
 
-export async function validateCredentials({ homey, body }: { homey: Homey, body: Configuration }) : Promise<boolean> {
+export async function saveSettings({ homey, body }: { homey: Homey, body: Configuration }): Promise<boolean> {
 
-    // TODO: Validate body
-    ConfigurationManager.setConfiguration(homey, body);
+    if (!body.username || !body.password) {
+        throw new Error("Username and password cannot be empty.");
+    }
 
     let app = (homey.app as BMWConnectedDrive);
     if (app.connectedDriveApi) {
         app.connectedDriveApi = undefined;
     }
     app.connectedDriveApi = new ConnectedDrive(body.username, body.password, Regions.RestOfWorld, app.tokenStore);
-    try
-    {
+    try {
         await app.connectedDriveApi.account.getToken();
     }
-    catch (err)
-    {
+    catch (err) {
         app.connectedDriveApi = undefined;
         homey.app.log(err);
         return false;
     }
+    ConfigurationManager.setConfiguration(homey, body);
+
     homey.app.log("Login successfull");
     return true;
+}
+
+export async function getLogs({ homey }: { homey: Homey }): Promise<string[]> {
+
+    let app = (homey.app as BMWConnectedDrive);
+
+    return app.logger?.logs ?? [];
 }

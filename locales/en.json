@@ -1,6 +1,13 @@
 {
   "settings": {
-    "title": "My Settings Page",
-    "subtitle": "Please log in"
+    "title": "Settings",
+    "loginLabel": "Login",
+    "username": "Username",
+    "password": "Password",
+    "logLabel": "Log",
+    "enabled": "Enabled",
+    "logLevel": "Log Level",
+    "logRequestCount": "Number of requests to log (most recent)",
+    "logs": "Logs"
   }
 }

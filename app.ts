@@ -2,10 +2,12 @@ import sourceMapSupport from 'source-map-support';
 sourceMapSupport.install();
 
 import Homey from 'homey';
-import { ConnectedDrive, Regions } from 'bmw-connected-drive';
+import { ConnectedDrive, ILogger, Regions } from 'bmw-connected-drive';
 import { HomeyTokenStore } from './configuration/HomeyTokenStore';
 import { ConfigurationManager } from './configuration/ConfigurationManager';
 import { DeviceData } from './configuration/DeviceData';
+import { Configuration } from './configuration/Configuration';
+import { Logger } from './logging/Logger';
 
 // TODO:
 // Location capability
@@ -19,15 +21,17 @@ import { DeviceData } from './configuration/DeviceData';
 export class BMWConnectedDrive extends Homey.App {
   tokenStore?: HomeyTokenStore;
   connectedDriveApi?: ConnectedDrive;
+  logger?: Logger;
 
   /**
    * onInit is called when the app is initialized.
    */
   async onInit(): Promise<void> {
-    let configuration = ConfigurationManager.getConfiguration(this.homey);
+    const configuration = ConfigurationManager.getConfiguration(this.homey);
     if (configuration && configuration.username && configuration.password) {
       this.tokenStore = new HomeyTokenStore(this.homey);
-      this.connectedDriveApi = new ConnectedDrive(configuration.username, configuration.password, Regions.RestOfWorld, this.tokenStore);
+      this.logger = new Logger(this.homey);
+      this.connectedDriveApi = new ConnectedDrive(configuration.username, configuration.password, Regions.RestOfWorld, this.tokenStore, this.logger);
     }
     this.log('BMWConnectedDrive app has been initialized');
 
