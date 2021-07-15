@@ -1,6 +1,6 @@
 import { LoggerBase, LogLevel } from "bmw-connected-drive";
 import { Homey } from "homey";
-import { ConfigurationManager } from "../configuration/ConfigurationManager";
+import { ConfigurationManager } from "./ConfigurationManager";
 
 export class Logger extends LoggerBase {
     homey: Homey;
@@ -19,7 +19,7 @@ export class Logger extends LoggerBase {
         this.homey.log(logMessage);
         if (configuration.logEnabled) {
             this.logs[this.logCount] = logMessage;
-            this.logCount = (this.logCount + 1) % (ConfigurationManager.getConfiguration(this.homey).logRequestCount ?? 10);
+            this.logCount = (this.logCount + 1) % (configuration.logRequestCount ?? 10);
         }
     }
 }

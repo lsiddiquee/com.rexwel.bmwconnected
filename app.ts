@@ -3,11 +3,10 @@ sourceMapSupport.install();
 
 import Homey from 'homey';
 import { ConnectedDrive, ILogger, Regions } from 'bmw-connected-drive';
-import { HomeyTokenStore } from './configuration/HomeyTokenStore';
-import { ConfigurationManager } from './configuration/ConfigurationManager';
-import { DeviceData } from './configuration/DeviceData';
-import { Configuration } from './configuration/Configuration';
-import { Logger } from './logging/Logger';
+import { HomeyTokenStore } from './utils/HomeyTokenStore';
+import { ConfigurationManager } from './utils/ConfigurationManager';
+import { DeviceData } from './utils/DeviceData';
+import { Logger } from './utils/Logger';
 
 // TODO:
 // Location capability

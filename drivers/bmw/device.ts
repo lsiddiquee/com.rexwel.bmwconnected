@@ -1,6 +1,6 @@
 import { Device } from 'homey';
 import { BMWConnectedDrive } from '../../app';
-import { DeviceData } from '../../configuration/DeviceData';
+import { DeviceData } from '../../utils/DeviceData';
 import { ConnectedDrive } from 'bmw-connected-drive';
 
 class Vehicle extends Device {

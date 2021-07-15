@@ -1,7 +1,7 @@
 import { Homey } from "homey";
 import { BMWConnectedDrive } from "./app";
-import { Configuration } from "./configuration/Configuration";
-import { ConfigurationManager } from "./configuration/ConfigurationManager";
+import { Configuration } from "./utils/Configuration";
+import { ConfigurationManager } from "./utils/ConfigurationManager";
 import { ConnectedDrive, Regions } from "bmw-connected-drive";
 
 export async function saveSettings({ homey, body }: { homey: Homey, body: Configuration }): Promise<boolean> {
