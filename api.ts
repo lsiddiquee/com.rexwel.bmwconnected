@@ -1,7 +1,7 @@
 import { Homey } from "homey";
 import { BMWConnectedDrive } from "./app";
-import { Configuration } from "./configuration/Configuration";
-import { ConfigurationManager } from "./configuration/ConfigurationManager";
+import { Configuration } from "./utils/Configuration";
+import { ConfigurationManager } from "./utils/ConfigurationManager";
 import { ConnectedDrive, Regions } from "bmw-connected-drive";
 
 export async function saveSettings({ homey, body }: { homey: Homey, body: Configuration }): Promise<boolean> {
@@ -11,15 +11,13 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
     }
 
     let app = (homey.app as BMWConnectedDrive);
-    if (app.connectedDriveApi) {
-        app.connectedDriveApi = undefined;
-    }
-    app.connectedDriveApi = new ConnectedDrive(body.username, body.password, Regions.RestOfWorld, app.tokenStore);
+    const api = new ConnectedDrive(body.username, body.password, Regions.RestOfWorld, app.tokenStore);
+
     try {
-        await app.connectedDriveApi.account.getToken();
+        await api.account.getToken();
+        app.connectedDriveApi = api;
     }
     catch (err) {
-        app.connectedDriveApi = undefined;
         homey.app.log(err);
         return false;
     }

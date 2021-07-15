@@ -8,7 +8,7 @@
   "0.0.5": {
     "en": "Improved capability detection for older cars. Added Remaining Fuel capability."
   },
-  "0.0.6": {
-    "en": "Added logging"
+  "0.0.7": {
+    "en": "Added lock unlock flow for older cars. Added logging."
   }
 }

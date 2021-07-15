@@ -8,6 +8,20 @@
       "$filter": "capabilities=climate_now_capability"
     },
     {
+      "id": "lock_vehicle",
+      "title": {
+        "en": "Lock"
+      },
+      "$filter": "capabilities=only_lock_unlock_flow_capability"
+    },
+    {
+      "id": "unlock_vehicle",
+      "title": {
+        "en": "Unlock"
+      },
+      "$filter": "capabilities=only_lock_unlock_flow_capability"
+    },
+    {
       "id": "blow_horn",
       "title": {
         "en": "Blow Horn"
