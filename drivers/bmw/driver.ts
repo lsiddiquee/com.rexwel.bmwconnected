@@ -57,6 +57,12 @@ class ConnectedDriveDriver extends Driver {
           this.log(`doorLockState: ${vehicleStatus.doorLockState}`);
         }
 
+        if (vehicleStatus.gpsLat > 0 && vehicleStatus.gpsLng > 0) {
+          capabilities.push("location_capability");
+        } else {
+          this.log(`gpsLat: ${vehicleStatus.gpsLat}, gpsLng: ${vehicleStatus.gpsLng}`);
+        }
+
         if (vehicleStatus.remainingRange > 0) {
           capabilities.push("range_capability");
         } else {

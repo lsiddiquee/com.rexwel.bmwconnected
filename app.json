@@ -70,6 +70,45 @@
             "filter": "driver_id=bmw&capabilities=charging_status_capability"
           }
         ]
+      },
+      {
+        "id": "location_changed",
+        "title": {
+          "en": "Location Changed"
+        },
+        "tokens": [
+          {
+            "name": "latitude",
+            "type": "number",
+            "title": {
+              "en": "Latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "longitude",
+            "type": "number",
+            "title": {
+              "en": "Longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "address",
+            "type": "string",
+            "title": {
+              "en": "Address"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw&capabilities=location_capability"
+          }
+        ]
       }
     ],
     "actions": [
@@ -264,6 +303,15 @@
       "setable": true,
       "uiComponent": "toggle",
       "icon": "/assets/airco.svg"
+    },
+    "location_capability": {
+      "type": "string",
+      "title": {
+        "en": "location_capability"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": null
     },
     "mileage_capability": {
       "type": "number",

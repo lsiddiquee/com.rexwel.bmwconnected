@@ -15,7 +15,7 @@ export class Logger extends LoggerBase {
     Log(level: LogLevel, message: string): void {
         const configuration = ConfigurationManager.getConfiguration(this.homey);
         if (level < configuration.logLevel) return;
-        const logMessage = `${LogLevel[level]}: ${message}`;
+        const logMessage = `[${new Date().toISOString()}] ${LogLevel[level]}: ${message}`;
         this.homey.log(logMessage);
         if (configuration.logEnabled) {
             this.logs[this.logCount] = logMessage;
