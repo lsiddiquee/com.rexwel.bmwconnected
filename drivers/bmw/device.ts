@@ -1,29 +1,36 @@
 import { Device } from 'homey';
 import { BMWConnectedDrive } from '../../app';
 import { DeviceData } from '../../utils/DeviceData';
-import { ConnectedDrive } from 'bmw-connected-drive';
+import { ConnectedDrive, VehicleStatus } from 'bmw-connected-drive';
 import { GeoLocation } from '../../utils/GeoLocation';
-// import { Logger } from '../../utils/Logger';
+import { Settings } from '../../utils/Settings';
+import { ConfigurationManager } from '../../utils/ConfigurationManager';
+import { Logger } from '../../utils/Logger';
+import { nameof } from '../../utils/Utils';
+import { LocationTrigger } from '../../utils/LocationTrigger';
 
-type location = { gpsLat: number, gpsLong: number, address: string };
+type location = { latitude: number, longitude: number, address?: string };
 class Vehicle extends Device {
 
-  // logger?: Logger;
-  api?: ConnectedDrive;
+  logger?: Logger;
+  app!: BMWConnectedDrive;
   deviceData!: DeviceData;
   deviceStatusPoller!: NodeJS.Timeout;
-  deviceStatusPollingInterval!: number;
+  settings: Settings = new Settings();
   currentLocation?: location;
+
+  get api(): ConnectedDrive | undefined {
+    return this.app.connectedDriveApi;
+  }
 
   /**
    * onInit is called when the device is initialized.
    */
   async onInit() {
-    const app = this.homey.app as BMWConnectedDrive;
-    // this.logger = app.logger;
-    this.api = app.connectedDriveApi;
+    this.app = this.homey.app as BMWConnectedDrive;
+    this.logger = this.app.logger;
     this.deviceData = this.getData() as DeviceData;
-    this.deviceStatusPollingInterval = (this.getSetting("pollingInterval") as number) * 1000;
+    this.settings = this.getSettings() as Settings;
 
     // register a capability listener
     if (this.hasCapability("locked")) {
@@ -37,17 +44,19 @@ class Vehicle extends Device {
       if (coordinate) {
         const splitString = coordinate.split(":");
         if (splitString.length === 2) {
-          this.currentLocation = { gpsLat: parseFloat(splitString[0]) ?? 0, gpsLong: parseFloat(splitString[1]) ?? 0, address: "" }; // TODO: Update address during init.
-          this.currentLocation.address = await GeoLocation.GetAddress(this.currentLocation.gpsLat, this.currentLocation.gpsLong);
-          this.log(`Initialized location to '${this.currentLocation.address}' (${this.currentLocation.gpsLat}:${this.currentLocation.gpsLong})`);
+          this.currentLocation = { latitude: parseFloat(splitString[0]) ?? 0, longitude: parseFloat(splitString[1]) ?? 0, address: "" }; // TODO: Update address during init.
+          const apiKey = ConfigurationManager.getConfiguration(this.homey).hereApiKey;
+          if (apiKey) {
+            this.currentLocation.address = await GeoLocation.GetAddress(apiKey, this.currentLocation.latitude, this.currentLocation.longitude, this.app.logger);
+          }
         }
       }
     }
 
     await this.updateState();
-    this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.deviceStatusPollingInterval);
+    this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
 
-    this.log(`${this.getName()} (${this.deviceData.id}) has been initialized`);
+    this.logger?.LogInformation(`${this.getName()} (${this.deviceData.id}) has been initialized`);
   }
 
   // this method is called when the Device has requested a state change (turned on or off)
@@ -81,16 +90,6 @@ class Vehicle extends Device {
     }
   }
 
-  async onLocationChanged(newLocation: location) {
-    this.log(`Location updated old: ${JSON.stringify(this.currentLocation)}.`);
-    this.log(`Location updated new: ${JSON.stringify(newLocation)}.`);
-    this.currentLocation = newLocation;
-    this.currentLocation.address = await GeoLocation.GetAddress(this.currentLocation.gpsLat, this.currentLocation.gpsLong);
-    const locationChangedFlowCard: any = this.homey.flow.getDeviceTriggerCard("location_changed");
-    locationChangedFlowCard.trigger(this, { latitude: this.currentLocation.gpsLat, longitude: this.currentLocation.gpsLong, address: this.currentLocation.address }, {});
-    return Promise.resolve;
-  }
-
   /**
    * onAdded is called when the user adds the device, called just after pairing.
    */
@@ -106,13 +105,14 @@ class Vehicle extends Device {
    * @param {string[]} event.changedKeys An array of keys changed since the previous version
    * @returns {Promise<string|void>} return a custom message that will be displayed
    */
-  async onSettings({ oldSettings, newSettings, changedKeys }: { oldSettings: any, newSettings: any, changedKeys: string[] }): Promise<string | void> {
-    this.log('Vehicle settings was changed');
-    if (changedKeys.includes("pollingInterval")) {
-      clearInterval(this.deviceStatusPoller);
-      this.deviceStatusPollingInterval = (newSettings.pollingInterval as number) * 1000;
-      this.log(`setting polling interval to ${this.deviceStatusPollingInterval} milliseconds`);
-      this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.deviceStatusPollingInterval);
+  async onSettings({ newSettings, changedKeys }: { newSettings: any, changedKeys: string[] }): Promise<string | void> {
+    this.settings = newSettings;
+    if (changedKeys.includes(nameof<Settings>("pollingInterval"))) {
+      if (this.deviceStatusPoller) {
+        clearInterval(this.deviceStatusPoller);
+      }
+      this.app.logger?.LogInformation(`setting polling interval to ${this.settings.pollingInterval} seconds`);
+      this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
     }
   }
 
@@ -130,10 +130,32 @@ class Vehicle extends Device {
    */
   async onDeleted() {
     this.log('Vehicle has been deleted');
-    this.api = undefined;
     if (this.deviceStatusPoller) {
       clearInterval(this.deviceStatusPoller);
     }
+  }
+
+  async updateLocation(vehicle: VehicleStatus) {
+    if (vehicle.gpsLat && vehicle.gpsLng) {
+      if (!this.hasCapability("location_capability")) {
+        await this.addCapability("location_capability");
+      }
+      if (this.currentLocation?.latitude !== vehicle.gpsLat || this.currentLocation?.longitude !== vehicle.gpsLng) {
+        this.onLocationChanged({ latitude: vehicle.gpsLat, longitude: vehicle.gpsLng });
+      }
+    }
+  }
+
+  async onLocationChanged(newLocation: location) {
+    this.currentLocation = newLocation;
+    this.setCapabilityValue("location_capability", `${this.currentLocation.latitude}:${this.currentLocation.longitude}`);
+    const apiKey = ConfigurationManager.getConfiguration(this.homey).hereApiKey;
+    if (apiKey) {
+      this.currentLocation.address = await GeoLocation.GetAddress(apiKey, this.currentLocation.latitude, this.currentLocation.longitude, this.app.logger);
+    }
+    const locationChangedFlowCard: any = this.homey.flow.getDeviceTriggerCard("location_changed");
+    locationChangedFlowCard.trigger(this, { latitude: this.currentLocation.latitude, longitude: this.currentLocation.longitude, address: this.currentLocation.address }, {});
+    return Promise.resolve;
   }
 
   async updateState() {
@@ -142,12 +164,16 @@ class Vehicle extends Device {
       if (this.api) {
         const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
         if (this.hasCapability("locked")) {
-          this.setCapabilityValue("locked", vehicle.doorLockState === "SECURED" || vehicle.doorLockState === "LOCKED");
+          const locked = vehicle.doorLockState === "SECURED" || vehicle.doorLockState === "LOCKED";
+          this.setCapabilityValue("locked", locked);
+          if (locked && this.settings.updateLocationTrigger === LocationTrigger.Locked) {
+            this.updateLocation(vehicle);
+          }
         }
         if (this.hasCapability("mileage_capability")) {
           this.setCapabilityValue("mileage_capability", vehicle.mileage);
         }
-        if (vehicle.remainingFuel > 0) {
+        if (vehicle.remainingFuel) {
           if (!this.hasCapability("remanining_fuel_liters_capability")) {
             await this.addCapability("remanining_fuel_liters_capability");
           }
@@ -159,14 +185,8 @@ class Vehicle extends Device {
         if (this.hasCapability("alarm_generic")) {
           this.setCapabilityValue("alarm_generic", vehicle.doorLockState !== "SECURED");
         }
-        if (vehicle.gpsLat > 0 && vehicle.gpsLng > 0) {
-          if (!this.hasCapability("location_capability")) {
-            await this.addCapability("location_capability");
-          }
-          if (this.currentLocation?.gpsLat !== vehicle.gpsLat || this.currentLocation?.gpsLong !== vehicle.gpsLng) {
-            this.setCapabilityValue("location_capability", `${vehicle.gpsLat}:${vehicle.gpsLng}`);
-            this.onLocationChanged({ gpsLat: vehicle.gpsLat, gpsLong: vehicle.gpsLng, address: "" });
-          }
+        if (this.settings.updateLocationTrigger === LocationTrigger.Polling) {
+          this.updateLocation(vehicle);
         }
         if (this.hasCapability("measure_battery")) {
           this.setCapabilityValue("measure_battery", vehicle.chargingLevelHv);

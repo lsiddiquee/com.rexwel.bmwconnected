@@ -12,6 +12,7 @@ export class ConfigurationManager {
         return this.configurationCache;
     }
     static setConfiguration(homey: Homey, value: Configuration) {
+        value.token = this.configurationCache?.token;
         this.configurationCache = value;
         homey.settings.set(ConfigurationManager._settingsKey, value);
     }

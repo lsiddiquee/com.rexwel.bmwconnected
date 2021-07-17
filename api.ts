@@ -18,12 +18,12 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
         app.connectedDriveApi = api;
     }
     catch (err) {
-        homey.app.log(err);
+        app.logger?.LogError(err);
         return false;
     }
     ConfigurationManager.setConfiguration(homey, body);
 
-    homey.app.log("Login successfull");
+    app.logger?.LogInformation("Login successfull");
     return true;
 }
 

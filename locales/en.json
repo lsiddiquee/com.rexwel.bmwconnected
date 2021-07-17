@@ -4,6 +4,8 @@
     "loginLabel": "Login",
     "username": "Username",
     "password": "Password",
+    "geocodingLabel": "Geocoding",
+    "hereApiKey": "Here Api Key",
     "logLabel": "Log",
     "enabled": "Enabled",
     "logLevel": "Log Level",

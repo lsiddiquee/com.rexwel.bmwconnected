@@ -279,6 +279,31 @@
           "hint": {
             "en": "The interval at which the app polls to update the state of the vehicle."
           }
+        },
+        {
+          "id": "updateLocationTrigger",
+          "type": "dropdown",
+          "label": {
+            "en": "Update location when"
+          },
+          "value": "locked",
+          "values": [
+            {
+              "id": "locked",
+              "label": {
+                "en": "Locked"
+              }
+            },
+            {
+              "id": "polling",
+              "label": {
+                "en": "Polling"
+              }
+            }
+          ],
+          "hint": {
+            "en": "The time when the vehicle location will be updated. Keep in mind that this will also trigger the flow and reverse geocoding if configured."
+          }
         }
       ]
     }

@@ -69,6 +69,21 @@
     </fieldset>
 
     <fieldset>
+      <legend data-i18n="settings.geocodingLabel">
+        <!-- Translated -->
+      </legend>
+
+      <div class="field row">
+        <label for="hereApiKey" data-i18n="settings.hereApiKey"></label>
+        <input id="hereApiKey" type="text" value="" />
+        <p>
+          Navigate to <a href="https://developer.here.com/">https://developer.here.com/</a> and generate a REST API and
+          an API keys and set that here.
+        </p>
+      </div>
+    </fieldset>
+
+    <fieldset>
       <legend data-i18n="settings.logLabel">
         <!-- Translated -->
       </legend>
@@ -112,12 +127,13 @@
     function onHomeyReady(Homey) {
       var usernameElement = document.getElementById("username");
       var passwordElement = document.getElementById("password");
-      var errorElement = document.getElementById("error");
-      var successElement = document.getElementById("success");
+      var hereApiKeyElement = document.getElementById("hereApiKey");
       var logEnabledElement = document.getElementById("logEnabled");
       var logRequestCountElement = document.getElementById("logRequestCount");
       var logMessagesElement = document.getElementById("logMessages");
       var logLevelElement = document.getElementById("logLevel");
+      var errorElement = document.getElementById("error");
+      var successElement = document.getElementById("success");
 
       var initializeSettings = function (err, data) {
         if (err || !data) {
@@ -127,6 +143,7 @@
 
         usernameElement.value = data.username;
         passwordElement.value = data.password;
+        hereApiKeyElement.value = data.hereApiKey;
         logEnabledElement.checked = data.logEnabled;
         logLevel.value = data.logLevel;
         logRequestCountElement.value = data.logRequestCount;
@@ -143,7 +160,13 @@
       saveElement.addEventListener("click", function (e) {
         successElement.innerHTML = '';
         errorElement.innerHTML = '';
-        Homey.api("POST", "/saveSettings", { username: usernameElement.value, password: passwordElement.value, logEnabled: logEnabledElement.checked, logLevel: (parseInt(logLevelElement.value) ?? 3)}, function (err, result) {
+        Homey.api("POST", "/saveSettings", {
+          username: usernameElement.value,
+          password: passwordElement.value,
+          hereApiKey: hereApiKeyElement.value,
+          logEnabled: logEnabledElement.checked,
+          logLevel: (parseInt(logLevelElement.value) ?? 3)
+        }, function (err, result) {
           if (err) return Homey.alert(err);
           if (result === true) {
             successElement.innerHTML = 'Login Successful. Settings saved.';

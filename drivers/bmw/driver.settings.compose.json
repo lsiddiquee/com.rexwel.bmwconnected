@@ -1,11 +1,40 @@
 [
-    {
-      "id": "pollingInterval",
-      "type": "number",
-      "label": { "en": "Polling Interval (seconds)" },
-      "value": 60,
-      "min": 5,
-      "max": 3600,
-      "hint": { "en": "The interval at which the app polls to update the state of the vehicle." }
+  {
+    "id": "pollingInterval",
+    "type": "number",
+    "label": {
+      "en": "Polling Interval (seconds)"
+    },
+    "value": 60,
+    "min": 5,
+    "max": 3600,
+    "hint": {
+      "en": "The interval at which the app polls to update the state of the vehicle."
     }
-  ]
+  },
+  {
+    "id": "updateLocationTrigger",
+    "type": "dropdown",
+    "label": {
+      "en": "Update location when"
+    },
+    "value": "locked",
+    "values": [
+      {
+        "id": "locked",
+        "label": {
+          "en": "Locked"
+        }
+      },
+      {
+        "id": "polling",
+        "label": {
+          "en": "Polling"
+        }
+      }
+    ],
+    "hint": {
+      "en": "The time when the vehicle location will be updated. Keep in mind that this will also trigger the flow and reverse geocoding if configured."
+    }
+  }
+]

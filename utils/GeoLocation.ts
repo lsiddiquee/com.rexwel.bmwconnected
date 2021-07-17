@@ -1,10 +1,24 @@
-import { get } from "request-promise-native";
+import fetch from "cross-fetch";
+import { Logger } from "./Logger";
 
 export class GeoLocation {
-    static async GetAddress(gpsLat: number, gpsLng: number): Promise<string> {
+    static async GetAddress(apiKey: string, gpsLat: number, gpsLng: number, logger?: Logger): Promise<string | undefined> {
 
-        const response = await get(`https://revgeocode.search.hereapi.com/v1/revgeocode?apiKey=4ebe67LjKUJQwWCs44AAzui5pWPyFocePQAzQGvA6jk&at=${gpsLat},${gpsLng}`);
+        logger?.LogInformation(`Resolving address for Latitude: ${gpsLat} Longitude: ${gpsLng}`);
+        const tokenUrl: string = `https://revgeocode.search.hereapi.com/v1/revgeocode?apiKey=${apiKey}&at=${gpsLat},${gpsLng}`;
 
-        return JSON.parse(response)?.items[0]?.title ?? "";
+        const serverResponse = await fetch(tokenUrl);
+
+        const response = await serverResponse.text();
+
+        if (!serverResponse.ok) {
+            logger?.LogError(`${serverResponse.status}: Error occurred while attempting to retrieve token. Server response: ${response}`);
+            return undefined;
+        }
+
+        const address = JSON.parse(response).items[0]?.title;
+        logger?.LogInformation(`Resolved address: ${address}`);
+
+        return address;
     }
 }

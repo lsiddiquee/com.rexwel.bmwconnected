@@ -32,7 +32,7 @@ export class BMWConnectedDrive extends Homey.App {
     if (configuration && configuration.username && configuration.password) {
       this.connectedDriveApi = new ConnectedDrive(configuration.username, configuration.password, Regions.RestOfWorld, this.tokenStore, this.logger);
     }
-    this.log('BMWConnectedDrive app has been initialized');
+    this.logger.LogInformation('BMWConnectedDrive app has been initialized');
 
     this.registerActionCards();
   }
