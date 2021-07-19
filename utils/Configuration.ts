@@ -4,9 +4,9 @@ export class Configuration {
     username!: string;
     password!: string;
     geofences?: {
+        label: string,
         latitude: number,
         longitude: number,
-        radius: number,
         address: string
     }[];
     logEnabled: boolean = false;

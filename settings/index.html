@@ -74,22 +74,31 @@
       </legend>
 
       <div class="field row">
-        <p>Currently geofencing works by manually entering the latitude and longitude of a location, along with the
-          radius of the geofence in meters.</p>
+        <p>Currently geofencing works by manually entering the latitude and longitude of a location.</p>
       </div>
       <div class="field row">
+        <label for="locationLabel" data-i18n="settings.label">label</label>
+        <input id="locationLabel" type="text" value="" />
         <label for="latitude" data-i18n="settings.latitude">latitude</label>
         <input id="latitude" type="text" value="" />
         <label for="longitude" data-i18n="settings.longitude">longitude</label>
         <input id="longitude" type="text" value="" />
-        <label for="radius" data-i18n="settings.radius">radius</label>
-        <input id="radius" type="text" value="" />
         <button type="button" onclick="addGeofence()" data-i18n="settings.add">add</button>
       </div>
       <div class="field row">
-        <select id="geofences" name="geofences" size="6" multiple>
-        </select>
-        <button type="button" onclick="removeGeofence ()" data-i18n="settings.remove">remove</button>
+        <table id="geofences" name="geofences">
+          <thead>
+            <tr>
+              <th data-i18n="settings.label">label</th>
+              <th data-i18n="settings.latitude">latitude</th>
+              <th data-i18n="settings.longitude">longitude</th>
+              <th data-i18n="settings.address">address</th>
+              <th data-i18n="settings.remove">remove</th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
       </div>
     </fieldset>
 
@@ -159,11 +168,7 @@
 
         geofencesElement.length = 0;
         data.geofences.forEach(item => {
-          var option = document.createElement("option");
-          option.text = item.address;
-          option.value = item.latitude + ":" + item.longitude + ":" + item.radius;
-          var geofencesElement = document.getElementById("geofences");
-          geofencesElement.add(option);
+          addGeofenceEntry(item.label, item.latitude, item.longitude, item.address);
         });
       }
 
@@ -179,15 +184,14 @@
         successElement.innerHTML = '';
         errorElement.innerHTML = '';
 
-        var geofences = Array.from(geofencesElement.options).map(item => {
-          var splits = item.value.split(":");
+        var geofences = Array.from(document.getElementById("geofences").getElementsByTagName('tbody')[0].rows).map(item => {
           return {
-            latitude: parseFloat(splits[0]),
-            longitude: parseFloat(splits[1]),
-            radius: parseFloat(splits[2]),
-            address: item.text
+            label: item.cells[0].innerText,
+            latitude: parseFloat(item.cells[1].innerText),
+            longitude: parseFloat(item.cells[2].innerText),
+            address: item.cells[3].innerText
           }
-        });
+        }) ?? [];
 
         Homey.api("POST", "/saveSettings", {
           username: usernameElement.value,
@@ -237,35 +241,48 @@
     document.getElementById("defaultOpen").click();
 
     function addGeofence() {
+      var labelElement = document.getElementById("locationLabel");
       var latitudeElement = document.getElementById("latitude");
       var longitudeElement = document.getElementById("longitude");
-      var radiusElement = document.getElementById("radius");
       var latitude = parseFloat(latitudeElement.value);
       var longitude = parseFloat(longitudeElement.value);
-      var radius = parseInt(radiusElement.value);
 
-      if (isNaN(latitude) || isNaN(longitude) || isNaN(radius)) {
-        return Homey.alert("Latitude, longitude and radius should be numbers.")
+      if (isNaN(latitude) || isNaN(longitude)) {
+        return Homey.alert("Latitude and longitude should be numbers.")
       }
 
       Homey.api("GET", `/resolveAddress?latitude=${latitude}&longitude=${longitude}`, {}, function (err, result) {
         if (err) return Homey.alert(err);
-        var geofencesElement = document.getElementById("geofences");
-
-        if (Array.from(geofencesElement.options).filter(item => item.text === result)) {
-          return Homey.alert("This location is already added.")
-        }
-
-        var option = document.createElement("option");
-        option.text = result;
-        option.value = latitude + ":" + longitude + ":" + radius;
-        geofencesElement.add(option);
+        addGeofenceEntry(labelElement.value, latitude, longitude, result);
       });
     }
 
-    function removeGeofence() {
-      var geofencesElement = document.getElementById("geofences");
-      geofencesElement.remove(geofencesElement.selectedIndex);
+    function addGeofenceEntry(label, latitude, longitude, address) {
+      var rowId = latitude + "=" + longitude + "=" + address;
+      var geofencesElement = document.getElementById("geofences").getElementsByTagName('tbody')[0];
+
+      if (document.getElementById(rowId)) {
+        return alert("This location is already added.")
+      }
+      var newRow = geofencesElement.insertRow();
+      newRow.id = rowId;
+
+      var newCell = newRow.insertCell();
+      newCell.innerText = label;
+      newCell = newRow.insertCell();
+      newCell.innerText = latitude;
+      newCell = newRow.insertCell();
+      newCell.innerText = longitude;
+      newCell = newRow.insertCell();
+      newCell.innerText = address;
+      newCell = newRow.insertCell();
+      var button = document.createElement('button');
+      button.innerHTML = 'Remove';
+      button.onclick = function () {
+        geofencesElement.removeChild(newRow);
+        return false;
+      };
+      newCell.appendChild(button);
     }
   </script>
 </body>
