@@ -45,10 +45,7 @@ class Vehicle extends Device {
         const splitString = coordinate.split(":");
         if (splitString.length === 2) {
           this.currentLocation = { latitude: parseFloat(splitString[0]) ?? 0, longitude: parseFloat(splitString[1]) ?? 0, address: "" }; // TODO: Update address during init.
-          const apiKey = ConfigurationManager.getConfiguration(this.homey).hereApiKey;
-          if (apiKey) {
-            this.currentLocation.address = await GeoLocation.GetAddress(apiKey, this.currentLocation.latitude, this.currentLocation.longitude, this.app.logger);
-          }
+          this.currentLocation.address = await GeoLocation.GetAddress(this.currentLocation.latitude, this.currentLocation.longitude, this.app.logger);
         }
       }
     }
@@ -149,10 +146,7 @@ class Vehicle extends Device {
   async onLocationChanged(newLocation: location) {
     this.currentLocation = newLocation;
     this.setCapabilityValue("location_capability", `${this.currentLocation.latitude}:${this.currentLocation.longitude}`);
-    const apiKey = ConfigurationManager.getConfiguration(this.homey).hereApiKey;
-    if (apiKey) {
-      this.currentLocation.address = await GeoLocation.GetAddress(apiKey, this.currentLocation.latitude, this.currentLocation.longitude, this.app.logger);
-    }
+    this.currentLocation.address = await GeoLocation.GetAddress(this.currentLocation.latitude, this.currentLocation.longitude, this.app.logger);
     const locationChangedFlowCard: any = this.homey.flow.getDeviceTriggerCard("location_changed");
     locationChangedFlowCard.trigger(this, { latitude: this.currentLocation.latitude, longitude: this.currentLocation.longitude, address: this.currentLocation.address }, {});
     return Promise.resolve;

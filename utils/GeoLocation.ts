@@ -2,12 +2,14 @@ import fetch from "cross-fetch";
 import { Logger } from "./Logger";
 
 export class GeoLocation {
-    static async GetAddress(apiKey: string, gpsLat: number, gpsLng: number, logger?: Logger): Promise<string | undefined> {
+    static async GetAddress(gpsLat: number, gpsLng: number, logger?: Logger): Promise<string | undefined> {
 
         logger?.LogInformation(`Resolving address for Latitude: ${gpsLat} Longitude: ${gpsLng}`);
-        const tokenUrl: string = `https://revgeocode.search.hereapi.com/v1/revgeocode?apiKey=${apiKey}&at=${gpsLat},${gpsLng}`;
+        const url: string = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${gpsLat}&lon=${gpsLng}&zoom=18&addressdetails=0`;
 
-        const serverResponse = await fetch(tokenUrl);
+        const serverResponse = await fetch(url, { headers: {
+            "User-Agent": "HomeyAppBMWConnected"
+        }});
 
         const response = await serverResponse.text();
 
@@ -16,7 +18,7 @@ export class GeoLocation {
             return undefined;
         }
 
-        const address = JSON.parse(response).items[0]?.title;
+        const address = JSON.parse(response)?.display_name;
         logger?.LogInformation(`Resolved address: ${address}`);
 
         return address;

@@ -182,6 +182,9 @@
         "title": {
           "en": "Send Message"
         },
+        "titleFormatted": {
+          "en": "Send Message ([[subject]]) [[message]]"
+        },
         "args": [
           {
             "type": "device",

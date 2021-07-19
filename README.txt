@@ -2,3 +2,4 @@ Pre-condition your BMW in the morning based on the temperature outside. Send a r
 
 Disclaimer:
 - Use at your own risk. I accept no responsibility for any damages caused by using this app.
+- Reverse geo coding data is provided under ODbL and © OpenStreetMap contributors. Further details https://www.openstreetmap.org/copyright.
