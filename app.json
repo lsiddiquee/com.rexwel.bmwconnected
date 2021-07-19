@@ -32,6 +32,10 @@
     "getLogs": {
       "method": "GET",
       "path": "/getLogs"
+    },
+    "resolveAddress": {
+      "method": "GET",
+      "path": "/resolveAddress"
     }
   },
   "bugs": {
