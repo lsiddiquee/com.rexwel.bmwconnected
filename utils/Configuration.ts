@@ -1,14 +1,10 @@
 import { LogLevel, Token } from "bmw-connected-drive";
+import { LocationType } from "./LocationType";
 
 export class Configuration {
     username!: string;
     password!: string;
-    geofences?: {
-        label: string,
-        latitude: number,
-        longitude: number,
-        address: string
-    }[];
+    geofences?: LocationType[];
     logEnabled: boolean = false;
     logLevel: LogLevel = LogLevel.Warning;
     logRequestCount: number = 20;

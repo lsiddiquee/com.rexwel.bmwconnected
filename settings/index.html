@@ -83,20 +83,23 @@
         <input id="latitude" type="text" value="" />
         <label for="longitude" data-i18n="settings.longitude">longitude</label>
         <input id="longitude" type="text" value="" />
+        <label for="radius" data-i18n="settings.radius">radius</label>
+        <input id="radius" type="text" value="20" />
         <button type="button" onclick="addGeofence()" data-i18n="settings.add">add</button>
       </div>
       <div class="field row">
-        <table id="geofences" name="geofences">
+        <table>
           <thead>
             <tr>
               <th data-i18n="settings.label">label</th>
               <th data-i18n="settings.latitude">latitude</th>
               <th data-i18n="settings.longitude">longitude</th>
+              <th data-i18n="settings.radius">radius</th>
               <th data-i18n="settings.address">address</th>
               <th data-i18n="settings.remove">remove</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="geofences" name="geofences">
           </tbody>
         </table>
       </div>
@@ -166,9 +169,9 @@
         logLevel.value = data.logLevel;
         logRequestCountElement.value = data.logRequestCount;
 
-        geofencesElement.length = 0;
+        geofencesElement.innerHTML = "";
         data.geofences.forEach(item => {
-          addGeofenceEntry(item.label, item.latitude, item.longitude, item.address);
+          addGeofenceEntry(item.label, item.latitude, item.longitude, item.radius, item.address);
         });
       }
 
@@ -181,15 +184,16 @@
 
       var saveElement = document.getElementById("save");
       saveElement.addEventListener("click", function (e) {
-        successElement.innerHTML = '';
-        errorElement.innerHTML = '';
+        successElement.innerHTML = "";
+        errorElement.innerHTML = "";
 
-        var geofences = Array.from(document.getElementById("geofences").getElementsByTagName('tbody')[0].rows).map(item => {
+        var geofences = Array.from(document.getElementById("geofences").rows).map(item => {
           return {
             label: item.cells[0].innerText,
             latitude: parseFloat(item.cells[1].innerText),
             longitude: parseFloat(item.cells[2].innerText),
-            address: item.cells[3].innerText
+            radius: parseFloat(item.cells[3].innerText),
+            address: item.cells[4].innerText
           }
         }) ?? [];
 
@@ -244,26 +248,32 @@
       var labelElement = document.getElementById("locationLabel");
       var latitudeElement = document.getElementById("latitude");
       var longitudeElement = document.getElementById("longitude");
+      var radiusElement = document.getElementById("radius");
       var latitude = parseFloat(latitudeElement.value);
       var longitude = parseFloat(longitudeElement.value);
+      var radius = parseFloat(radiusElement.value);
 
-      if (isNaN(latitude) || isNaN(longitude)) {
-        return Homey.alert("Latitude and longitude should be numbers.")
+      if (isNaN(latitude) || isNaN(longitude) || isNaN(radius)) {
+        return Homey.alert("Latitude, longitude and radius should be numbers.")
       }
 
       Homey.api("GET", `/resolveAddress?latitude=${latitude}&longitude=${longitude}`, {}, function (err, result) {
         if (err) return Homey.alert(err);
-        addGeofenceEntry(labelElement.value, latitude, longitude, result);
+        addGeofenceEntry(labelElement.value, latitude, longitude, radius, result);
       });
     }
 
-    function addGeofenceEntry(label, latitude, longitude, address) {
+    function addGeofenceEntry(label, latitude, longitude, radius, address) {
       var rowId = latitude + "=" + longitude + "=" + address;
-      var geofencesElement = document.getElementById("geofences").getElementsByTagName('tbody')[0];
+      var geofencesElement = document.getElementById("geofences");
 
       if (document.getElementById(rowId)) {
-        return alert("This location is already added.")
+        return Homey.alert("This location is already added.")
       }
+      if (Array.from(geofencesElement.rows).find(row => row.cells[0].innerText === label)) {
+        return Homey.alert("This location label is already used.")
+      }
+
       var newRow = geofencesElement.insertRow();
       newRow.id = rowId;
 
@@ -274,6 +284,8 @@
       newCell = newRow.insertCell();
       newCell.innerText = longitude;
       newCell = newRow.insertCell();
+      newCell.innerText = radius;
+      newCell = newRow.insertCell();
       newCell.innerText = address;
       newCell = newRow.insertCell();
       var button = document.createElement('button');
@@ -283,6 +295,11 @@
         return false;
       };
       newCell.appendChild(button);
+
+      labelElement.value = "";
+      latitudeElement.value = "";
+      longitudeElement.value = "";
+      radiusElement.value = "20";
     }
   </script>
 </body>

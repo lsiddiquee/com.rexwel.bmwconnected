@@ -8,6 +8,7 @@
     "label": "Label",
     "latitude": "Latitude",
     "longitude": "Longitude",
+    "radius": "Radius",
     "address": "Address",
     "add": "Add",
     "remove": "Remove",

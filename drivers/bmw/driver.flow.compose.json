@@ -90,6 +90,14 @@
       },
       "tokens": [
         {
+          "name": "label",
+          "type": "string",
+          "title": {
+            "en": "Label"
+          },
+          "example": "Home"
+        },
+        {
           "name": "latitude",
           "type": "number",
           "title": {

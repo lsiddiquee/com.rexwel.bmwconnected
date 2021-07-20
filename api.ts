@@ -42,5 +42,5 @@ export async function resolveAddress({ homey, query }: { homey: Homey, query: an
     if (isNaN(latitude) || isNaN(longitude)) {
         throw new Error("Latitude and longitude must be valid numbers.");
     }
-    return await GeoLocation.GetAddress(query.latitude, query.longitude, app.logger);
+    return await GeoLocation.GetAddress({ Latitude: query.latitude, Longitude: query.longitude }, app.logger);
 }
