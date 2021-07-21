@@ -171,7 +171,7 @@
 
         geofencesElement.innerHTML = "";
         data.geofences.forEach(item => {
-          addGeofenceEntry(item.label, item.latitude, item.longitude, item.radius, item.address);
+          addGeofenceEntry(item.Label, item.Latitude, item.Longitude, item.Radius, item.Address);
         });
       }
 
@@ -189,11 +189,11 @@
 
         var geofences = Array.from(document.getElementById("geofences").rows).map(item => {
           return {
-            label: item.cells[0].innerText,
-            latitude: parseFloat(item.cells[1].innerText),
-            longitude: parseFloat(item.cells[2].innerText),
-            radius: parseFloat(item.cells[3].innerText),
-            address: item.cells[4].innerText
+            Label: item.cells[0].innerText,
+            Latitude: parseFloat(item.cells[1].innerText),
+            Longitude: parseFloat(item.cells[2].innerText),
+            Radius: parseFloat(item.cells[3].innerText),
+            Address: item.cells[4].innerText
           }
         }) ?? [];
 
@@ -260,6 +260,11 @@
       Homey.api("GET", `/resolveAddress?latitude=${latitude}&longitude=${longitude}`, {}, function (err, result) {
         if (err) return Homey.alert(err);
         addGeofenceEntry(labelElement.value, latitude, longitude, radius, result);
+
+        labelElement.value = "";
+        latitudeElement.value = "";
+        longitudeElement.value = "";
+        radiusElement.value = "20";
       });
     }
 
@@ -295,11 +300,6 @@
         return false;
       };
       newCell.appendChild(button);
-
-      labelElement.value = "";
-      latitudeElement.value = "";
-      longitudeElement.value = "";
-      radiusElement.value = "20";
     }
   </script>
 </body>

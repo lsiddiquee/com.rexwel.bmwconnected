@@ -82,7 +82,7 @@
         },
         "tokens": [
           {
-            "name": "label",
+            "name": "Label",
             "type": "string",
             "title": {
               "en": "Label"
@@ -90,7 +90,7 @@
             "example": "Home"
           },
           {
-            "name": "latitude",
+            "name": "Latitude",
             "type": "number",
             "title": {
               "en": "Latitude"
@@ -98,7 +98,7 @@
             "example": "52.10017398097361"
           },
           {
-            "name": "longitude",
+            "name": "Longitude",
             "type": "number",
             "title": {
               "en": "Longitude"
@@ -106,7 +106,7 @@
             "example": "5.044052884751771"
           },
           {
-            "name": "address",
+            "name": "Address",
             "type": "string",
             "title": {
               "en": "Address"
