@@ -6,7 +6,7 @@ Before adding a car you need to go to app settings and fill in your username and
 
 ## Triggers
 - Car location changed (this is only triggered when the car is locked, otherwise the update will be way too frequent.)
--- If the location is inside a configured geofence additional 'Label' argument is filled.
+  - If the location is inside a configured geofence additional 'Label' argument is filled.
 - Car alarm activated/deactivated.
 - Car locked/unlocked.
 - Battery level changed.
