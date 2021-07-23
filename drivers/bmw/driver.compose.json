@@ -3,6 +3,7 @@
     "en": "BMW"
   },
   "class": "other",
+  "connectivity": ["cloud"],
   "capabilities": [
     "alarm_generic",
     "locked",

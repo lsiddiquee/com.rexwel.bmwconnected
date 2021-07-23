@@ -1,11 +1,15 @@
 [
-    {
-      "id": "pollingInterval",
-      "type": "number",
-      "label": { "en": "Polling Interval (seconds)" },
-      "value": 60,
-      "min": 5,
-      "max": 3600,
-      "hint": { "en": "The interval at which the app polls to update the state of the vehicle." }
+  {
+    "id": "pollingInterval",
+    "type": "number",
+    "label": {
+      "en": "Polling Interval (seconds)"
+    },
+    "value": 60,
+    "min": 5,
+    "max": 3600,
+    "hint": {
+      "en": "The interval at which the app polls to update the state of the vehicle."
     }
-  ]
+  }
+]

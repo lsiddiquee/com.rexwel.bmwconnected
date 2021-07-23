@@ -18,6 +18,7 @@ class ConnectedDriveDriver extends Driver {
   async onPairListDevices() {
     const api = (this.homey.app as BMWConnectedDrive).connectedDriveApi;
 
+    // TOOD: Skip already added vehicles.
     if (api) {
       const vehicles = await api.getVehicles();
 
@@ -32,13 +33,13 @@ class ConnectedDriveDriver extends Driver {
 
         let capabilities: string[] = [];
 
-        if (vehicleStatus.mileage > 0) {
+        if (vehicleStatus.mileage) {
           capabilities.push("mileage_capability");
         } else {
           this.log(`mileage: ${vehicleStatus.mileage}`);
         }
 
-        if (vehicleStatus.remainingFuel > 0) {
+        if (vehicleStatus.remainingFuel) {
           capabilities.push("remanining_fuel_liters_capability");
         } else {
           this.log(`remanining_fuel_liters_capability: ${vehicleStatus.remainingFuel}`);
@@ -57,7 +58,13 @@ class ConnectedDriveDriver extends Driver {
           this.log(`doorLockState: ${vehicleStatus.doorLockState}`);
         }
 
-        if (vehicleStatus.remainingRange > 0) {
+        if (vehicleStatus.gpsLat && vehicleStatus.gpsLng) {
+          capabilities.push("location_capability");
+        } else {
+          this.log(`gpsLat: ${vehicleStatus.gpsLat}, gpsLng: ${vehicleStatus.gpsLng}`);
+        }
+
+        if (vehicleStatus.remainingRange) {
           capabilities.push("range_capability");
         } else {
           this.log(`remainingRange: ${vehicleStatus.remainingRange}`);

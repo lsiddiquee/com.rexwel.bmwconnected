@@ -9,8 +9,6 @@ import { DeviceData } from './utils/DeviceData';
 import { Logger } from './utils/Logger';
 
 // TODO:
-// Location capability
-// Trigger: Location based
 // Window states capability
 // Hood state capability
 // Trunk state capability
@@ -32,7 +30,7 @@ export class BMWConnectedDrive extends Homey.App {
     if (configuration && configuration.username && configuration.password) {
       this.connectedDriveApi = new ConnectedDrive(configuration.username, configuration.password, Regions.RestOfWorld, this.tokenStore, this.logger);
     }
-    this.log('BMWConnectedDrive app has been initialized');
+    this.logger.LogInformation('BMWConnectedDrive app has been initialized');
 
     this.registerActionCards();
   }
