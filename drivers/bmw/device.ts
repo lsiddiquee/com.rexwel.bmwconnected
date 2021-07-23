@@ -161,20 +161,9 @@ class Vehicle extends Device {
       this.logger?.LogInformation(`Polling BMW ConnectedDrive for vehicle status updates for ${this.getName()}.`);
       if (this.api) {
         const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
+
         if (this.hasCapability("locked")) {
           this.setCapabilityValue("locked", vehicle.doorLockState === "SECURED" || vehicle.doorLockState === "LOCKED");
-        }
-        if (this.hasCapability("mileage_capability")) {
-          this.setCapabilityValue("mileage_capability", vehicle.mileage);
-        }
-        if (vehicle.remainingFuel) {
-          if (!this.hasCapability("remanining_fuel_liters_capability")) {
-            await this.addCapability("remanining_fuel_liters_capability");
-          }
-          this.setCapabilityValue("remanining_fuel_liters_capability", vehicle.remainingFuel);
-        }
-        if (this.hasCapability("range_capability")) {
-          this.setCapabilityValue("range_capability", vehicle.remainingRange);
         }
         if (this.hasCapability("alarm_generic")) {
           this.setCapabilityValue("alarm_generic", vehicle.doorLockState !== "SECURED");
@@ -184,17 +173,20 @@ class Vehicle extends Device {
             await this.addCapability("location_capability");
           }
           if (this.currentLocation?.Latitude !== vehicle.gpsLat || this.currentLocation?.Longitude !== vehicle.gpsLng) {
-            this.onLocationChanged({ Latitude: vehicle.gpsLat, Longitude: vehicle.gpsLng });
+            this.onLocationChanged({ Label: "", Latitude: vehicle.gpsLat, Longitude: vehicle.gpsLng });
           }
         }
+        await this.UpdateCapabilityValue("mileage_capability", vehicle.mileage);
+        await this.UpdateCapabilityValue("remanining_fuel_liters_capability", vehicle.remainingFuel);
+        await this.UpdateCapabilityValue("range_capability", vehicle.remainingRange);
 
         if (this.hasCapability("measure_battery")) {
-          this.setCapabilityValue("measure_battery", vehicle.chargingLevelHv);
-          this.setCapabilityValue("measure_battery.actual", vehicle.socHvPercent);
-          this.setCapabilityValue("range_capability.battery", vehicle.beRemainingRangeElectric);
-          this.setCapabilityValue("range_capability.fuel", vehicle.beRemainingRangeFuel);
+          await this.UpdateCapabilityValue("measure_battery", vehicle.chargingLevelHv);
+          await this.UpdateCapabilityValue("measure_battery.actual", vehicle.socHvPercent);
+          await this.UpdateCapabilityValue("range_capability.battery", vehicle.beRemainingRangeElectric);
+          await this.UpdateCapabilityValue("range_capability.fuel", vehicle.beRemainingRangeFuel);
           const oldChargingStatus = this.getCapabilityValue("charging_status_capability");
-          this.setCapabilityValue("charging_status_capability", vehicle.chargingStatus);
+          await this.UpdateCapabilityValue("charging_status_capability", vehicle.chargingStatus);
           if (oldChargingStatus !== vehicle.chargingStatus) {
             const chargingStatusFlowCard: any = this.homey.flow.getDeviceTriggerCard("charging_status_change");
             chargingStatusFlowCard.trigger(this, { charging_status: vehicle.chargingStatus }, {});
@@ -203,6 +195,15 @@ class Vehicle extends Device {
       }
     } catch (error) {
       this.log("Error occurred while attempting to update device state.", error);
+    }
+  }
+
+  async UpdateCapabilityValue(name: string, value: any) {
+    if (value || value === 0 || value === false) {
+      if (!this.hasCapability(name)) {
+        await this.addCapability(name);
+      }
+      this.setCapabilityValue(name, value);
     }
   }
 }

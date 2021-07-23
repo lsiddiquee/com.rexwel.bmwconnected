@@ -9,8 +9,6 @@ import { DeviceData } from './utils/DeviceData';
 import { Logger } from './utils/Logger';
 
 // TODO:
-// Location capability
-// Trigger: Location based
 // Window states capability
 // Hood state capability
 // Trunk state capability
