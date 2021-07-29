@@ -9,9 +9,6 @@ export class ConfigurationManager {
         if (!this.configurationCache) {
             this.configurationCache = homey.settings.get(ConfigurationManager._settingsKey);
         }
-        if (!this.configurationCache.geofences) {
-            this.configurationCache.geofences = [];
-        }
         return this.configurationCache;
     }
     static setConfiguration(homey: Homey, value: Configuration) {

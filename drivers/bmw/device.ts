@@ -134,26 +134,23 @@ class Vehicle extends Device {
   async onLocationChanged(newLocation: LocationType) {
     this.logger?.LogInformation("Location changed.")
 
-    const locked: boolean = this.getCapabilityValue("locked");
-    if (locked === true) {
-      const configuration = ConfigurationManager.getConfiguration(this.homey);
-      if (configuration?.geofences) {
-        this.logger?.LogInformation("Checking geofences.")
-        // Checking if the position is inside a geofence.
-        const position = configuration.geofences.find(fence => GeoLocation.IsInsideGeofence(newLocation, fence));
-        if (position) {
-          this.logger?.LogInformation(`Geofences triggered '${position.Label}'.`)
-          // Hit on a geofence.
-          newLocation.Label = position.Label;
-        }
+    const configuration = ConfigurationManager.getConfiguration(this.homey);
+    if (configuration?.geofences) {
+      this.logger?.LogInformation("Checking geofences.")
+      // Checking if the position is inside a geofence.
+      const position = configuration.geofences.find(fence => GeoLocation.IsInsideGeofence(newLocation, fence));
+      if (position) {
+        this.logger?.LogInformation(`Geofences triggered '${position.Label}'.`)
+        // Hit on a geofence.
+        newLocation.Label = position.Label;
       }
-
-      this.currentLocation = newLocation;
-      this.setCapabilityValue("location_capability", `${this.currentLocation.Latitude}:${this.currentLocation.Longitude}`);
-      this.currentLocation.Address = await GeoLocation.GetAddress(this.currentLocation, this.app.logger);
-      const locationChangedFlowCard: any = this.homey.flow.getDeviceTriggerCard("location_changed");
-      locationChangedFlowCard.trigger(this, this.currentLocation, {});
     }
+
+    this.currentLocation = newLocation;
+    this.setCapabilityValue("location_capability", `${this.currentLocation.Latitude}:${this.currentLocation.Longitude}`);
+    this.currentLocation.Address = await GeoLocation.GetAddress(this.currentLocation, this.app.logger);
+    const locationChangedFlowCard: any = this.homey.flow.getDeviceTriggerCard("location_changed");
+    locationChangedFlowCard.trigger(this, this.currentLocation, {});
   }
 
   async updateState() {
@@ -163,18 +160,20 @@ class Vehicle extends Device {
         const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
 
         if (this.hasCapability("locked")) {
-          this.setCapabilityValue("locked", vehicle.doorLockState === "SECURED" || vehicle.doorLockState === "LOCKED");
+          const locked = vehicle.doorLockState === "SECURED" || vehicle.doorLockState === "LOCKED";
+          this.setCapabilityValue("locked", locked);
+
+          if (locked && vehicle.gpsLat && vehicle.gpsLng) {
+            if (!this.hasCapability("location_capability")) {
+              await this.addCapability("location_capability");
+            }
+            if (this.currentLocation?.Latitude !== vehicle.gpsLat || this.currentLocation?.Longitude !== vehicle.gpsLng) {
+              this.onLocationChanged({ Label: "", Latitude: vehicle.gpsLat, Longitude: vehicle.gpsLng });
+            }
+          }
         }
         if (this.hasCapability("alarm_generic")) {
           this.setCapabilityValue("alarm_generic", vehicle.doorLockState !== "SECURED");
-        }
-        if (vehicle.gpsLat && vehicle.gpsLng) {
-          if (!this.hasCapability("location_capability")) {
-            await this.addCapability("location_capability");
-          }
-          if (this.currentLocation?.Latitude !== vehicle.gpsLat || this.currentLocation?.Longitude !== vehicle.gpsLng) {
-            this.onLocationChanged({ Label: "", Latitude: vehicle.gpsLat, Longitude: vehicle.gpsLng });
-          }
         }
         await this.UpdateCapabilityValue("mileage_capability", vehicle.mileage);
         await this.UpdateCapabilityValue("remanining_fuel_liters_capability", vehicle.remainingFuel);
