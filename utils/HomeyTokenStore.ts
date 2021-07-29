@@ -12,9 +12,6 @@ export class HomeyTokenStore implements ITokenStore {
 
     storeToken(token: Token): void {
         let config : Configuration = ConfigurationManager.getConfiguration(this.homey);
-        if (!config) {
-            config = new Configuration();
-        }
         config.token = token;
         ConfigurationManager.setConfiguration(this.homey, config);
     }
@@ -22,6 +19,7 @@ export class HomeyTokenStore implements ITokenStore {
     retrieveToken(): Token | undefined {
         const token = ConfigurationManager.getConfiguration(this.homey)?.token;
         if (token) {
+            // Token needs to be constructed again new as the persisted value might be of not date type.
             token.validUntil = new Date(token.validUntil);
         }
 
