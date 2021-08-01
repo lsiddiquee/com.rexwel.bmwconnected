@@ -10,5 +10,8 @@
   },
   "0.0.9": {
     "en": "Added lock unlock flow for older cars. Added location capability and geofence based flow triggers. Added logging."
+  },
+  "0.0.11": {
+    "en": "Fixed issue with fresh install."
   }
 }

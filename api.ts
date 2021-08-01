@@ -11,7 +11,7 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
         throw new Error("Username and password cannot be empty.");
     }
 
-    body.geofences?.forEach(fence => {
+    body.geofences.forEach(fence => {
         if (!fence.Label || !fence.Latitude || !fence.Longitude || !fence.Radius) {
             throw new Error("Geofence information cannot be empty.");
         }

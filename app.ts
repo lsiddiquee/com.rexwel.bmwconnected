@@ -7,6 +7,7 @@ import { HomeyTokenStore } from './utils/HomeyTokenStore';
 import { ConfigurationManager } from './utils/ConfigurationManager';
 import { DeviceData } from './utils/DeviceData';
 import { Logger } from './utils/Logger';
+import { Configuration } from './utils/Configuration';
 
 // TODO:
 // Window states capability
@@ -26,8 +27,12 @@ export class BMWConnectedDrive extends Homey.App {
   async onInit(): Promise<void> {
     this.logger = new Logger(this.homey);
     this.tokenStore = new HomeyTokenStore(this.homey);
-    const configuration = ConfigurationManager.getConfiguration(this.homey);
-    if (configuration && configuration.username && configuration.password) {
+    let configuration = ConfigurationManager.getConfiguration(this.homey);
+    if (!configuration) {
+      configuration = new Configuration();
+      ConfigurationManager.setConfiguration(this.homey, configuration);
+    }
+    if (configuration.username && configuration.password) {
       this.connectedDriveApi = new ConnectedDrive(configuration.username, configuration.password, Regions.RestOfWorld, this.tokenStore, this.logger);
     }
     this.logger.LogInformation('BMWConnectedDrive app has been initialized');
