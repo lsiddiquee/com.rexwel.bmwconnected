@@ -1,0 +1,9 @@
+{
+  "type": "string",
+  "title": {
+    "en": "address_capability"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": null
+}

@@ -17,6 +17,7 @@ class Vehicle extends Device {
   deviceStatusPoller!: NodeJS.Timeout;
   settings: Settings = new Settings();
   currentLocation?: LocationType;
+  currentMileage?: number;
 
   get api(): ConnectedDrive | undefined {
     return this.app.connectedDriveApi;
@@ -50,6 +51,7 @@ class Vehicle extends Device {
     }
 
     await this.updateState();
+    this.currentMileage = this.getCapabilityValue("mileage_capability");
     this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
 
     this.logger?.LogInformation(`${this.getName()} (${this.deviceData.id}) has been initialized`);
@@ -145,12 +147,29 @@ class Vehicle extends Device {
         newLocation.Label = position.Label;
       }
     }
+    newLocation.Address = await GeoLocation.GetAddress(newLocation, this.app.logger);
 
+    const oldMileage = this.currentMileage;
+    const oldLocation = this.currentLocation;
     this.currentLocation = newLocation;
-    this.setCapabilityValue("location_capability", `${this.currentLocation.Latitude}:${this.currentLocation.Longitude}`);
-    this.currentLocation.Address = await GeoLocation.GetAddress(this.currentLocation, this.app.logger);
+    this.currentMileage = this.getCapabilityValue("mileage_capability");
+    await this.UpdateCapabilityValue("location_capability", `${newLocation.Latitude}:${newLocation.Longitude}`);
+    await this.UpdateCapabilityValue("address_capability", newLocation.Address);
     const locationChangedFlowCard: any = this.homey.flow.getDeviceTriggerCard("location_changed");
-    locationChangedFlowCard.trigger(this, this.currentLocation, {});
+    locationChangedFlowCard.trigger(this, newLocation, {});
+    const driveSessionCompletedFlowCard: any = this.homey.flow.getDeviceTriggerCard("drive_session_completed");
+    locationChangedFlowCard.trigger(this, {
+      StartLabel: oldLocation?.Label,
+      StartLatitude: oldLocation?.Latitude,
+      StartLongitude: oldLocation?.Longitude,
+      StartAddress: oldLocation?.Address,
+      StartMileage: oldMileage,
+      EndLabel: newLocation?.Label,
+      EndLatitude: newLocation?.Latitude,
+      EndLongitude: newLocation?.Longitude,
+      EndAddress: newLocation?.Address,
+      EndMileage: this.currentMileage,
+    }, {});
   }
 
   async updateState() {
@@ -159,14 +178,15 @@ class Vehicle extends Device {
       if (this.api) {
         const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
 
+        await this.UpdateCapabilityValue("mileage_capability", vehicle.mileage);
+        await this.UpdateCapabilityValue("remanining_fuel_liters_capability", vehicle.remainingFuel);
+        await this.UpdateCapabilityValue("range_capability", vehicle.remainingRange);
+
         if (this.hasCapability("locked")) {
           const locked = vehicle.doorLockState === "SECURED" || vehicle.doorLockState === "LOCKED";
           this.setCapabilityValue("locked", locked);
 
           if (locked && vehicle.gpsLat && vehicle.gpsLng) {
-            if (!this.hasCapability("location_capability")) {
-              await this.addCapability("location_capability");
-            }
             if (this.currentLocation?.Latitude !== vehicle.gpsLat || this.currentLocation?.Longitude !== vehicle.gpsLng) {
               this.onLocationChanged({ Label: "", Latitude: vehicle.gpsLat, Longitude: vehicle.gpsLng });
             }
@@ -175,9 +195,6 @@ class Vehicle extends Device {
         if (this.hasCapability("alarm_generic")) {
           this.setCapabilityValue("alarm_generic", vehicle.doorLockState !== "SECURED");
         }
-        await this.UpdateCapabilityValue("mileage_capability", vehicle.mileage);
-        await this.UpdateCapabilityValue("remanining_fuel_liters_capability", vehicle.remainingFuel);
-        await this.UpdateCapabilityValue("range_capability", vehicle.remainingRange);
 
         if (this.hasCapability("measure_battery")) {
           await this.UpdateCapabilityValue("measure_battery", vehicle.chargingLevelHv);
@@ -202,7 +219,7 @@ class Vehicle extends Device {
       if (!this.hasCapability(name)) {
         await this.addCapability(name);
       }
-      this.setCapabilityValue(name, value);
+      await this.setCapabilityValue(name, value);
     }
   }
 }

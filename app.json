@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "com.rexwel.bmwconnected",
-  "version": "0.0.11",
+  "version": "0.0.14",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -112,6 +112,101 @@
               "en": "Address"
             },
             "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw&capabilities=location_capability"
+          }
+        ]
+      },
+      {
+        "id": "drive_session_completed",
+        "title": {
+          "en": "Drive session completed"
+        },
+        "tokens": [
+          {
+            "name": "StartLabel",
+            "type": "string",
+            "title": {
+              "en": "Starting Label"
+            },
+            "example": "Home"
+          },
+          {
+            "name": "StartLatitude",
+            "type": "number",
+            "title": {
+              "en": "Starting Latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "StartLongitude",
+            "type": "number",
+            "title": {
+              "en": "Starting Longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "StartAddress",
+            "type": "string",
+            "title": {
+              "en": "Starting Address"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          },
+          {
+            "name": "StartMileage",
+            "type": "number",
+            "title": {
+              "en": "Starting Mileage"
+            },
+            "example": "45875"
+          },
+          {
+            "name": "EndLabel",
+            "type": "string",
+            "title": {
+              "en": "End Label"
+            },
+            "example": "Home"
+          },
+          {
+            "name": "EndLatitude",
+            "type": "number",
+            "title": {
+              "en": "End Latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "EndLongitude",
+            "type": "number",
+            "title": {
+              "en": "End Longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "EndAddress",
+            "type": "string",
+            "title": {
+              "en": "End Address"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          },
+          {
+            "name": "EndMileage",
+            "type": "number",
+            "title": {
+              "en": "End Mileage"
+            },
+            "example": "45875"
           }
         ],
         "args": [
@@ -302,6 +397,15 @@
     }
   ],
   "capabilities": {
+    "address_capability": {
+      "type": "string",
+      "title": {
+        "en": "address_capability"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": null
+    },
     "charging_status_capability": {
       "type": "string",
       "title": {
