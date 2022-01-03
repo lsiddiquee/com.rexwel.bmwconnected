@@ -16,5 +16,8 @@
   },
   "0.0.14": {
     "en": "Add trigger to improve log odometer readings. Added text address capability."
+  },
+  "0.0.15": {
+    "en": "None"
   }
 }
