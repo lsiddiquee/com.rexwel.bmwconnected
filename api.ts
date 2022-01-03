@@ -23,9 +23,12 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
     try {
         await api.account.getToken();
         app.connectedDriveApi = api;
-    }
-    catch (err) {
-        app.logger?.LogError(err);
+    } catch (err) {
+        if (typeof err === "string") {
+            app.logger?.LogError(err);
+        } else if (err instanceof Error) {
+            app.logger?.LogError(err.message);
+        }
         return false;
     }
     ConfigurationManager.setConfiguration(homey, body);
