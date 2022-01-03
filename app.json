@@ -216,6 +216,53 @@
             "filter": "driver_id=bmw&capabilities=location_capability"
           }
         ]
+      },
+      {
+        "id": "refuelled",
+        "title": {
+          "en": "Refuelled"
+        },
+        "tokens": [
+          {
+            "name": "FuelBeforeRefuelling",
+            "type": "number",
+            "title": {
+              "en": "Remaining fuel prior to refuelling"
+            },
+            "example": "9"
+          },
+          {
+            "name": "FuelAfterRefuelling",
+            "type": "number",
+            "title": {
+              "en": "Remaining fuel after refuelling"
+            },
+            "example": "46"
+          },
+          {
+            "name": "RefuelledLiters",
+            "type": "number",
+            "title": {
+              "en": "Amount refuelled"
+            },
+            "example": "37"
+          },
+          {
+            "name": "Location",
+            "type": "string",
+            "title": {
+              "en": "Location"
+            },
+            "example": "Proostwetering 90, 3543 AJ Utrecht"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw&capabilities=remanining_fuel_liters_capability"
+          }
+        ]
       }
     ],
     "actions": [
@@ -391,6 +438,19 @@
           "max": 3600,
           "hint": {
             "en": "The interval at which the app polls to update the state of the vehicle."
+          }
+        },
+        {
+          "id": "refuellingTriggerThreshold",
+          "type": "number",
+          "label": {
+            "en": "Refuelling trigger threshold (liter)"
+          },
+          "value": 5,
+          "min": 1,
+          "max": 100,
+          "hint": {
+            "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger."
           }
         }
       ]

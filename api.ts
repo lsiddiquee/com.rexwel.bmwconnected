@@ -19,6 +19,7 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
 
     const app = (homey.app as BMWConnectedDrive);
     const api = new ConnectedDrive(body.username, body.password, Regions.RestOfWorld, app.tokenStore);
+    ConfigurationManager.setConfiguration(homey, body);
 
     try {
         await api.account.getToken();
@@ -31,7 +32,6 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
         }
         return false;
     }
-    ConfigurationManager.setConfiguration(homey, body);
 
     app.logger?.LogInformation("Login successfull");
     return true;
