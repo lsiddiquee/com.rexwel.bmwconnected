@@ -13,5 +13,8 @@
   },
   "0.0.11": {
     "en": "Fixed issue with fresh install."
+  },
+  "0.0.16": {
+    "en": "Added flow trigger to improve log odometer readings. Added text address capability. Added flow trigger when refuelled."
   }
 }

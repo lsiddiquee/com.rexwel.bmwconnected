@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "com.rexwel.bmwconnected",
-  "version": "0.0.11",
+  "version": "0.0.16",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -119,6 +119,148 @@
             "type": "device",
             "name": "device",
             "filter": "driver_id=bmw&capabilities=location_capability"
+          }
+        ]
+      },
+      {
+        "id": "drive_session_completed",
+        "title": {
+          "en": "Drive session completed"
+        },
+        "tokens": [
+          {
+            "name": "StartLabel",
+            "type": "string",
+            "title": {
+              "en": "Starting Label"
+            },
+            "example": "Home"
+          },
+          {
+            "name": "StartLatitude",
+            "type": "number",
+            "title": {
+              "en": "Starting Latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "StartLongitude",
+            "type": "number",
+            "title": {
+              "en": "Starting Longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "StartAddress",
+            "type": "string",
+            "title": {
+              "en": "Starting Address"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          },
+          {
+            "name": "StartMileage",
+            "type": "number",
+            "title": {
+              "en": "Starting Mileage"
+            },
+            "example": "45875"
+          },
+          {
+            "name": "EndLabel",
+            "type": "string",
+            "title": {
+              "en": "End Label"
+            },
+            "example": "Home"
+          },
+          {
+            "name": "EndLatitude",
+            "type": "number",
+            "title": {
+              "en": "End Latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "EndLongitude",
+            "type": "number",
+            "title": {
+              "en": "End Longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "EndAddress",
+            "type": "string",
+            "title": {
+              "en": "End Address"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          },
+          {
+            "name": "EndMileage",
+            "type": "number",
+            "title": {
+              "en": "End Mileage"
+            },
+            "example": "45875"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw&capabilities=location_capability"
+          }
+        ]
+      },
+      {
+        "id": "refuelled",
+        "title": {
+          "en": "Refuelled"
+        },
+        "tokens": [
+          {
+            "name": "FuelBeforeRefuelling",
+            "type": "number",
+            "title": {
+              "en": "Remaining fuel prior to refuelling"
+            },
+            "example": "9"
+          },
+          {
+            "name": "FuelAfterRefuelling",
+            "type": "number",
+            "title": {
+              "en": "Remaining fuel after refuelling"
+            },
+            "example": "46"
+          },
+          {
+            "name": "RefuelledLiters",
+            "type": "number",
+            "title": {
+              "en": "Amount refuelled"
+            },
+            "example": "37"
+          },
+          {
+            "name": "Location",
+            "type": "string",
+            "title": {
+              "en": "Location"
+            },
+            "example": "Proostwetering 90, 3543 AJ Utrecht"
+          }
+        ],
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw&capabilities=remanining_fuel_liters_capability"
           }
         ]
       }
@@ -297,11 +439,33 @@
           "hint": {
             "en": "The interval at which the app polls to update the state of the vehicle."
           }
+        },
+        {
+          "id": "refuellingTriggerThreshold",
+          "type": "number",
+          "label": {
+            "en": "Refuelling trigger threshold (liter)"
+          },
+          "value": 5,
+          "min": 1,
+          "max": 100,
+          "hint": {
+            "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger."
+          }
         }
       ]
     }
   ],
   "capabilities": {
+    "address_capability": {
+      "type": "string",
+      "title": {
+        "en": "address_capability"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": null
+    },
     "charging_status_capability": {
       "type": "string",
       "title": {

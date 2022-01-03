@@ -11,5 +11,18 @@
     "hint": {
       "en": "The interval at which the app polls to update the state of the vehicle."
     }
+  },
+  {
+    "id": "refuellingTriggerThreshold",
+    "type": "number",
+    "label": {
+      "en": "Refuelling trigger threshold (liter)"
+    },
+    "value": 5,
+    "min": 1,
+    "max": 100,
+    "hint": {
+      "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger."
+    }
   }
 ]
