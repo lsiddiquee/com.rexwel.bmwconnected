@@ -40,15 +40,15 @@ class Vehicle extends Device {
             this.registerCapabilityListener("climate_now_capability", this.onCapabilityClimateNow.bind(this));
         }
         if (this.hasCapability("location_capability")) {
-            const coordinate: string = this.getCapabilityValue("location_capability");
+            const coordinate: string = await this.getCapabilityValue("location_capability");
             if (coordinate) {
                 const splitString = coordinate.split(":");
                 if (splitString.length === 2) {
                     this.currentLocation = {
                         Latitude: parseFloat(splitString[0]) ?? 0,
-                        Longitude: parseFloat(splitString[1]) ?? 0
+                        Longitude: parseFloat(splitString[1]) ?? 0,
+                        Address: await this.getCapabilityValue("address_capability")
                     };
-                    this.currentLocation.Address = await GeoLocation.GetAddress(this.currentLocation, this.app.logger);
                 }
             }
         }
@@ -147,7 +147,6 @@ class Vehicle extends Device {
                 newLocation.Label = position.Label;
             }
         }
-        newLocation.Address = await GeoLocation.GetAddress(newLocation, this.app.logger);
 
         const oldMileage = this.currentMileage;
         const oldLocation = this.currentLocation;
@@ -183,56 +182,57 @@ class Vehicle extends Device {
                 let oldFuelValue = this.hasCapability("remanining_fuel_liters_capability") ?
                     await this.getCapabilityValue("remanining_fuel_liters_capability")
                     : undefined;
-                await this.UpdateCapabilityValue("mileage_capability", vehicle.mileage);
-                await this.UpdateCapabilityValue("remanining_fuel_liters_capability", vehicle.remainingFuel);
-                await this.UpdateCapabilityValue("range_capability", vehicle.remainingRange);
+                await this.UpdateCapabilityValue("mileage_capability", vehicle.status.currentMileage.mileage);
+                await this.setCapabilityOptions("mileage_capability", {"units": vehicle.status.currentMileage.units});
+                await this.UpdateCapabilityValue("remanining_fuel_liters_capability", vehicle.properties.fuelLevel.value);
+                await this.UpdateCapabilityValue("range_capability", vehicle.properties.combinedRange.distance.value);
+                await this.setCapabilityOptions("range_capability", {"units": vehicle.properties.combinedRange.distance.units});
                 if (this.hasCapability("alarm_generic")) {
-                    await this.setCapabilityValue("alarm_generic", vehicle.doorLockState !== "SECURED");
+                    await this.setCapabilityValue("alarm_generic", !vehicle.properties.areDoorsLocked);
                 }
 
                 let triggerChargingStatusChange = false;
                 if (this.hasCapability("measure_battery")) {
-                    await this.UpdateCapabilityValue("measure_battery", vehicle.chargingLevelHv);
-                    await this.UpdateCapabilityValue("measure_battery.actual", vehicle.socHvPercent);
-                    await this.UpdateCapabilityValue("range_capability.battery", vehicle.beRemainingRangeElectric);
-                    await this.UpdateCapabilityValue("range_capability.fuel", vehicle.beRemainingRangeFuel);
+                    await this.UpdateCapabilityValue("measure_battery", vehicle.properties.chargingState.chargePercentage);
+                    await this.UpdateCapabilityValue("measure_battery.actual", vehicle.properties.chargingState.chargePercentage);
+                    await this.UpdateCapabilityValue("range_capability.battery", vehicle.properties.electricRange.distance.value);
+                    await this.setCapabilityOptions("range_capability.battery", {"units": vehicle.properties.electricRange.distance.units});
+                    await this.UpdateCapabilityValue("range_capability.fuel", vehicle.properties.combustionRange.distance.value);
+                    await this.setCapabilityOptions("range_capability.fuel", {"units": vehicle.properties.combustionRange.distance.units});
                     const oldChargingStatus = this.getCapabilityValue("charging_status_capability");
-                    await this.UpdateCapabilityValue("charging_status_capability", vehicle.chargingStatus);
-                    if (oldChargingStatus !== vehicle.chargingStatus) {
+                    await this.UpdateCapabilityValue("charging_status_capability", vehicle.properties.chargingState.state);
+                    if (oldChargingStatus !== vehicle.properties.chargingState.state) {
                         triggerChargingStatusChange = true;
                     }
                 }
 
-                let locationUpdated = false;
                 if (this.hasCapability("locked")) {
-                    const locked = vehicle.doorLockState === "SECURED" || vehicle.doorLockState === "LOCKED";
-                    await this.setCapabilityValue("locked", locked);
+                    await this.setCapabilityValue("locked", vehicle.properties.areDoorsLocked);
 
-                    if (locked && vehicle.gpsLat && vehicle.gpsLng) {
-                        if (this.currentLocation?.Latitude !== vehicle.gpsLat || this.currentLocation?.Longitude !== vehicle.gpsLng) {
-                            locationUpdated = true;
-                            this.onLocationChanged({Label: "", Latitude: vehicle.gpsLat, Longitude: vehicle.gpsLng});
-                        }
+                }
+
+                if (this.hasCapability("climate_now_capability")) {
+                    await this.setCapabilityValue("climate_now_capability", vehicle.properties.climateControl.activity !== "INACTIVE");
+                }
+
+                if (!vehicle.properties.inMotion && vehicle.properties.vehicleLocation.coordinates.latitude && vehicle.properties.vehicleLocation.coordinates.longitude) {
+                    if (this.currentLocation?.Latitude !== vehicle.properties.vehicleLocation.coordinates.latitude || this.currentLocation?.Longitude !== vehicle.properties.vehicleLocation.coordinates.longitude) {
+                        this.onLocationChanged({Label: "", Latitude: vehicle.properties.vehicleLocation.coordinates.latitude, Longitude: vehicle.properties.vehicleLocation.coordinates.longitude, Address: vehicle.properties.vehicleLocation.address.formatted});
                     }
                 }
 
                 if (triggerChargingStatusChange) {
                     const chargingStatusFlowCard: any = this.homey.flow.getDeviceTriggerCard("charging_status_change");
-                    chargingStatusFlowCard.trigger(this, {charging_status: vehicle.chargingStatus}, {});
+                    chargingStatusFlowCard.trigger(this, {charging_status: vehicle.properties.chargingState.state}, {});
                 }
                 
-                if (oldFuelValue && vehicle.remainingFuel && (vehicle.remainingFuel - oldFuelValue) >= this.settings.refuellingTriggerThreshold){
-                    let address = locationUpdated ? this.currentLocation?.Address
-                        : vehicle.gpsLat && vehicle.gpsLng ? 
-                        (await GeoLocation.GetAddress({Label: "", Latitude: vehicle.gpsLat, Longitude: vehicle.gpsLng}, this.app.logger))
-                            : "";
-
+                if (oldFuelValue && vehicle.properties.fuelLevel.value && (vehicle.properties.fuelLevel.value - oldFuelValue) >= this.settings.refuellingTriggerThreshold){
                     const refuelledFlowCard: any = this.homey.flow.getDeviceTriggerCard("refuelled");
                     refuelledFlowCard.trigger(this, {
                         FuelBeforeRefuelling: oldFuelValue,
-                        FuelAfterRefuelling: vehicle.remainingFuel,
-                        RefuelledLiters: vehicle.remainingFuel - oldFuelValue,
-                        Location: address
+                        FuelAfterRefuelling: vehicle.properties.fuelLevel.value,
+                        RefuelledLiters: vehicle.properties.fuelLevel.value - oldFuelValue,
+                        Location: vehicle.properties?.vehicleLocation?.address?.formatted
                     }, {});
                 }
             }
