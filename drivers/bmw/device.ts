@@ -161,15 +161,15 @@ class Vehicle extends Device {
         const driveSessionCompletedFlowCard: any = this.homey.flow.getDeviceTriggerCard("drive_session_completed");
         driveSessionCompletedFlowCard.trigger(this, {
             StartLabel: oldLocation?.Label ?? "",
-            StartLatitude: oldLocation?.Latitude ?? "",
-            StartLongitude: oldLocation?.Longitude ?? "",
+            StartLatitude: oldLocation?.Latitude ?? 0,
+            StartLongitude: oldLocation?.Longitude ?? 0,
             StartAddress: oldLocation?.Address ?? "",
-            StartMileage: oldMileage ?? "",
+            StartMileage: oldMileage ?? 0,
             EndLabel: newLocation?.Label ?? "",
-            EndLatitude: newLocation?.Latitude ?? "",
-            EndLongitude: newLocation?.Longitude ?? "",
+            EndLatitude: newLocation?.Latitude ?? 0,
+            EndLongitude: newLocation?.Longitude ?? 0,
             EndAddress: newLocation?.Address ?? "",
-            EndMileage: this.currentMileage ?? ""
+            EndMileage: this.currentMileage ?? 0
         }, {});
     }
 
