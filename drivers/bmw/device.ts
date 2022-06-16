@@ -160,16 +160,16 @@ class Vehicle extends Device {
         // Currently onLocationChanged is only triggered if location changed and the door is locked.
         const driveSessionCompletedFlowCard: any = this.homey.flow.getDeviceTriggerCard("drive_session_completed");
         driveSessionCompletedFlowCard.trigger(this, {
-            StartLabel: oldLocation?.Label,
-            StartLatitude: oldLocation?.Latitude,
-            StartLongitude: oldLocation?.Longitude,
-            StartAddress: oldLocation?.Address,
-            StartMileage: oldMileage,
-            EndLabel: newLocation?.Label,
-            EndLatitude: newLocation?.Latitude,
-            EndLongitude: newLocation?.Longitude,
-            EndAddress: newLocation?.Address,
-            EndMileage: this.currentMileage,
+            StartLabel: oldLocation?.Label ?? "",
+            StartLatitude: oldLocation?.Latitude ?? "",
+            StartLongitude: oldLocation?.Longitude ?? "",
+            StartAddress: oldLocation?.Address ?? "",
+            StartMileage: oldMileage ?? "",
+            EndLabel: newLocation?.Label ?? "",
+            EndLatitude: newLocation?.Latitude ?? "",
+            EndLongitude: newLocation?.Longitude ?? "",
+            EndAddress: newLocation?.Address ?? "",
+            EndMileage: this.currentMileage ?? ""
         }, {});
     }
 
