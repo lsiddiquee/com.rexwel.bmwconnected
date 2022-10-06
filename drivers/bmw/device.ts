@@ -32,6 +32,8 @@ class Vehicle extends Device {
         this.deviceData = this.getData() as DeviceData;
         this.settings = this.getSettings() as Settings;
 
+        await this.CleanupCapability("measure_battery.actual");
+
         // register a capability listener
         if (this.hasCapability("locked")) {
             this.registerCapabilityListener("locked", this.onCapabilityLocked.bind(this));
@@ -182,57 +184,56 @@ class Vehicle extends Device {
                 let oldFuelValue = this.hasCapability("remanining_fuel_liters_capability") ?
                     await this.getCapabilityValue("remanining_fuel_liters_capability")
                     : undefined;
-                await this.UpdateCapabilityValue("mileage_capability", vehicle.status.currentMileage.mileage);
-                await this.setCapabilityOptions("mileage_capability", {"units": vehicle.status.currentMileage.units});
-                await this.UpdateCapabilityValue("remanining_fuel_liters_capability", vehicle.properties.fuelLevel.value);
-                await this.UpdateCapabilityValue("range_capability", vehicle.properties.combinedRange.distance.value);
-                await this.setCapabilityOptions("range_capability", {"units": vehicle.properties.combinedRange.distance.units});
-                if (this.hasCapability("alarm_generic")) {
-                    await this.setCapabilityValue("alarm_generic", !vehicle.properties.areDoorsLocked);
-                }
+                await this.UpdateCapabilityValue("mileage_capability", vehicle.currentMileage);
+                await this.setCapabilityOptions("mileage_capability", {"units": ""}); // TODO: Fix units
+                await this.UpdateCapabilityValue("remanining_fuel_liters_capability", vehicle.combustionFuelLevel.remainingFuelLiters);
+                await this.UpdateCapabilityValue("range_capability", vehicle.range);
+                await this.setCapabilityOptions("range_capability", {"units": ""});
+
+                const secured : boolean = vehicle.doorsState.combinedSecurityState === "SECURED";
+                await this.UpdateCapabilityValue("alarm_generic", !secured);
 
                 let triggerChargingStatusChange = false;
                 if (this.hasCapability("measure_battery")) {
-                    await this.UpdateCapabilityValue("measure_battery", vehicle.properties.chargingState.chargePercentage);
-                    await this.UpdateCapabilityValue("measure_battery.actual", vehicle.properties.chargingState.chargePercentage);
-                    await this.UpdateCapabilityValue("range_capability.battery", vehicle.properties.electricRange.distance.value);
-                    await this.setCapabilityOptions("range_capability.battery", {"units": vehicle.properties.electricRange.distance.units});
-                    await this.UpdateCapabilityValue("range_capability.fuel", vehicle.properties.combustionRange.distance.value);
-                    await this.setCapabilityOptions("range_capability.fuel", {"units": vehicle.properties.combustionRange.distance.units});
+                    await this.UpdateCapabilityValue("measure_battery", vehicle.electricChargingState.chargingLevelPercent);
+                    await this.UpdateCapabilityValue("range_capability.battery", vehicle.electricChargingState.range);
+                    await this.setCapabilityOptions("range_capability.battery", {"units": ""}); // TODO: Fix units
+                    await this.UpdateCapabilityValue("range_capability.fuel", vehicle.combustionFuelLevel.range);
+                    await this.setCapabilityOptions("range_capability.fuel", {"units": ""}); // TODO: Fix units
                     const oldChargingStatus = this.getCapabilityValue("charging_status_capability");
-                    await this.UpdateCapabilityValue("charging_status_capability", vehicle.properties.chargingState.state);
-                    if (oldChargingStatus !== vehicle.properties.chargingState.state) {
+                    await this.UpdateCapabilityValue("charging_status_capability", vehicle.electricChargingState.chargingStatus);
+                    if (oldChargingStatus !== vehicle.electricChargingState.chargingStatus) {
                         triggerChargingStatusChange = true;
                     }
                 }
 
                 if (this.hasCapability("locked")) {
-                    await this.setCapabilityValue("locked", vehicle.properties.areDoorsLocked);
+                    await this.setCapabilityValue("locked", vehicle.doorsState.combinedState === "CLOSED");
 
                 }
 
-                if (this.hasCapability("climate_now_capability")) {
-                    await this.setCapabilityValue("climate_now_capability", vehicle.properties.climateControl.activity !== "INACTIVE");
+                if (vehicle.climateControlState?.activity) {
+                    await this.UpdateCapabilityValue("climate_now_capability", vehicle.climateControlState.activity !== "INACTIVE");
                 }
 
-                if (!vehicle.properties.inMotion && vehicle.properties.vehicleLocation.coordinates.latitude && vehicle.properties.vehicleLocation.coordinates.longitude) {
-                    if (this.currentLocation?.Latitude !== vehicle.properties.vehicleLocation.coordinates.latitude || this.currentLocation?.Longitude !== vehicle.properties.vehicleLocation.coordinates.longitude) {
-                        this.onLocationChanged({Label: "", Latitude: vehicle.properties.vehicleLocation.coordinates.latitude, Longitude: vehicle.properties.vehicleLocation.coordinates.longitude, Address: vehicle.properties.vehicleLocation.address.formatted});
+                if (!secured && vehicle.location.coordinates.latitude && vehicle.location.coordinates.longitude) {
+                    if (this.currentLocation?.Latitude !== vehicle.location.coordinates.latitude || this.currentLocation?.Longitude !== vehicle.location.coordinates.longitude) {
+                        this.onLocationChanged({Label: "", Latitude: vehicle.location.coordinates.latitude, Longitude: vehicle.location.coordinates.longitude, Address: vehicle.location.address.formatted});
                     }
                 }
 
                 if (triggerChargingStatusChange) {
                     const chargingStatusFlowCard: any = this.homey.flow.getDeviceTriggerCard("charging_status_change");
-                    chargingStatusFlowCard.trigger(this, {charging_status: vehicle.properties.chargingState.state}, {});
+                    chargingStatusFlowCard.trigger(this, {charging_status: vehicle.electricChargingState.chargingStatus}, {});
                 }
                 
-                if (oldFuelValue && vehicle.properties.fuelLevel.value && (vehicle.properties.fuelLevel.value - oldFuelValue) >= this.settings.refuellingTriggerThreshold){
+                if (oldFuelValue && vehicle.combustionFuelLevel.remainingFuelLiters && (vehicle.combustionFuelLevel.remainingFuelLiters - oldFuelValue) >= this.settings.refuellingTriggerThreshold){
                     const refuelledFlowCard: any = this.homey.flow.getDeviceTriggerCard("refuelled");
                     refuelledFlowCard.trigger(this, {
                         FuelBeforeRefuelling: oldFuelValue,
-                        FuelAfterRefuelling: vehicle.properties.fuelLevel.value,
-                        RefuelledLiters: vehicle.properties.fuelLevel.value - oldFuelValue,
-                        Location: vehicle.properties?.vehicleLocation?.address?.formatted
+                        FuelAfterRefuelling: vehicle.combustionFuelLevel.remainingFuelLiters,
+                        RefuelledLiters: vehicle.combustionFuelLevel.remainingFuelLiters - oldFuelValue,
+                        Location: vehicle.location?.address?.formatted
                     }, {});
                 }
             }
@@ -252,6 +253,12 @@ class Vehicle extends Device {
 
         return false;
     }
+
+    async CleanupCapability(name: string) {
+        if (this.hasCapability(name)) {
+            await this.removeCapability(name);
+        }
+}
 }
 
 module.exports = Vehicle;

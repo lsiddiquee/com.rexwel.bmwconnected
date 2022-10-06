@@ -19,5 +19,8 @@
   },
   "0.1.2": {
     "en": "Fixed authentication issue and remote services."
+  },
+  "0.1.4": {
+    "en": "Fixed issue with retrieving vehicles."
   }
 }
