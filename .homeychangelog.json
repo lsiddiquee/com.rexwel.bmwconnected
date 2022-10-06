@@ -16,5 +16,11 @@
   },
   "0.0.17": {
     "en": "Added flow trigger to improve log odometer readings. Added text address capability. Added flow trigger when refuelled."
+  },
+  "0.1.2": {
+    "en": "Fixed authentication issue and remote services."
+  },
+  "0.1.4": {
+    "en": "Fixed issue with retrieving vehicles."
   }
 }

@@ -18,101 +18,21 @@ class ConnectedDriveDriver extends Driver {
   async onPairListDevices() {
     const api = (this.homey.app as BMWConnectedDrive).connectedDriveApi;
 
-    // TOOD: Skip already added vehicles.
     if (api) {
       const vehicles = await api.getVehicles();
 
       return Promise.all(vehicles.map(async vehicle => {
-        this.log(`Vehicle detected: ${vehicle.vin}, ${vehicle.model}, ${vehicle.color}, ${vehicle.licensePlate}`);
+        this.log(`Vehicle detected: ${vehicle.vin}, ${vehicle.attributes.model}`);
 
         if (!vehicle.vin) {
           throw new Error("Cannot list vehicle as vin is empty.");
         }
 
-        const vehicleStatus = await api.getVehicleStatus(vehicle.vin);
-
-        let capabilities: string[] = [];
-
-        if (vehicleStatus.mileage) {
-          capabilities.push("mileage_capability");
-        } else {
-          this.log(`mileage: ${vehicleStatus.mileage}`);
-        }
-
-        if (vehicleStatus.remainingFuel) {
-          capabilities.push("remanining_fuel_liters_capability");
-        } else {
-          this.log(`remanining_fuel_liters_capability: ${vehicleStatus.remainingFuel}`);
-        }
-
-        if (vehicleStatus.doorLockState) {
-          capabilities.push("locked");
-
-          if (vehicle.hasAlarmSystem) {
-            capabilities.push("alarm_generic");
-          } else {
-            this.log(`HasAlarmSystem: ${vehicle.hasAlarmSystem}`);
-          }
-        } else {
-          capabilities.push("only_lock_unlock_flow_capability");
-          this.log(`doorLockState: ${vehicleStatus.doorLockState}`);
-        }
-
-        if (vehicleStatus.gpsLat && vehicleStatus.gpsLng) {
-          capabilities.push("location_capability");
-        } else {
-          this.log(`gpsLat: ${vehicleStatus.gpsLat}, gpsLng: ${vehicleStatus.gpsLng}`);
-        }
-
-        if (vehicleStatus.remainingRange) {
-          capabilities.push("range_capability");
-        } else {
-          this.log(`remainingRange: ${vehicleStatus.remainingRange}`);
-        }
-
-        if (vehicle.climateNow === "ACTIVATED") {
-          capabilities.push("climate_now_capability");
-        } else {
-          this.log(`ClimateNow: ${vehicle.climateNow}`);
-        }
-
-        if (vehicle.driveTrain === "PHEV" || vehicle.driveTrain === "BEV") {
-          capabilities.push("measure_battery");
-          capabilities.push("measure_battery.actual");
-          capabilities.push("range_capability.battery");
-          capabilities.push("range_capability.fuel");
-          capabilities.push("charging_status_capability");
-        } else {
-          this.log(`Drivetrain: ${vehicle.driveTrain}`);
-        }
-
         const deviceData = new DeviceData();
         deviceData.id = vehicle.vin;
         return {
-          "name": `${vehicle.model} (${vehicle.licensePlate ?? vehicle.color})`,
+          "name": `${vehicle.attributes.model} (${vehicle.vin})`,
           "data": deviceData,
-          "capabilities": capabilities,
-          "capabilitiesOptions": {
-            "range_capability": {
-              "units": vehicleStatus.unitOfLength
-            },
-            "range_capability.battery": {
-              "title": {
-                "en": "Range Battery"
-              },
-              "units": vehicleStatus.unitOfLength
-            },
-            "range_capability.fuel": {
-              "title": {
-                "en": "Range Fuel"
-              },
-              "units": vehicleStatus.unitOfLength
-            }
-          }
-          //   store: {
-          //     address: '127.0.0.1',
-          //   },
-          // },
         };
       }));
     }
