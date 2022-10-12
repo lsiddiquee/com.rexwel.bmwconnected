@@ -22,5 +22,8 @@
   },
   "0.1.4": {
     "en": "Fixed issue with retrieving vehicles."
+  },
+  "0.1.5": {
+    "en": "Fixed location trigger"
   }
 }
