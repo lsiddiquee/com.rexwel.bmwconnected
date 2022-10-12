@@ -34,13 +34,6 @@ class Vehicle extends Device {
 
         await this.CleanupCapability("measure_battery.actual");
 
-        // register a capability listener
-        if (this.hasCapability("locked")) {
-            this.registerCapabilityListener("locked", this.onCapabilityLocked.bind(this));
-        }
-        if (this.hasCapability("climate_now_capability")) {
-            this.registerCapabilityListener("climate_now_capability", this.onCapabilityClimateNow.bind(this));
-        }
         if (this.hasCapability("location_capability")) {
             const coordinate: string = await this.getCapabilityValue("location_capability");
             if (coordinate) {
@@ -55,7 +48,16 @@ class Vehicle extends Device {
             }
         }
 
+        // Intentionally done here to ensure that all capabilities are set prior to registering the triggers.
         await this.updateState();
+
+        if (this.hasCapability("locked")) {
+            this.registerCapabilityListener("locked", this.onCapabilityLocked.bind(this));
+        }
+        if (this.hasCapability("climate_now_capability")) {
+            this.registerCapabilityListener("climate_now_capability", this.onCapabilityClimateNow.bind(this));
+        }
+
         this.currentMileage = this.getCapabilityValue("mileage_capability");
         this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
 
@@ -216,7 +218,7 @@ class Vehicle extends Device {
                     await this.UpdateCapabilityValue("climate_now_capability", vehicle.climateControlState.activity !== "INACTIVE");
                 }
 
-                if (!secured && vehicle.location.coordinates.latitude && vehicle.location.coordinates.longitude) {
+                if (secured && vehicle.location.coordinates.latitude && vehicle.location.coordinates.longitude) {
                     if (this.currentLocation?.Latitude !== vehicle.location.coordinates.latitude || this.currentLocation?.Longitude !== vehicle.location.coordinates.longitude) {
                         this.onLocationChanged({Label: "", Latitude: vehicle.location.coordinates.latitude, Longitude: vehicle.location.coordinates.longitude, Address: vehicle.location.address.formatted});
                     }
