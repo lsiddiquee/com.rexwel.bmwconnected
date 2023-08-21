@@ -25,5 +25,11 @@
   },
   "0.1.5": {
     "en": "Updated dependency to fix issue with talking to the BMW API."
+  },
+  "0.1.6": {
+    "en": "Updated dependency to fix issue with talking to the BMW API."
+  },
+  "0.1.7": {
+    "en": "Fixed issue regarding lock status and location changed trigger."
   }
 }
