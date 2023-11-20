@@ -7,8 +7,8 @@ import { GeoLocation } from "./utils/GeoLocation";
 
 export async function saveSettings({ homey, body }: { homey: Homey, body: Configuration }): Promise<boolean> {
 
-    if (!body.username || !body.password) {
-        throw new Error("Username and password cannot be empty.");
+    if (!body.username || !body.password || !body.region) {
+        throw new Error("Username, password and region cannot be empty.");
     }
 
     body.geofences.forEach(fence => {
@@ -18,7 +18,7 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
     });
 
     const app = (homey.app as BMWConnectedDrive);
-    const api = new ConnectedDrive(body.username, body.password, Regions.RestOfWorld, app.tokenStore);
+    const api = new ConnectedDrive(body.username, body.password, body.region, app.tokenStore);
     ConfigurationManager.setConfiguration(homey, body);
 
     try {
@@ -33,7 +33,7 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
         return false;
     }
 
-    app.logger?.LogInformation("Login successfull");
+    app.logger?.LogInformation("Login successful");
     return true;
 }
 

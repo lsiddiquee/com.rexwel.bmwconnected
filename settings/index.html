@@ -66,6 +66,14 @@
         <label for="password" data-i18n="settings.password"></label>
         <input id="password" type="password" value="" />
       </div>
+      <div class="field row">
+        <label for="region" data-i18n="settings.Region"></label>
+        <select name="region" id="region">
+          <option value="NorthAmerica" data-i18n="settings.region_north_america"></option>
+          <option value="RestOfWorld" data-i18n="settings.region_rest_of_the_world"></option>
+          <!-- <option value="China" data-i18n="settings.region_china"></option> -->
+        </select>
+      </div>
     </fieldset>
 
     <fieldset>
@@ -149,6 +157,7 @@
     function onHomeyReady(Homey) {
       var usernameElement = document.getElementById("username");
       var passwordElement = document.getElementById("password");
+      var regionElement = document.getElementById("region");
       var geofencesElement = document.getElementById("geofences");
       var logEnabledElement = document.getElementById("logEnabled");
       var logRequestCountElement = document.getElementById("logRequestCount");
@@ -165,6 +174,9 @@
 
         usernameElement.value = data.username;
         passwordElement.value = data.password;
+        if (data.region) {
+          regionElement.value = data.region;
+        }
         logEnabledElement.checked = data.logEnabled;
         logLevel.value = data.logLevel;
         logRequestCountElement.value = data.logRequestCount;
@@ -200,6 +212,7 @@
         Homey.api("POST", "/saveSettings", {
           username: usernameElement.value,
           password: passwordElement.value,
+          region: regionElement.value,
           geofences: geofences,
           logEnabled: logEnabledElement.checked,
           logLevel: (parseInt(logLevelElement.value) ?? 3)
@@ -273,10 +286,10 @@
       var geofencesElement = document.getElementById("geofences");
 
       if (document.getElementById(rowId)) {
-        return Homey.alert("This location is already added.")
+        return Homey.alert("This location is already added.");
       }
       if (Array.from(geofencesElement.rows).find(row => row.cells[0].innerText === label)) {
-        return Homey.alert("This location label is already used.")
+        return Homey.alert("This location label is already used.");
       }
 
       var newRow = geofencesElement.insertRow();
