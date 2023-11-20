@@ -165,6 +165,17 @@ class Vehicle extends Device {
         await this.UpdateCapabilityValue("address_capability", newLocation.Address);
         const locationChangedFlowCard: any = this.homey.flow.getDeviceTriggerCard("location_changed");
         locationChangedFlowCard.trigger(this, newLocation, {});
+
+        if (oldLocation?.Label !== newLocation.Label) {
+            if (newLocation?.Label) {
+                const genFenceEnter: any = this.homey.flow.getDeviceTriggerCard("geo_fence_enter");
+                genFenceEnter.trigger(this, newLocation, {});
+            }
+            if (oldLocation?.Label) {
+                const genFenceExit: any = this.homey.flow.getDeviceTriggerCard("geo_fence_exit");
+                genFenceExit.trigger(this, newLocation, {});
+            }
+        }
         
         // Currently onLocationChanged is only triggered if location changed and the door is locked.
         const driveSessionCompletedFlowCard: any = this.homey.flow.getDeviceTriggerCard("drive_session_completed");
