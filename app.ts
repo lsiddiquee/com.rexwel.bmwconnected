@@ -8,6 +8,7 @@ import { ConfigurationManager } from './utils/ConfigurationManager';
 import { DeviceData } from './utils/DeviceData';
 import { Logger } from './utils/Logger';
 import { Configuration } from './utils/Configuration';
+import { LocationType } from './utils/LocationType';
 
 // TODO:
 // Window states capability
@@ -20,6 +21,7 @@ export class BMWConnectedDrive extends Homey.App {
   tokenStore?: HomeyTokenStore;
   connectedDriveApi?: ConnectedDrive;
   logger?: Logger;
+  currentLocation?: LocationType;
 
   /**
    * onInit is called when the app is initialized.
@@ -47,7 +49,12 @@ export class BMWConnectedDrive extends Homey.App {
         throw new Error("VIN not found while climate_now flow triggered.");
       }
       args.device.log(`Flow triggered climate_now for vin ${vin}`);
-      await this.connectedDriveApi?.startClimateControl(vin);
+
+      try {
+        await this.connectedDriveApi?.startClimateControl(vin);
+      } catch (err) {
+        this.logger?.LogError(err);
+      }
     });
 
     this.homey.flow.getActionCard('lock_vehicle').registerRunListener(async (args: any) => {
@@ -56,7 +63,12 @@ export class BMWConnectedDrive extends Homey.App {
         throw new Error("VIN not found while lock_vehicle flow triggered.");
       }
       args.device.log(`Flow triggered lock_vehicle for vin ${vin}`);
-      await this.connectedDriveApi?.lockDoors(vin);
+
+      try {
+        await this.connectedDriveApi?.lockDoors(vin);
+      } catch (err) {
+        this.logger?.LogError(err);
+      }
     });
 
     this.homey.flow.getActionCard('unlock_vehicle').registerRunListener(async (args: any) => {
@@ -65,7 +77,12 @@ export class BMWConnectedDrive extends Homey.App {
         throw new Error("VIN not found while unlock_vehicle flow triggered.");
       }
       args.device.log(`Flow triggered unlock_vehicle for vin ${vin}`);
-      await this.connectedDriveApi?.unlockDoors(vin);
+
+      try {
+        await this.connectedDriveApi?.unlockDoors(vin);
+      } catch (err) {
+        this.logger?.LogError(err);
+      }
     });
 
     this.homey.flow.getActionCard('blow_horn').registerRunListener(async (args: any) => {
@@ -74,7 +91,12 @@ export class BMWConnectedDrive extends Homey.App {
         throw new Error("VIN not found while blow_horn triggered.");
       }
       args.device.log(`Flow triggered blow_horn for vin ${vin}`);
-      await this.connectedDriveApi?.blowHorn(vin);
+
+      try {
+        await this.connectedDriveApi?.blowHorn(vin);
+      } catch (err) {
+        this.logger?.LogError(err);
+      }
     });
 
     this.homey.flow.getActionCard('flash_lights').registerRunListener(async (args: any) => {
@@ -83,7 +105,12 @@ export class BMWConnectedDrive extends Homey.App {
         throw new Error("VIN not found while flash_lights flow triggered.");
       }
       args.device.log(`Flow triggered flash_lights for vin ${vin}`);
-      await this.connectedDriveApi?.flashLights(vin);
+
+      try {
+        await this.connectedDriveApi?.flashLights(vin);
+      } catch (err) {
+        this.logger?.LogError(err);
+      }
     });
 
     this.homey.flow.getActionCard('send_message').registerRunListener(async (args: any) => {
@@ -92,7 +119,12 @@ export class BMWConnectedDrive extends Homey.App {
         throw new Error("VIN not found while send_message flow triggered.");
       }
       args.device.log(`Flow triggered send_message for vin ${vin}`);
-      await this.connectedDriveApi?.sendMessage(vin, args.subject, args.message);
+
+      try {
+        await this.connectedDriveApi?.sendMessage(vin, args.subject, args.message);
+      } catch (err) {
+        this.logger?.LogError(err);
+      }
     });
   }
 }

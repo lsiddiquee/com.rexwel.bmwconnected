@@ -31,5 +31,8 @@
   },
   "0.1.7": {
     "en": "Fixed issue regarding lock status and location changed trigger."
+  },
+  "0.2.0": {
+    "en": "Added support for logging in from North America."
   }
 }

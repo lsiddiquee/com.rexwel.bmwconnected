@@ -41,6 +41,7 @@ class Vehicle extends Device {
         if (this.hasCapability("climate_now_capability")) {
             this.registerCapabilityListener("climate_now_capability", this.onCapabilityClimateNow.bind(this));
         }
+
         if (this.hasCapability("location_capability")) {
             const coordinate: string = await this.getCapabilityValue("location_capability");
             if (coordinate) {
@@ -51,6 +52,7 @@ class Vehicle extends Device {
                         Longitude: parseFloat(splitString[1]) ?? 0,
                         Address: await this.getCapabilityValue("address_capability")
                     };
+                    this.app.currentLocation = this.currentLocation;
                 }
             }
         }
@@ -73,11 +75,15 @@ class Vehicle extends Device {
     async onCapabilityClimateNow(value: boolean) {
 
         if (this.api) {
-            if (value) {
-                this.logger?.LogInformation("Starting climate control.");
-                await this.api.startClimateControl(this.deviceData.id);
-            } else {
-                await this.api.stopClimateControl(this.deviceData.id);
+            try {
+                if (value) {
+                    this.logger?.LogInformation("Starting climate control.");
+                    await this.api.startClimateControl(this.deviceData.id);
+                } else {
+                    await this.api.stopClimateControl(this.deviceData.id);
+                }
+            } catch (err) {
+                this.logger?.LogError(err);
             }
         } else {
             throw new Error("API is not available.");
@@ -88,10 +94,14 @@ class Vehicle extends Device {
     async onCapabilityLocked(value: boolean) {
 
         if (this.api) {
-            if (value) {
-                await this.api.lockDoors(this.deviceData.id, true);
-            } else {
-                await this.api.unlockDoors(this.deviceData.id, true);
+            try {
+                if (value) {
+                    await this.api.lockDoors(this.deviceData.id, true);
+                } else {
+                    await this.api.unlockDoors(this.deviceData.id, true);
+                }
+            } catch (err) {
+                this.logger?.LogError(err);
             }
         } else {
             throw new Error("API is not available.");
@@ -167,15 +177,20 @@ class Vehicle extends Device {
         locationChangedFlowCard.trigger(this, newLocation, {});
 
         if (oldLocation?.Label !== newLocation.Label) {
+            this.logger?.LogInformation(`Geofence changed. Old Location: [${oldLocation?.Label}]. New Location: [${newLocation.Label}]`)
             if (newLocation?.Label) {
-                const genFenceEnter: any = this.homey.flow.getDeviceTriggerCard("geo_fence_enter");
-                genFenceEnter.trigger(this, newLocation, {});
+                this.logger?.LogInformation("Entered geofence.")
+                const geoFenceEnter: any = this.homey.flow.getDeviceTriggerCard("geo_fence_enter");
+                geoFenceEnter.trigger(this, newLocation, {});
             }
             if (oldLocation?.Label) {
-                const genFenceExit: any = this.homey.flow.getDeviceTriggerCard("geo_fence_exit");
-                genFenceExit.trigger(this, newLocation, {});
+                this.logger?.LogInformation("Exit geofence.")
+                const geoFenceExit: any = this.homey.flow.getDeviceTriggerCard("geo_fence_exit");
+                geoFenceExit.trigger(this, oldLocation, {});
             }
         }
+
+        this.app.currentLocation = newLocation;
         
         // Currently onLocationChanged is only triggered if location changed and the door is locked.
         const driveSessionCompletedFlowCard: any = this.homey.flow.getDeviceTriggerCard("drive_session_completed");
@@ -251,8 +266,9 @@ class Vehicle extends Device {
                     }, {});
                 }
             }
-        } catch (error) {
-            this.log("Error occurred while attempting to update device state.", error);
+        } catch (err) {
+            this.log("Error occurred while attempting to update device state.", err);
+            this.logger?.LogError(err);
         }
     }
 

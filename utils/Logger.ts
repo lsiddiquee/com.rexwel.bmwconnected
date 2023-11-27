@@ -22,4 +22,14 @@ export class Logger extends LoggerBase {
             this.logCount = (this.logCount + 1) % (configuration.logRequestCount ?? 10);
         }
     }
+
+    LogError(err: any): void {
+        if (typeof err === "string") {
+            this.Log(LogLevel.Error, err);
+        } else if (err instanceof Error) {
+            this.Log(LogLevel.Error, err.message);
+        } else {
+            this.Log(LogLevel.Error, String(err));
+        }
+    }
 }

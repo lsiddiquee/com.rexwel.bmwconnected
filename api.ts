@@ -4,6 +4,7 @@ import { Configuration } from "./utils/Configuration";
 import { ConfigurationManager } from "./utils/ConfigurationManager";
 import { ConnectedDrive, Regions } from "bmw-connected-drive";
 import { GeoLocation } from "./utils/GeoLocation";
+import { LocationType } from "./utils/LocationType";
 
 export async function saveSettings({ homey, body }: { homey: Homey, body: Configuration }): Promise<boolean> {
 
@@ -25,11 +26,7 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
         await api.account.getToken();
         app.connectedDriveApi = api;
     } catch (err) {
-        if (typeof err === "string") {
-            app.logger?.LogError(err);
-        } else if (err instanceof Error) {
-            app.logger?.LogError(err.message);
-        }
+        app.logger?.LogError(err);
         return false;
     }
 
@@ -39,12 +36,14 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
 
 export async function getLogs({ homey }: { homey: Homey }): Promise<string[]> {
     const app = (homey.app as BMWConnectedDrive);
+    app.logger?.LogInformation("getLogs invoked.");
 
     return app.logger?.logs ?? [];
 }
 
 export async function resolveAddress({ homey, query }: { homey: Homey, query: any }): Promise<string | undefined> {
     let app = (homey.app as BMWConnectedDrive);
+    app.logger?.LogInformation("resolveAddress invoked.");
 
     const latitude = parseFloat(query.latitude);
     const longitude = parseFloat(query.longitude);
@@ -52,4 +51,15 @@ export async function resolveAddress({ homey, query }: { homey: Homey, query: an
         throw new Error("Latitude and longitude must be valid numbers.");
     }
     return await GeoLocation.GetAddress({ Latitude: query.latitude, Longitude: query.longitude }, app.logger);
+}
+
+export async function getCurrentLocation({ homey }: { homey: Homey }): Promise<LocationType | undefined> {
+    let app = (homey.app as BMWConnectedDrive);
+    app.logger?.LogInformation("getCurrentLocation invoked.");
+
+    try {
+        return app.currentLocation;
+    } catch (err) {
+        app.logger?.LogError(err);
+    }
 }

@@ -9,6 +9,7 @@
     "region_rest_of_the_world": "Rest of the World",
     "region_china": "China",
     "geofence": "Geofence",
+    "useCurrentLocation": "Use Current Location",
     "label": "Label",
     "latitude": "Latitude",
     "longitude": "Longitude",

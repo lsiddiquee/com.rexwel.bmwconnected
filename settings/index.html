@@ -85,6 +85,9 @@
         <p>Currently geofencing works by manually entering the latitude and longitude of a location.</p>
       </div>
       <div class="field row">
+        <button type="button" onclick="useCurrentLocation()" data-i18n="settings.useCurrentLocation">useCurrentLocation</button>
+      </div>
+      <div class="field row">
         <label for="locationLabel" data-i18n="settings.label">label</label>
         <input id="locationLabel" type="text" value="" />
         <label for="latitude" data-i18n="settings.latitude">latitude</label>
@@ -256,6 +259,26 @@
       evt.currentTarget.className += " active";
     }
     document.getElementById("defaultOpen").click();
+
+    function useCurrentLocation() {
+      var labelElement = document.getElementById("locationLabel");
+      var latitudeElement = document.getElementById("latitude");
+      var longitudeElement = document.getElementById("longitude");
+      var radiusElement = document.getElementById("radius");
+
+      Homey.api("GET", "/getCurrentLocation", {}, function (err, result) {
+        if (err) return Homey.alert(err);
+
+        Homey.alert(result);
+
+        if (result && result.Latitude && result.Longitude) {
+          labelElement.value = "";
+          latitudeElement.value = result.Latitude;
+          longitudeElement.value = result.Longitude;
+          radiusElement.value = "20";
+        }
+      });
+    }
 
     function addGeofence() {
       var labelElement = document.getElementById("locationLabel");
