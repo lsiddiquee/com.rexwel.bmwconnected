@@ -8,6 +8,7 @@ import {Logger} from '../../utils/Logger';
 import {nameof} from '../../utils/Utils';
 import {LocationType} from '../../utils/LocationType';
 import {ConfigurationManager} from '../../utils/ConfigurationManager';
+import { UnitConverter } from '../../utils/UnitConverter';
 
 class Vehicle extends Device {
 
@@ -61,51 +62,9 @@ class Vehicle extends Device {
         this.currentMileage = this.getCapabilityValue("mileage_capability");
         this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
 
-        await this.setCapabilityOptions("mileage_capability", {"units": ""}); // TODO: Fix units
-        await this.setCapabilityOptions("range_capability", {"units": ""}); // TODO: Fix units
-        if (this.hasCapability("measure_battery")) {
-            await this.setCapabilityOptions("range_capability.battery", {"units": ""}); // TODO: Fix units
-            await this.setCapabilityOptions("range_capability.fuel", {"units": ""}); // TODO: Fix units
-        }
+        await this.setDistanceUnits(this.settings.distanceUnit);
 
         this.logger?.LogInformation(`${this.getName()} (${this.deviceData.id}) has been initialized`);
-    }
-
-    // this method is called when the Device has requested a state change (turned on or off)
-    async onCapabilityClimateNow(value: boolean) {
-
-        if (this.api) {
-            try {
-                if (value) {
-                    this.logger?.LogInformation("Starting climate control.");
-                    await this.api.startClimateControl(this.deviceData.id);
-                } else {
-                    await this.api.stopClimateControl(this.deviceData.id);
-                }
-            } catch (err) {
-                this.logger?.LogError(err);
-            }
-        } else {
-            throw new Error("API is not available.");
-        }
-    }
-
-    // this method is called when the Device has requested a state change (turned on or off)
-    async onCapabilityLocked(value: boolean) {
-
-        if (this.api) {
-            try {
-                if (value) {
-                    await this.api.lockDoors(this.deviceData.id, true);
-                } else {
-                    await this.api.unlockDoors(this.deviceData.id, true);
-                }
-            } catch (err) {
-                this.logger?.LogError(err);
-            }
-        } else {
-            throw new Error("API is not available.");
-        }
     }
 
     /**
@@ -124,12 +83,20 @@ class Vehicle extends Device {
      */
     async onSettings({newSettings, changedKeys}: { newSettings: any, changedKeys: string[] }): Promise<string | void> {
         this.settings = newSettings;
+
         if (changedKeys.includes(nameof<Settings>("pollingInterval"))) {
             if (this.deviceStatusPoller) {
                 clearInterval(this.deviceStatusPoller);
             }
             this.app.logger?.LogInformation(`setting polling interval to ${this.settings.pollingInterval} seconds`);
             this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
+        }
+
+        if (changedKeys.includes(nameof<Settings>("distanceUnit"))) {
+            this.app.logger?.LogInformation(`Distance unit changed.`);
+
+            await this.setDistanceUnits(this.settings.distanceUnit);
+            await this.updateState();
         }
     }
 
@@ -152,7 +119,44 @@ class Vehicle extends Device {
         }
     }
 
-    async onLocationChanged(newLocation: LocationType) {
+    // this method is called when the Device has requested a state change (turned on or off)
+    private async onCapabilityClimateNow(value: boolean) {
+
+        if (this.api) {
+            try {
+                if (value) {
+                    this.logger?.LogInformation("Starting climate control.");
+                    await this.api.startClimateControl(this.deviceData.id);
+                } else {
+                    await this.api.stopClimateControl(this.deviceData.id);
+                }
+            } catch (err) {
+                this.logger?.LogError(err);
+            }
+        } else {
+            throw new Error("API is not available.");
+        }
+    }
+
+    // this method is called when the Device has requested a state change (turned on or off)
+    private async onCapabilityLocked(value: boolean) {
+
+        if (this.api) {
+            try {
+                if (value) {
+                    await this.api.lockDoors(this.deviceData.id, true);
+                } else {
+                    await this.api.unlockDoors(this.deviceData.id, true);
+                }
+            } catch (err) {
+                this.logger?.LogError(err);
+            }
+        } else {
+            throw new Error("API is not available.");
+        }
+    }
+
+    private async onLocationChanged(newLocation: LocationType) {
         this.logger?.LogInformation("Location changed.")
 
         const configuration = ConfigurationManager.getConfiguration(this.homey);
@@ -208,7 +212,7 @@ class Vehicle extends Device {
         }, {});
     }
 
-    async updateState() {
+    private async updateState() {
         try {
             this.logger?.LogInformation(`Polling BMW ConnectedDrive for vehicle status updates for ${this.getName()}.`);
             if (this.api) {
@@ -217,9 +221,9 @@ class Vehicle extends Device {
                 let oldFuelValue = this.hasCapability("remanining_fuel_liters_capability") ?
                     await this.getCapabilityValue("remanining_fuel_liters_capability")
                     : undefined;
-                await this.UpdateCapabilityValue("mileage_capability", vehicle.currentMileage);
+                await this.UpdateCapabilityValue("mileage_capability", UnitConverter.ConvertDistance(vehicle.currentMileage, this.settings.distanceUnit));
                 await this.UpdateCapabilityValue("remanining_fuel_liters_capability", vehicle.combustionFuelLevel.remainingFuelLiters);
-                await this.UpdateCapabilityValue("range_capability", vehicle.range);
+                await this.UpdateCapabilityValue("range_capability", UnitConverter.ConvertDistance(vehicle.range, this.settings.distanceUnit));
 
                 const secured : boolean = vehicle.doorsState.combinedSecurityState === "SECURED";
                 await this.UpdateCapabilityValue("alarm_generic", !secured);
@@ -227,8 +231,8 @@ class Vehicle extends Device {
                 let triggerChargingStatusChange = false;
                 if (this.hasCapability("measure_battery")) {
                     await this.UpdateCapabilityValue("measure_battery", vehicle.electricChargingState.chargingLevelPercent);
-                    await this.UpdateCapabilityValue("range_capability.battery", vehicle.electricChargingState.range);
-                    await this.UpdateCapabilityValue("range_capability.fuel", vehicle.combustionFuelLevel.range);
+                    await this.UpdateCapabilityValue("range_capability.battery", UnitConverter.ConvertDistance(vehicle.electricChargingState.range, this.settings.distanceUnit));
+                    await this.UpdateCapabilityValue("range_capability.fuel", UnitConverter.ConvertDistance(vehicle.combustionFuelLevel.range, this.settings.distanceUnit));
                     const oldChargingStatus = this.getCapabilityValue("charging_status_capability");
                     await this.UpdateCapabilityValue("charging_status_capability", vehicle.electricChargingState.chargingStatus);
                     if (oldChargingStatus !== vehicle.electricChargingState.chargingStatus) {
@@ -272,7 +276,7 @@ class Vehicle extends Device {
         }
     }
 
-    async UpdateCapabilityValue(name: string, value: any): Promise<boolean> {
+    private async UpdateCapabilityValue(name: string, value: any): Promise<boolean> {
         if (value || value === 0 || value === false) {
             if (!this.hasCapability(name)) {
                 await this.addCapability(name);
@@ -284,11 +288,20 @@ class Vehicle extends Device {
         return false;
     }
 
-    async CleanupCapability(name: string) {
+    private async CleanupCapability(name: string) {
         if (this.hasCapability(name)) {
             await this.removeCapability(name);
         }
-}
+    }
+
+    private async setDistanceUnits(distanceUnit: string) {
+        await this.setCapabilityOptions("mileage_capability", { "units": distanceUnit === "metric" ? "km" : "miles" });
+        await this.setCapabilityOptions("range_capability", { "units": distanceUnit === "metric" ? "km" : "miles" });
+        if (this.hasCapability("measure_battery")) {
+            await this.setCapabilityOptions("range_capability.battery", { "units": distanceUnit === "metric" ? "km" : "miles" });
+            await this.setCapabilityOptions("range_capability.fuel", { "units": distanceUnit === "metric" ? "km" : "miles" });
+        }
+    }
 }
 
 module.exports = Vehicle;
