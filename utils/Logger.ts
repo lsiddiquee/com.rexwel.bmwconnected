@@ -14,12 +14,12 @@ export class Logger extends LoggerBase {
 
     Log(level: LogLevel, message: string): void {
         const configuration = ConfigurationManager.getConfiguration(this.homey);
-        if (level < configuration.logLevel) return;
+        if (level < configuration.logLevel && level < LogLevel.Error) return;
         const logMessage = `[${new Date().toISOString()}] ${LogLevel[level]}: ${message}`;
         this.homey.log(logMessage);
-        if (configuration.logEnabled) {
+        if (configuration.logEnabled || level >= LogLevel.Error) {
             this.logs[this.logCount] = logMessage;
-            this.logCount = (this.logCount + 1) % (configuration.logRequestCount ?? 10);
+            this.logCount = (this.logCount + 1) % configuration.logRequestCount;
         }
     }
 
