@@ -269,8 +269,6 @@
       Homey.api("GET", "/getCurrentLocation", {}, function (err, result) {
         if (err) return Homey.alert(err);
 
-        Homey.alert(result);
-
         if (result && result.Latitude && result.Longitude) {
           labelElement.value = "";
           latitudeElement.value = result.Latitude;
