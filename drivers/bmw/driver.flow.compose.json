@@ -121,8 +121,7 @@
           },
           "example": "Vleutensebaan, 3544 Utrecht, Nederland"
         }
-      ],
-      "$filter": "capabilities=location_capability"
+      ]
     },
     {
       "id": "drive_session_completed",
@@ -210,8 +209,7 @@
           },
           "example": "45875"
         }
-      ],
-      "$filter": "capabilities=location_capability"
+      ]
     },
     {
       "id": "refuelled",
@@ -252,7 +250,7 @@
           "example": "Proostwetering 90, 3543 AJ Utrecht"
         }
       ],
-      "$filter": "capabilities=remanining_fuel_liters_capability"
+      "$filter": "capabilities=remaining_fuel_capability"
     },
     {
       "id": "geo_fence_enter",
@@ -292,8 +290,7 @@
           },
           "example": "Vleutensebaan, 3544 Utrecht, Nederland"
         }
-      ],
-      "$filter": "capabilities=location_capability"
+      ]
     },
     {
       "id": "geo_fence_exit",
@@ -333,8 +330,7 @@
           },
           "example": "Vleutensebaan, 3544 Utrecht, Nederland"
         }
-      ],
-      "$filter": "capabilities=location_capability"
+      ]
     }
   ]
 }

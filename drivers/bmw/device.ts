@@ -34,6 +34,10 @@ class Vehicle extends Device {
         this.settings = this.getSettings() as Settings;
 
         await this.CleanupCapability("measure_battery.actual");
+        if (this.hasCapability("remanining_fuel_liters_capability")) {
+            let oldFuelValue = await this.CleanupCapability("remanining_fuel_liters_capability");
+            await this.UpdateCapabilityValue("remaining_fuel_liters_capability", oldFuelValue);
+        }
 
         // register a capability listener
         if (this.hasCapability("locked")) {
@@ -58,11 +62,13 @@ class Vehicle extends Device {
             }
         }
 
+        await this.setDistanceUnits(this.settings.distanceUnit);
+        //await this.setFuelUnits(this.settings.fuelUnit);
+
         await this.updateState();
         this.currentMileage = this.getCapabilityValue("mileage_capability");
-        this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
 
-        await this.setDistanceUnits(this.settings.distanceUnit);
+        this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
 
         this.logger?.LogInformation(`${this.getName()} (${this.deviceData.id}) has been initialized`);
     }
@@ -92,10 +98,23 @@ class Vehicle extends Device {
             this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
         }
 
+        let shouldUpdateState = false;
+
         if (changedKeys.includes(nameof<Settings>("distanceUnit"))) {
             this.app.logger?.LogInformation(`Distance unit changed.`);
 
             await this.setDistanceUnits(this.settings.distanceUnit);
+            shouldUpdateState = true;
+        }
+
+        if (changedKeys.includes(nameof<Settings>("fuelUnit"))) {
+            this.app.logger?.LogInformation(`Fuel unit changed.`);
+
+            await this.setFuelUnits(this.settings.fuelUnit);
+            shouldUpdateState = true;
+        }
+
+        if (shouldUpdateState) {
             await this.updateState();
         }
     }
@@ -218,12 +237,14 @@ class Vehicle extends Device {
             if (this.api) {
                 const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
 
-                let oldFuelValue = this.hasCapability("remanining_fuel_liters_capability") ?
-                    await this.getCapabilityValue("remanining_fuel_liters_capability")
+                let oldFuelValue = this.hasCapability("remaining_fuel_liters_capability") ?
+                    await this.getCapabilityValue("remaining_fuel_liters_capability")
                     : undefined;
                 await this.UpdateCapabilityValue("mileage_capability", UnitConverter.ConvertDistance(vehicle.currentMileage, this.settings.distanceUnit));
-                await this.UpdateCapabilityValue("remanining_fuel_liters_capability", vehicle.combustionFuelLevel.remainingFuelLiters);
                 await this.UpdateCapabilityValue("range_capability", UnitConverter.ConvertDistance(vehicle.range, this.settings.distanceUnit));
+
+                await this.UpdateCapabilityValue("remaining_fuel_liters_capability", vehicle.combustionFuelLevel.remainingFuelLiters);
+                await this.UpdateCapabilityValue("remaining_fuel_capability", UnitConverter.ConvertFuel(vehicle.combustionFuelLevel.remainingFuelLiters, this.settings.fuelUnit));
 
                 const secured : boolean = vehicle.doorsState.combinedSecurityState === "SECURED";
                 await this.UpdateCapabilityValue("alarm_generic", !secured);
@@ -288,19 +309,31 @@ class Vehicle extends Device {
         return false;
     }
 
-    private async CleanupCapability(name: string) {
+    private async CleanupCapability(name: string) : Promise<any> {
         if (this.hasCapability(name)) {
+            let oldValue = await this.getCapabilityValue(name)
             await this.removeCapability(name);
+            return oldValue;
         }
+
+        return undefined;
     }
 
     private async setDistanceUnits(distanceUnit: string) {
+        this.logger?.LogInformation(`Setting distance unit to ${distanceUnit}`);
+
         await this.setCapabilityOptions("mileage_capability", { "units": distanceUnit === "metric" ? "km" : "miles" });
         await this.setCapabilityOptions("range_capability", { "units": distanceUnit === "metric" ? "km" : "miles" });
         if (this.hasCapability("measure_battery")) {
             await this.setCapabilityOptions("range_capability.battery", { "units": distanceUnit === "metric" ? "km" : "miles" });
             await this.setCapabilityOptions("range_capability.fuel", { "units": distanceUnit === "metric" ? "km" : "miles" });
         }
+    }
+
+    private async setFuelUnits(fuelUnit: string) {
+        this.logger?.LogInformation(`Setting fuel unit to ${fuelUnit}`);
+
+        await this.setCapabilityOptions("remaining_fuel_capability", { "units": fuelUnit === "liter" ? "l" : "gal" });
     }
 }
 

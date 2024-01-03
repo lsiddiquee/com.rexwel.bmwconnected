@@ -40,5 +40,8 @@
   },
   "0.2.2": {
     "en": "Added support to switch between miles and km in device settings."
+  },
+  "0.3.0": {
+    "en": "Added support for geofence based trigger, miles/km support, l/GAL (US)/GAL (UK) support, improved error handling"
   }
 }

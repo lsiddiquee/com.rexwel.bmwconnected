@@ -1,0 +1,10 @@
+{
+  "type": "number",
+  "title": {
+    "en": "remaining_fuel_liters_capability"
+  },
+  "getable": true,
+  "setable": false,
+  "units": "l",
+  "uiComponent": null
+}

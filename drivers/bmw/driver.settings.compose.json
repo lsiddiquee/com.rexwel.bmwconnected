@@ -42,5 +42,27 @@
         "label": "Miles"
       }
     ]
+  },
+  {
+    "id": "fuelUnit",
+    "type": "dropdown",
+    "label": {
+      "en": "Fuel Unit"
+    },
+    "value": "liter",
+    "values": [
+      {
+        "id": "liter",
+        "label": "Liter"
+      },
+      {
+        "id": "gallonUS",
+        "label": "Gallon (US)"
+      },
+      {
+        "id": "gallonUK",
+        "label": "Gallon (UK)"
+      }
+    ]
   }
 ]
