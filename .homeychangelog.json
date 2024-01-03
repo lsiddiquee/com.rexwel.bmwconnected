@@ -31,5 +31,17 @@
   },
   "0.1.7": {
     "en": "Fixed issue regarding lock status and location changed trigger."
+  },
+  "0.2.0": {
+    "en": "Added support for users in the North America region."
+  },
+  "0.2.1": {
+    "en": "Added geofence enter and exit trigger. Added support in settings page to use the current location of the vehicle."
+  },
+  "0.2.2": {
+    "en": "Added support to switch between miles and km in device settings."
+  },
+  "0.3.0": {
+    "en": "Added support for geofence based trigger, miles/km support, l/GAL (US)/GAL (UK) support, improved error handling"
   }
 }

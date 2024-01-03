@@ -24,5 +24,45 @@
     "hint": {
       "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger."
     }
+  },
+  {
+    "id": "distanceUnit",
+    "type": "dropdown",
+    "label": {
+      "en": "Distance Unit"
+    },
+    "value": "metric",
+    "values": [
+      {
+        "id": "metric",
+        "label": "KM"
+      },
+      {
+        "id": "miles",
+        "label": "Miles"
+      }
+    ]
+  },
+  {
+    "id": "fuelUnit",
+    "type": "dropdown",
+    "label": {
+      "en": "Fuel Unit"
+    },
+    "value": "liter",
+    "values": [
+      {
+        "id": "liter",
+        "label": "Liter"
+      },
+      {
+        "id": "gallonUS",
+        "label": "Gallon (US)"
+      },
+      {
+        "id": "gallonUK",
+        "label": "Gallon (UK)"
+      }
+    ]
   }
 ]

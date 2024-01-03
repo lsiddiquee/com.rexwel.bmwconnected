@@ -1,6 +1,6 @@
 {
   "id": "com.rexwel.bmwconnected",
-  "version": "0.1.7",
+  "version": "0.3.0",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -35,6 +35,10 @@
     "resolveAddress": {
       "method": "GET",
       "path": "/resolveAddress"
+    },
+    "getCurrentLocation": {
+      "method": "GET",
+      "path": "/getCurrentLocation"
     }
   },
   "bugs": {
