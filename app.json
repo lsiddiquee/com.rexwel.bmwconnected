@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "com.rexwel.bmwconnected",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -363,6 +363,174 @@
         ]
       }
     ],
+    "conditions": [
+      {
+        "id": "battery_percentage",
+        "title": {
+          "en": "Battery charge is !{{less than|more than or equal to}} ..."
+        },
+        "titleFormatted": {
+          "en": "Battery charge is !{{less than|more than or equal to}} '[[battery_charge_test]]'"
+        },
+        "hint": {
+          "en": "Checks if battery charge is less/more than or equal to a given percentage."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw"
+          },
+          {
+            "type": "number",
+            "name": "battery_charge_test",
+            "title": {
+              "en": "Charge"
+            },
+            "placeholder": {
+              "en": "50"
+            },
+            "min": 0,
+            "max": 100
+          }
+        ]
+      },
+      {
+        "id": "geofence",
+        "title": {
+          "en": "!{{Inside|Outside}} of geo-fence ..."
+        },
+        "titleFormatted": {
+          "en": "!{{Inside|Outside}} of geo-fence '[[geo_fence]]'"
+        },
+        "hint": {
+          "en": "Checks if the car is inside/outside a geofence location."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw"
+          },
+          {
+            "type": "autocomplete",
+            "name": "geo_fence",
+            "title": {
+              "en": "Geofence label"
+            },
+            "placeholder": {
+              "en": "Selected geofence"
+            }
+          }
+        ]
+      },
+      {
+        "id": "charging_status",
+        "title": {
+          "en": "Charging Status !{{is|is not}} ..."
+        },
+        "titleFormatted": {
+          "en": "Charging Status !{{is|is not}} '[[charging_state]]'"
+        },
+        "hint": {
+          "en": "Checks if the car is inside/outside a geofence location."
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw"
+          },
+          {
+            "type": "dropdown",
+            "name": "charging_state",
+            "title": {
+              "en": "Charging status"
+            },
+            "values": [
+              {
+                "id": "DEFAULT",
+                "title": {
+                  "en": "Default"
+                }
+              },
+              {
+                "id": "CHARGING",
+                "title": {
+                  "en": "Charging"
+                }
+              },
+              {
+                "id": "ERROR",
+                "title": {
+                  "en": "Error"
+                }
+              },
+              {
+                "id": "COMPLETE",
+                "title": {
+                  "en": "Complete"
+                }
+              },
+              {
+                "id": "FULLY_CHARGED",
+                "title": {
+                  "en": "Fully Charged"
+                }
+              },
+              {
+                "id": "FINISHED_FULLY_CHARGED",
+                "title": {
+                  "en": "Finished Fully Charged"
+                }
+              },
+              {
+                "id": "FINISHED_NOT_FULL",
+                "title": {
+                  "en": "Finished Not Full"
+                }
+              },
+              {
+                "id": "INVALID",
+                "title": {
+                  "en": "Invalid"
+                }
+              },
+              {
+                "id": "NOT_CHARGING",
+                "title": {
+                  "en": "Not Charging"
+                }
+              },
+              {
+                "id": "PLUGGED_IN",
+                "title": {
+                  "en": "Plugged In"
+                }
+              },
+              {
+                "id": "WAITING_FOR_CHARGING",
+                "title": {
+                  "en": "Waiting For Charging"
+                }
+              },
+              {
+                "id": "TARGET_REACHED",
+                "title": {
+                  "en": "Target Reached"
+                }
+              },
+              {
+                "id": "UNKNOWN",
+                "title": {
+                  "en": "Unknown"
+                }
+              }
+            ]
+          }
+        ]
+      }
+    ],
     "actions": [
       {
         "id": "climate_now",
@@ -605,10 +773,90 @@
       "uiComponent": null
     },
     "charging_status_capability": {
-      "type": "string",
+      "type": "enum",
       "title": {
         "en": "Charging Status"
       },
+      "values": [
+        {
+          "id": "DEFAULT",
+          "title": {
+            "en": "Default"
+          }
+        },
+        {
+          "id": "CHARGING",
+          "title": {
+            "en": "Charging"
+          }
+        },
+        {
+          "id": "ERROR",
+          "title": {
+            "en": "Error"
+          }
+        },
+        {
+          "id": "COMPLETE",
+          "title": {
+            "en": "Complete"
+          }
+        },
+        {
+          "id": "FULLY_CHARGED",
+          "title": {
+            "en": "Fully Charged"
+          }
+        },
+        {
+          "id": "FINISHED_FULLY_CHARGED",
+          "title": {
+            "en": "Finished Fully Charged"
+          }
+        },
+        {
+          "id": "FINISHED_NOT_FULL",
+          "title": {
+            "en": "Finished Not Full"
+          }
+        },
+        {
+          "id": "INVALID",
+          "title": {
+            "en": "Invalid"
+          }
+        },
+        {
+          "id": "NOT_CHARGING",
+          "title": {
+            "en": "Not Charging"
+          }
+        },
+        {
+          "id": "PLUGGED_IN",
+          "title": {
+            "en": "Plugged In"
+          }
+        },
+        {
+          "id": "WAITING_FOR_CHARGING",
+          "title": {
+            "en": "Waiting For Charging"
+          }
+        },
+        {
+          "id": "TARGET_REACHED",
+          "title": {
+            "en": "Target Reached"
+          }
+        },
+        {
+          "id": "UNKNOWN",
+          "title": {
+            "en": "Unknown"
+          }
+        }
+      ],
       "getable": true,
       "setable": false,
       "uiComponent": "sensor",

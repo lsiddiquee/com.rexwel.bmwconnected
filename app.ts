@@ -40,6 +40,7 @@ export class BMWConnectedDrive extends Homey.App {
     this.logger.LogInformation('BMWConnectedDrive app has been initialized');
 
     this.registerActionCards();
+    this.registerConditionCards();
   }
 
   private registerActionCards() {
@@ -125,6 +126,33 @@ export class BMWConnectedDrive extends Homey.App {
       } catch (err) {
         this.logger?.LogError(err);
       }
+    });
+  }
+
+  private registerConditionCards() {
+    const geofenceCard = this.homey.flow.getConditionCard('geofence');
+    geofenceCard.registerArgumentAutocompleteListener("geo_fence", async (query: any, args: any) => {
+      const configuration = ConfigurationManager.getConfiguration(this.homey);
+      if (configuration?.geofences) {
+        const geofences = configuration.geofences.map(item => ({name: item.Label, id: item.Label}));
+        return geofences.filter(result => result.name?.toLowerCase().includes(query.toLowerCase()));
+      }
+
+      return [];
+    });
+    geofenceCard.registerRunListener(async (args: any, state: any) => {
+      const app = this.homey.app as BMWConnectedDrive
+      return (app.currentLocation && args.geo_fence.id && app.currentLocation.Label === args.geo_fence.id);
+    });
+
+    this.homey.flow.getConditionCard('battery_percentage').registerRunListener(async (args: any, _: any) => {
+      const battery_percentage = args.device.getCapabilityValue('measure_battery');
+      return (battery_percentage < args.battery_charge_test);
+    });
+
+    this.homey.flow.getConditionCard('charging_status').registerRunListener(async (args: any, _: any) => {
+      const charging_state = args.device.getCapabilityValue('charging_status_capability');
+      return (charging_state === args.charging_state);
     });
   }
 }

@@ -43,5 +43,8 @@
   },
   "0.3.0": {
     "en": "Added support for geofence based trigger, miles/km support, l/GAL (US)/GAL (UK) support, improved error handling"
+  },
+  "0.4.0": {
+    "en": "Added condition cards for battery level, charging status and geofence location."
   }
 }

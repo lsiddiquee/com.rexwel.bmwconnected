@@ -1,13 +1,13 @@
-import {Device} from 'homey';
-import {BMWConnectedDrive} from '../../app';
-import {DeviceData} from '../../utils/DeviceData';
-import {ConnectedDrive} from 'bmw-connected-drive';
-import {GeoLocation} from '../../utils/GeoLocation';
-import {Settings} from '../../utils/Settings';
-import {Logger} from '../../utils/Logger';
-import {nameof} from '../../utils/Utils';
-import {LocationType} from '../../utils/LocationType';
-import {ConfigurationManager} from '../../utils/ConfigurationManager';
+import { Device } from 'homey';
+import { BMWConnectedDrive } from '../../app';
+import { DeviceData } from '../../utils/DeviceData';
+import { ConnectedDrive } from 'bmw-connected-drive';
+import { GeoLocation } from '../../utils/GeoLocation';
+import { Settings } from '../../utils/Settings';
+import { Logger } from '../../utils/Logger';
+import { nameof } from '../../utils/Utils';
+import { LocationType } from '../../utils/LocationType';
+import { ConfigurationManager } from '../../utils/ConfigurationManager';
 import { UnitConverter } from '../../utils/UnitConverter';
 
 class Vehicle extends Device {
@@ -57,6 +57,7 @@ class Vehicle extends Device {
                         Longitude: parseFloat(splitString[1]) ?? 0,
                         Address: await this.getCapabilityValue("address_capability")
                     };
+                    this.checkGeofence(this.currentLocation);
                     this.app.currentLocation = this.currentLocation;
                 }
             }
@@ -87,7 +88,7 @@ class Vehicle extends Device {
      * @param {string[]} event.changedKeys An array of keys changed since the previous version
      * @returns {Promise<string|void>} return a custom message that will be displayed
      */
-    async onSettings({newSettings, changedKeys}: { newSettings: any, changedKeys: string[] }): Promise<string | void> {
+    async onSettings({ newSettings, changedKeys }: { newSettings: any, changedKeys: string[] }): Promise<string | void> {
         this.settings = newSettings;
 
         if (changedKeys.includes(nameof<Settings>("pollingInterval"))) {
@@ -175,20 +176,26 @@ class Vehicle extends Device {
         }
     }
 
-    private async onLocationChanged(newLocation: LocationType) {
-        this.logger?.LogInformation("Location changed.")
-
+    private async checkGeofence(location: LocationType) {
         const configuration = ConfigurationManager.getConfiguration(this.homey);
         if (configuration?.geofences) {
             this.logger?.LogInformation("Checking geofences.")
             // Checking if the position is inside a geofence.
-            const position = configuration.geofences.find(fence => GeoLocation.IsInsideGeofence(newLocation, fence));
+            const position = configuration.geofences.find(fence => GeoLocation.IsInsideGeofence(location, fence));
             if (position) {
-                this.logger?.LogInformation(`Geofences triggered '${position.Label}'.`)
-                // Hit on a geofence.
-                newLocation.Label = position.Label;
+                this.logger?.LogInformation(`Inside geofence '${position.Label}'.`)
+                location.Label = position.Label;
+                return;
             }
         }
+
+        location.Label = undefined;
+    }
+
+    private async onLocationChanged(newLocation: LocationType) {
+        this.logger?.LogInformation("Location changed.")
+
+        this.checkGeofence(newLocation);
 
         const oldMileage = this.currentMileage;
         const oldLocation = this.currentLocation;
@@ -214,7 +221,7 @@ class Vehicle extends Device {
         }
 
         this.app.currentLocation = newLocation;
-        
+
         // Currently onLocationChanged is only triggered if location changed and the door is locked.
         const driveSessionCompletedFlowCard: any = this.homey.flow.getDeviceTriggerCard("drive_session_completed");
         driveSessionCompletedFlowCard.trigger(this, {
@@ -246,7 +253,7 @@ class Vehicle extends Device {
                 await this.UpdateCapabilityValue("remaining_fuel_liters_capability", vehicle.combustionFuelLevel.remainingFuelLiters);
                 await this.UpdateCapabilityValue("remaining_fuel_capability", UnitConverter.ConvertFuel(vehicle.combustionFuelLevel.remainingFuelLiters, this.settings.fuelUnit));
 
-                const secured : boolean = vehicle.doorsState.combinedSecurityState === "SECURED";
+                const secured: boolean = vehicle.doorsState.combinedSecurityState === "SECURED";
                 await this.UpdateCapabilityValue("alarm_generic", !secured);
 
                 let triggerChargingStatusChange = false;
@@ -272,16 +279,16 @@ class Vehicle extends Device {
 
                 if (secured && vehicle.location.coordinates.latitude && vehicle.location.coordinates.longitude) {
                     if (this.currentLocation?.Latitude !== vehicle.location.coordinates.latitude || this.currentLocation?.Longitude !== vehicle.location.coordinates.longitude) {
-                        this.onLocationChanged({Label: "", Latitude: vehicle.location.coordinates.latitude, Longitude: vehicle.location.coordinates.longitude, Address: vehicle.location.address.formatted});
+                        this.onLocationChanged({ Label: "", Latitude: vehicle.location.coordinates.latitude, Longitude: vehicle.location.coordinates.longitude, Address: vehicle.location.address.formatted });
                     }
                 }
 
                 if (triggerChargingStatusChange) {
                     const chargingStatusFlowCard: any = this.homey.flow.getDeviceTriggerCard("charging_status_change");
-                    chargingStatusFlowCard.trigger(this, {charging_status: vehicle.electricChargingState.chargingStatus}, {});
+                    chargingStatusFlowCard.trigger(this, { charging_status: vehicle.electricChargingState.chargingStatus }, {});
                 }
-                
-                if (oldFuelValue && vehicle.combustionFuelLevel.remainingFuelLiters && (vehicle.combustionFuelLevel.remainingFuelLiters - oldFuelValue) >= this.settings.refuellingTriggerThreshold){
+
+                if (oldFuelValue && vehicle.combustionFuelLevel.remainingFuelLiters && (vehicle.combustionFuelLevel.remainingFuelLiters - oldFuelValue) >= this.settings.refuellingTriggerThreshold) {
                     const refuelledFlowCard: any = this.homey.flow.getDeviceTriggerCard("refuelled");
                     refuelledFlowCard.trigger(this, {
                         FuelBeforeRefuelling: oldFuelValue,
@@ -309,7 +316,7 @@ class Vehicle extends Device {
         return false;
     }
 
-    private async CleanupCapability(name: string) : Promise<any> {
+    private async CleanupCapability(name: string): Promise<any> {
         if (this.hasCapability(name)) {
             let oldValue = await this.getCapabilityValue(name)
             await this.removeCapability(name);
