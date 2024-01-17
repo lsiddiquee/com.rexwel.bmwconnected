@@ -189,7 +189,7 @@ class Vehicle extends Device {
             }
         }
 
-        location.Label = undefined;
+        location.Label = "";
     }
 
     private async onLocationChanged(newLocation: LocationType) {
