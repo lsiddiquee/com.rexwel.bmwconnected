@@ -46,5 +46,8 @@
   },
   "0.4.0": {
     "en": "Added condition cards for battery level, charging status and geofence location."
+  },
+  "0.4.1": {
+    "en": "Fixed issue with location changed trigger if it is not in geofence."
   }
 }
