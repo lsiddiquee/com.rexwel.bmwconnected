@@ -361,6 +361,32 @@
             "filter": "driver_id=bmw"
           }
         ]
+      },
+      {
+        "id": "climate_now_started",
+        "title": {
+          "en": "Climate Now started"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw&capabilities=climate_now_capability"
+          }
+        ]
+      },
+      {
+        "id": "climate_now_stopped",
+        "title": {
+          "en": "Climate Now stopped"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw&capabilities=climate_now_capability"
+          }
+        ]
       }
     ],
     "conditions": [
@@ -536,6 +562,19 @@
         "id": "climate_now",
         "title": {
           "en": "Climate Now"
+        },
+        "args": [
+          {
+            "type": "device",
+            "name": "device",
+            "filter": "driver_id=bmw&capabilities=climate_now_capability"
+          }
+        ]
+      },
+      {
+        "id": "climate_cancel",
+        "title": {
+          "en": "Climate Cancel"
         },
         "args": [
           {

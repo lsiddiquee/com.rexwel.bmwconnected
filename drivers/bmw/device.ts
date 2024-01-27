@@ -273,8 +273,13 @@ class Vehicle extends Device {
                         || vehicle.doorsState.combinedSecurityState === "SECURED");
                 }
 
+                let triggerClimateStatusChange = false;
                 if (vehicle.climateControlState?.activity) {
+                    const oldClimateStatus = this.getCapabilityValue("climate_now_capability");
                     await this.UpdateCapabilityValue("climate_now_capability", vehicle.climateControlState.activity !== "INACTIVE");
+                    if (oldClimateStatus !== (vehicle.climateControlState.activity !== "INACTIVE")) {
+                        triggerClimateStatusChange = true;
+                    }
                 }
 
                 if (secured && vehicle.location.coordinates.latitude && vehicle.location.coordinates.longitude) {
@@ -286,6 +291,16 @@ class Vehicle extends Device {
                 if (triggerChargingStatusChange) {
                     const chargingStatusFlowCard: any = this.homey.flow.getDeviceTriggerCard("charging_status_change");
                     chargingStatusFlowCard.trigger(this, { charging_status: vehicle.electricChargingState.chargingStatus }, {});
+                }
+
+                if (triggerClimateStatusChange) {
+                    let climateStatusFlowCard: any;
+                    if (vehicle.climateControlState.activity !== "INACTIVE") {
+                        climateStatusFlowCard = this.homey.flow.getDeviceTriggerCard("climate_now_started");
+                    } else {
+                        climateStatusFlowCard = this.homey.flow.getDeviceTriggerCard("climate_now_stopped");
+                    }
+                    climateStatusFlowCard.trigger(this, {}, {});
                 }
 
                 if (oldFuelValue && vehicle.combustionFuelLevel.remainingFuelLiters && (vehicle.combustionFuelLevel.remainingFuelLiters - oldFuelValue) >= this.settings.refuellingTriggerThreshold) {
