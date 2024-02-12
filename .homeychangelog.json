@@ -49,5 +49,8 @@
   },
   "0.4.1": {
     "en": "Fixed issue with location changed trigger if it is not in geofence."
+  },
+  "0.5.0": {
+    "en": "Added Climate Cancel action card and Climate Started and Stopped trigger cards"
   }
 }
