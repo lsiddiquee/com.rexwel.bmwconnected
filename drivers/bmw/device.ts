@@ -274,10 +274,11 @@ class Vehicle extends Device {
                 }
 
                 let triggerClimateStatusChange = false;
+                const newClimateStatus = vehicle.climateControlState?.activity !== "INACTIVE";
                 if (vehicle.climateControlState?.activity) {
                     const oldClimateStatus = this.getCapabilityValue("climate_now_capability");
-                    await this.UpdateCapabilityValue("climate_now_capability", vehicle.climateControlState.activity !== "INACTIVE");
-                    if (oldClimateStatus !== (vehicle.climateControlState.activity !== "INACTIVE")) {
+                    await this.UpdateCapabilityValue("climate_now_capability", newClimateStatus);
+                    if (oldClimateStatus !== newClimateStatus) {
                         triggerClimateStatusChange = true;
                     }
                 }
@@ -295,7 +296,7 @@ class Vehicle extends Device {
 
                 if (triggerClimateStatusChange) {
                     let climateStatusFlowCard: any;
-                    if (vehicle.climateControlState.activity !== "INACTIVE") {
+                    if (newClimateStatus) {
                         climateStatusFlowCard = this.homey.flow.getDeviceTriggerCard("climate_now_started");
                     } else {
                         climateStatusFlowCard = this.homey.flow.getDeviceTriggerCard("climate_now_stopped");
