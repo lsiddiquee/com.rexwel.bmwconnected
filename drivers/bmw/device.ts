@@ -273,8 +273,14 @@ class Vehicle extends Device {
                         || vehicle.doorsState.combinedSecurityState === "SECURED");
                 }
 
+                let triggerClimateStatusChange = false;
+                const newClimateStatus = vehicle.climateControlState?.activity !== "INACTIVE";
                 if (vehicle.climateControlState?.activity) {
-                    await this.UpdateCapabilityValue("climate_now_capability", vehicle.climateControlState.activity !== "INACTIVE");
+                    const oldClimateStatus = this.getCapabilityValue("climate_now_capability");
+                    await this.UpdateCapabilityValue("climate_now_capability", newClimateStatus);
+                    if (oldClimateStatus !== newClimateStatus) {
+                        triggerClimateStatusChange = true;
+                    }
                 }
 
                 if (secured && vehicle.location.coordinates.latitude && vehicle.location.coordinates.longitude) {
@@ -286,6 +292,16 @@ class Vehicle extends Device {
                 if (triggerChargingStatusChange) {
                     const chargingStatusFlowCard: any = this.homey.flow.getDeviceTriggerCard("charging_status_change");
                     chargingStatusFlowCard.trigger(this, { charging_status: vehicle.electricChargingState.chargingStatus }, {});
+                }
+
+                if (triggerClimateStatusChange) {
+                    let climateStatusFlowCard: any;
+                    if (newClimateStatus) {
+                        climateStatusFlowCard = this.homey.flow.getDeviceTriggerCard("climate_now_started");
+                    } else {
+                        climateStatusFlowCard = this.homey.flow.getDeviceTriggerCard("climate_now_stopped");
+                    }
+                    climateStatusFlowCard.trigger(this, {}, {});
                 }
 
                 if (oldFuelValue && vehicle.combustionFuelLevel.remainingFuelLiters && (vehicle.combustionFuelLevel.remainingFuelLiters - oldFuelValue) >= this.settings.refuellingTriggerThreshold) {

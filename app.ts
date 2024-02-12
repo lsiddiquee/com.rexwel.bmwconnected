@@ -58,6 +58,20 @@ export class BMWConnectedDrive extends Homey.App {
       }
     });
 
+    this.homey.flow.getActionCard('climate_cancel').registerRunListener(async (args: any) => {
+      const vin = (args.device?.deviceData as DeviceData)?.id;
+      if (!vin) {
+        throw new Error("VIN not found while climate_cancel flow triggered.");
+      }
+      args.device.log(`Flow triggered climate_cancel for vin ${vin}`);
+
+      try {
+        await this.connectedDriveApi?.stopClimateControl(vin);
+      } catch (err) {
+        this.logger?.LogError(err);
+      }
+    });
+
     this.homey.flow.getActionCard('lock_vehicle').registerRunListener(async (args: any) => {
       const vin = (args.device?.deviceData as DeviceData)?.id;
       if (!vin) {

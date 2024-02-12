@@ -8,6 +8,13 @@
       "$filter": "capabilities=climate_now_capability"
     },
     {
+      "id": "climate_cancel",
+      "title": {
+        "en": "Climate Cancel"
+      },
+      "$filter": "capabilities=climate_now_capability"
+    },
+    {
       "id": "lock_vehicle",
       "title": {
         "en": "Lock"
@@ -331,6 +338,20 @@
           "example": "Vleutensebaan, 3544 Utrecht, Nederland"
         }
       ]
+    },
+    {
+      "id": "climate_now_started",
+      "title": {
+        "en": "Climate Now started"
+      },
+      "$filter": "capabilities=climate_now_capability"
+    },
+    {
+      "id": "climate_now_stopped",
+      "title": {
+        "en": "Climate Now stopped"
+      },
+      "$filter": "capabilities=climate_now_capability"
     }
   ],
   "conditions": [
