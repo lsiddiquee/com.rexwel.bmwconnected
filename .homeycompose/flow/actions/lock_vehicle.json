@@ -1,0 +1,7 @@
+{
+    "id": "lock_vehicle",
+    "title": {
+        "en": "Lock"
+    },
+    "$filter": "capabilities=only_lock_unlock_flow_capability"
+}

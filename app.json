@@ -59,72 +59,39 @@
       {
         "id": "charging_status_change",
         "title": {
-          "en": "Charging Status Changed"
+          "en": "Charging status changed",
+          "nl": "Laadstatus gewijzigd"
         },
         "tokens": [
           {
             "name": "charging_status",
             "type": "string",
             "title": {
-              "en": "Charging Status"
+              "en": "Charging status",
+              "nl": "Laadstatus"
             },
             "example": "NOCHARGING"
           }
         ],
         "args": [
           {
-            "type": "device",
             "name": "device",
-            "filter": "driver_id=bmw&capabilities=charging_status_capability"
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
           }
         ]
       },
       {
-        "id": "location_changed",
+        "id": "climate_now_started",
         "title": {
-          "en": "Location Changed"
-        },
-        "tokens": [
-          {
-            "name": "Label",
-            "type": "string",
-            "title": {
-              "en": "Label"
-            },
-            "example": "Home"
-          },
-          {
-            "name": "Latitude",
-            "type": "number",
-            "title": {
-              "en": "Latitude"
-            },
-            "example": "52.10017398097361"
-          },
-          {
-            "name": "Longitude",
-            "type": "number",
-            "title": {
-              "en": "Longitude"
-            },
-            "example": "5.044052884751771"
-          },
-          {
-            "name": "Address",
-            "type": "string",
-            "title": {
-              "en": "Address"
-            },
-            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
-          }
-        ],
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw"
-          }
-        ]
+          "en": "Climate Now started"
+        }
+      },
+      {
+        "id": "climate_now_stopped",
+        "title": {
+          "en": "Climate Now stopped"
+        }
       },
       {
         "id": "drive_session_completed",
@@ -212,60 +179,6 @@
             },
             "example": "45875"
           }
-        ],
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw"
-          }
-        ]
-      },
-      {
-        "id": "refuelled",
-        "title": {
-          "en": "Refuelled"
-        },
-        "tokens": [
-          {
-            "name": "FuelBeforeRefuelling",
-            "type": "number",
-            "title": {
-              "en": "Remaining fuel prior to refuelling"
-            },
-            "example": "9"
-          },
-          {
-            "name": "FuelAfterRefuelling",
-            "type": "number",
-            "title": {
-              "en": "Remaining fuel after refuelling"
-            },
-            "example": "46"
-          },
-          {
-            "name": "RefuelledLiters",
-            "type": "number",
-            "title": {
-              "en": "Amount refuelled"
-            },
-            "example": "37"
-          },
-          {
-            "name": "Location",
-            "type": "string",
-            "title": {
-              "en": "Location"
-            },
-            "example": "Proostwetering 90, 3543 AJ Utrecht"
-          }
-        ],
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw&capabilities=remaining_fuel_capability"
-          }
         ]
       },
       {
@@ -305,13 +218,6 @@
               "en": "Address"
             },
             "example": "Vleutensebaan, 3544 Utrecht, Nederland"
-          }
-        ],
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw"
           }
         ]
       },
@@ -353,38 +259,85 @@
             },
             "example": "Vleutensebaan, 3544 Utrecht, Nederland"
           }
-        ],
-        "args": [
+        ]
+      },
+      {
+        "id": "location_changed",
+        "title": {
+          "en": "Location Changed"
+        },
+        "tokens": [
           {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw"
+            "name": "Label",
+            "type": "string",
+            "title": {
+              "en": "Label"
+            },
+            "example": "Home"
+          },
+          {
+            "name": "Latitude",
+            "type": "number",
+            "title": {
+              "en": "Latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "Longitude",
+            "type": "number",
+            "title": {
+              "en": "Longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "Address",
+            "type": "string",
+            "title": {
+              "en": "Address"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
           }
         ]
       },
       {
-        "id": "climate_now_started",
+        "id": "refuelled",
         "title": {
-          "en": "Climate Now started"
+          "en": "Refuelled"
         },
-        "args": [
+        "tokens": [
           {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw&capabilities=climate_now_capability"
-          }
-        ]
-      },
-      {
-        "id": "climate_now_stopped",
-        "title": {
-          "en": "Climate Now stopped"
-        },
-        "args": [
+            "name": "FuelBeforeRefuelling",
+            "type": "number",
+            "title": {
+              "en": "Remaining fuel prior to refuelling"
+            },
+            "example": "9"
+          },
           {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw&capabilities=climate_now_capability"
+            "name": "FuelAfterRefuelling",
+            "type": "number",
+            "title": {
+              "en": "Remaining fuel after refuelling"
+            },
+            "example": "46"
+          },
+          {
+            "name": "RefuelledLiters",
+            "type": "number",
+            "title": {
+              "en": "Amount refuelled"
+            },
+            "example": "37"
+          },
+          {
+            "name": "Location",
+            "type": "string",
+            "title": {
+              "en": "Location"
+            },
+            "example": "Proostwetering 90, 3543 AJ Utrecht"
           }
         ]
       }
@@ -403,11 +356,6 @@
         },
         "args": [
           {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw"
-          },
-          {
             "type": "number",
             "name": "battery_charge_test",
             "title": {
@@ -418,35 +366,6 @@
             },
             "min": 0,
             "max": 100
-          }
-        ]
-      },
-      {
-        "id": "geofence",
-        "title": {
-          "en": "!{{Inside|Outside}} of geo-fence ..."
-        },
-        "titleFormatted": {
-          "en": "!{{Inside|Outside}} of geo-fence '[[geo_fence]]'"
-        },
-        "hint": {
-          "en": "Checks if the car is inside/outside a geofence location."
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw"
-          },
-          {
-            "type": "autocomplete",
-            "name": "geo_fence",
-            "title": {
-              "en": "Geofence label"
-            },
-            "placeholder": {
-              "en": "Selected geofence"
-            }
           }
         ]
       },
@@ -462,11 +381,6 @@
           "en": "Checks if the car is inside/outside a geofence location."
         },
         "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw"
-          },
           {
             "type": "dropdown",
             "name": "charging_state",
@@ -555,86 +469,62 @@
             ]
           }
         ]
+      },
+      {
+        "id": "geofence",
+        "title": {
+          "en": "!{{Inside|Outside}} of geo-fence ..."
+        },
+        "titleFormatted": {
+          "en": "!{{Inside|Outside}} of geo-fence '[[geo_fence]]'"
+        },
+        "hint": {
+          "en": "Checks if the car is inside/outside a geofence location."
+        },
+        "args": [
+          {
+            "type": "autocomplete",
+            "name": "geo_fence",
+            "title": {
+              "en": "Geofence label"
+            },
+            "placeholder": {
+              "en": "Selected geofence"
+            }
+          }
+        ]
       }
     ],
     "actions": [
       {
-        "id": "climate_now",
+        "id": "blow_horn",
         "title": {
-          "en": "Climate Now"
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw&capabilities=climate_now_capability"
-          }
-        ]
+          "en": "Blow Horn"
+        }
       },
       {
         "id": "climate_cancel",
         "title": {
           "en": "Climate Cancel"
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw&capabilities=climate_now_capability"
-          }
-        ]
+        }
       },
       {
-        "id": "lock_vehicle",
+        "id": "climate_now",
         "title": {
-          "en": "Lock"
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw&capabilities=only_lock_unlock_flow_capability"
-          }
-        ]
-      },
-      {
-        "id": "unlock_vehicle",
-        "title": {
-          "en": "Unlock"
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw&capabilities=only_lock_unlock_flow_capability"
-          }
-        ]
-      },
-      {
-        "id": "blow_horn",
-        "title": {
-          "en": "Blow Horn"
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw"
-          }
-        ]
+          "en": "Climate Now"
+        }
       },
       {
         "id": "flash_lights",
         "title": {
           "en": "Flash Lights"
-        },
-        "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw"
-          }
-        ]
+        }
+      },
+      {
+        "id": "lock_vehicle",
+        "title": {
+          "en": "Lock"
+        }
       },
       {
         "id": "send_message",
@@ -645,11 +535,6 @@
           "en": "Send Message ([[subject]]) [[message]]"
         },
         "args": [
-          {
-            "type": "device",
-            "name": "device",
-            "filter": "driver_id=bmw"
-          },
           {
             "type": "text",
             "name": "subject",
@@ -671,14 +556,17 @@
             }
           }
         ]
+      },
+      {
+        "id": "unlock_vehicle",
+        "title": {
+          "en": "Unlock"
+        }
       }
     ]
   },
   "drivers": [
     {
-      "name": {
-        "en": "BMW"
-      },
       "class": "other",
       "connectivity": [
         "cloud"
@@ -698,12 +586,14 @@
       "capabilitiesOptions": {
         "alarm_generic": {
           "title": {
-            "en": "Alarm Disarmed"
+            "en": "Alarm disarmed",
+            "nl": "Alarm uitgeschakeld"
           }
         },
         "measure_battery.actual": {
           "title": {
-            "en": "Actual Battery"
+            "en": "Actual battery",
+            "nl": "Huidige batterij"
           }
         }
       },
@@ -719,6 +609,37 @@
       },
       "pair": [
         {
+          "id": "loading",
+          "template": "loading"
+        },
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "logo": "large.png",
+            "title": {
+              "en": "Sign-in to Connected Drive",
+              "nl": "Meld je aan bij Connected Drive"
+            },
+            "usernameLabel": {
+              "en": "E-mail address",
+              "nl": "E-mailadres"
+            },
+            "usernamePlaceholder": {
+              "en": "john@doe.com",
+              "nl": "jan@doe.nl"
+            },
+            "passwordLabel": {
+              "en": "Password",
+              "nl": "Wachtwoord"
+            },
+            "passwordPlaceholder": {
+              "en": "Password",
+              "nl": "Wachtwoord"
+            }
+          }
+        },
+        {
           "id": "list_devices",
           "template": "list_devices",
           "navigation": {
@@ -730,75 +651,100 @@
           "template": "add_devices"
         }
       ],
-      "id": "bmw",
-      "settings": [
-        {
-          "id": "pollingInterval",
-          "type": "number",
-          "label": {
-            "en": "Polling Interval (seconds)"
-          },
-          "value": 60,
-          "min": 5,
-          "max": 3600,
-          "hint": {
-            "en": "The interval at which the app polls to update the state of the vehicle."
+      "name": {
+        "en": "BMW"
+      },
+      "id": "bmw"
+    },
+    {
+      "class": "other",
+      "connectivity": [
+        "cloud"
+      ],
+      "capabilities": [
+        "alarm_generic",
+        "locked",
+        "mileage_capability",
+        "range_capability",
+        "climate_now_capability",
+        "measure_battery",
+        "measure_battery.actual",
+        "range_capability.battery",
+        "range_capability.fuel",
+        "charging_status_capability"
+      ],
+      "capabilitiesOptions": {
+        "alarm_generic": {
+          "title": {
+            "en": "Alarm disarmed",
+            "nl": "Alarm uitgeschakeld"
           }
         },
-        {
-          "id": "refuellingTriggerThreshold",
-          "type": "number",
-          "label": {
-            "en": "Refuelling trigger threshold (liter)"
-          },
-          "value": 5,
-          "min": 1,
-          "max": 100,
-          "hint": {
-            "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger."
+        "measure_battery.actual": {
+          "title": {
+            "en": "Actual battery",
+            "nl": "Huidige batterij"
           }
-        },
-        {
-          "id": "distanceUnit",
-          "type": "dropdown",
-          "label": {
-            "en": "Distance Unit"
-          },
-          "value": "metric",
-          "values": [
-            {
-              "id": "metric",
-              "label": "KM"
-            },
-            {
-              "id": "miles",
-              "label": "Miles"
-            }
-          ]
-        },
-        {
-          "id": "fuelUnit",
-          "type": "dropdown",
-          "label": {
-            "en": "Fuel Unit"
-          },
-          "value": "liter",
-          "values": [
-            {
-              "id": "liter",
-              "label": "Liter"
-            },
-            {
-              "id": "gallonUS",
-              "label": "Gallon (US)"
-            },
-            {
-              "id": "gallonUK",
-              "label": "Gallon (UK)"
-            }
-          ]
         }
-      ]
+      },
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "images": {
+        "small": "/drivers/mini/assets/images/small.jpeg",
+        "large": "/drivers/mini/assets/images/large.jpeg",
+        "xlarge": "/drivers/mini/assets/images/xlarge.jpeg"
+      },
+      "pair": [
+        {
+          "id": "loading",
+          "template": "loading"
+        },
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "logo": "large.png",
+            "title": {
+              "en": "Sign-in to Connected Drive",
+              "nl": "Meld je aan bij Connected Drive"
+            },
+            "usernameLabel": {
+              "en": "E-mail address",
+              "nl": "E-mailadres"
+            },
+            "usernamePlaceholder": {
+              "en": "john@doe.com",
+              "nl": "jan@doe.nl"
+            },
+            "passwordLabel": {
+              "en": "Password",
+              "nl": "Wachtwoord"
+            },
+            "passwordPlaceholder": {
+              "en": "Password",
+              "nl": "Wachtwoord"
+            }
+          }
+        },
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "name": {
+        "en": "Mini"
+      },
+      "id": "mini"
     }
   ],
   "capabilities": {

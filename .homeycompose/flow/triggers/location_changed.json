@@ -1,0 +1,40 @@
+{
+    "id": "location_changed",
+    "title": {
+        "en": "Location Changed"
+    },
+    "tokens": [
+        {
+            "name": "Label",
+            "type": "string",
+            "title": {
+                "en": "Label"
+            },
+            "example": "Home"
+        },
+        {
+            "name": "Latitude",
+            "type": "number",
+            "title": {
+                "en": "Latitude"
+            },
+            "example": "52.10017398097361"
+        },
+        {
+            "name": "Longitude",
+            "type": "number",
+            "title": {
+                "en": "Longitude"
+            },
+            "example": "5.044052884751771"
+        },
+        {
+            "name": "Address",
+            "type": "string",
+            "title": {
+                "en": "Address"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+        }
+    ]
+}

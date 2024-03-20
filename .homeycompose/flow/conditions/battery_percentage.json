@@ -1,0 +1,26 @@
+{
+  "id": "battery_percentage",
+  "title": {
+    "en": "Battery charge is !{{less than|more than or equal to}} ..."
+  },
+  "titleFormatted": {
+    "en": "Battery charge is !{{less than|more than or equal to}} '[[battery_charge_test]]'"
+  },
+  "hint": {
+    "en": "Checks if battery charge is less/more than or equal to a given percentage."
+  },
+  "args": [
+    {
+      "type": "number",
+      "name": "battery_charge_test",
+      "title": {
+        "en": "Charge"
+      },
+      "placeholder": {
+        "en": "50"
+      },
+      "min": 0,
+      "max": 100
+    }
+  ]
+}

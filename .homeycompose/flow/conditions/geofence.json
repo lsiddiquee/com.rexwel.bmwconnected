@@ -1,0 +1,24 @@
+{
+    "id": "geofence",
+    "title": {
+        "en": "!{{Inside|Outside}} of geo-fence ..."
+    },
+    "titleFormatted": {
+        "en": "!{{Inside|Outside}} of geo-fence '[[geo_fence]]'"
+    },
+    "hint": {
+        "en": "Checks if the car is inside/outside a geofence location."
+    },
+    "args": [
+        {
+            "type": "autocomplete",
+            "name": "geo_fence",
+            "title": {
+                "en": "Geofence label"
+            },
+            "placeholder": {
+                "en": "Selected geofence"
+            }
+        }
+    ]
+}

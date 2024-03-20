@@ -1,0 +1,41 @@
+{
+    "id": "refuelled",
+    "title": {
+        "en": "Refuelled"
+    },
+    "tokens": [
+        {
+            "name": "FuelBeforeRefuelling",
+            "type": "number",
+            "title": {
+                "en": "Remaining fuel prior to refuelling"
+            },
+            "example": "9"
+        },
+        {
+            "name": "FuelAfterRefuelling",
+            "type": "number",
+            "title": {
+                "en": "Remaining fuel after refuelling"
+            },
+            "example": "46"
+        },
+        {
+            "name": "RefuelledLiters",
+            "type": "number",
+            "title": {
+                "en": "Amount refuelled"
+            },
+            "example": "37"
+        },
+        {
+            "name": "Location",
+            "type": "string",
+            "title": {
+                "en": "Location"
+            },
+            "example": "Proostwetering 90, 3543 AJ Utrecht"
+        }
+    ],
+    "$filter": "capabilities=remaining_fuel_capability"
+}

@@ -1,6 +1,6 @@
 {
   "name": {
-    "en": "BMW"
+    "en": "Mini"
   },
   "$extends": ["driver"]
 }

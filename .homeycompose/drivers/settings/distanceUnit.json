@@ -1,0 +1,18 @@
+{
+  "id": "distanceUnit",
+  "type": "dropdown",
+  "label": {
+    "en": "Distance Unit"
+  },
+  "value": "metric",
+  "values": [
+    {
+      "id": "metric",
+      "label": "KM"
+    },
+    {
+      "id": "miles",
+      "label": "Miles"
+    }
+  ]
+}

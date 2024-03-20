@@ -1,0 +1,13 @@
+{
+    "id": "climate_now_started",
+    "title": {
+        "en": "Climate now started",
+        "nl": "Nu klimatiseren gestart"
+    },
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini"
+    }],
+    "$filter": "capabilities=climate_now_capability"
+}

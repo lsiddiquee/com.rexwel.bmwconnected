@@ -1,0 +1,7 @@
+{
+    "id": "climate_cancel",
+    "title": {
+        "en": "Climate Cancel"
+    },
+    "$filter": "capabilities=climate_now_capability"
+}

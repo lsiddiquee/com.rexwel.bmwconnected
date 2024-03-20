@@ -1,0 +1,31 @@
+{
+    "id": "send_message",
+    "title": {
+        "en": "Send Message"
+    },
+    "titleFormatted": {
+        "en": "Send Message ([[subject]]) [[message]]"
+    },
+    "args": [
+        {
+            "type": "text",
+            "name": "subject",
+            "title": {
+                "en": "Subject"
+            },
+            "placeholder": {
+                "en": "Subject"
+            }
+        },
+        {
+            "type": "text",
+            "name": "message",
+            "title": {
+                "en": "Message"
+            },
+            "placeholder": {
+                "en": "Message"
+            }
+        }
+    ]
+}
