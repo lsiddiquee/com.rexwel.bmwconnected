@@ -1,7 +1,13 @@
 {
     "id": "climate_cancel",
     "title": {
-        "en": "Climate Cancel"
+        "en": "Climate cancel",
+        "nl": "Klimatiseren stoppen"
     },
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini"
+    }],
     "$filter": "capabilities=climate_now_capability"
 }

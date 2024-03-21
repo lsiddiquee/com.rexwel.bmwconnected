@@ -1,7 +1,13 @@
 {
     "id": "climate_now",
     "title": {
-        "en": "Climate Now"
+        "en": "Climate now",
+        "nl": "Nu klimatiseren"
     },
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini"
+    }],
     "$filter": "capabilities=climate_now_capability"
 }

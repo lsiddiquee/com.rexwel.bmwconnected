@@ -1,7 +1,8 @@
 {
     "id": "geo_fence_exit",
     "title": {
-        "en": "Geo-fence - Exit"
+        "en": "Geofence exited",
+        "nl": "Geofence verlaten"
     },
     "tokens": [
         {
@@ -10,7 +11,10 @@
             "title": {
                 "en": "Label"
             },
-            "example": "Home"
+            "example": {
+                "en": "Home",
+                "nl": "Thuis"
+            }
         },
         {
             "name": "Latitude",
@@ -32,9 +36,15 @@
             "name": "Address",
             "type": "string",
             "title": {
-                "en": "Address"
+                "en": "Address",
+                "nl": "Adres"
             },
             "example": "Vleutensebaan, 3544 Utrecht, Nederland"
         }
-    ]
+    ],
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini"
+    }]
 }

@@ -1,7 +1,13 @@
 {
     "id": "lock_vehicle",
     "title": {
-        "en": "Lock"
+        "en": "Lock",
+        "nl": "Vergrendelen"
     },
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini"
+    }],
     "$filter": "capabilities=only_lock_unlock_flow_capability"
 }

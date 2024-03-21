@@ -1,6 +1,12 @@
 {
     "id": "flash_lights",
     "title": {
-        "en": "Flash Lights"
-    }
+        "en": "Flash lights",
+        "nl": "Lichten knipperen"
+    },
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini"
+    }]
 }

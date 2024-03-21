@@ -1,26 +1,35 @@
 {
   "id": "battery_percentage",
   "title": {
-    "en": "Battery charge is !{{less than|more than or equal to}} ..."
+    "en": "Battery charge is !{{less than|more than or equal to}} ...",
+    "nl": "Batterijlading is !{{minder dan|meer dan of gelijk aan}} ..."
   },
   "titleFormatted": {
-    "en": "Battery charge is !{{less than|more than or equal to}} '[[battery_charge_test]]'"
+    "en": "Battery charge is !{{less than|more than or equal to}} '[[battery_charge_test]]'%",
+    "nl": "Batterijlading is !{{minder dan|meer dan of gelijk aan}} '[[battery_charge_test]]'%"
   },
   "hint": {
-    "en": "Checks if battery charge is less/more than or equal to a given percentage."
+    "en": "Checks if battery charge is less/more than or equal to a given percentage.",
+    "nl": "Controleert of de batterijlading minder/meer dan of gelijk is aan een gegeven percentage."
   },
   "args": [
     {
       "type": "number",
       "name": "battery_charge_test",
       "title": {
-        "en": "Charge"
+        "en": "Charge",
+        "nl": "Lading"
       },
       "placeholder": {
         "en": "50"
       },
       "min": 0,
       "max": 100
+    },
+    {
+      "name": "device",
+      "type": "device",
+      "filter": "driver_id=bmw|mini"
     }
   ]
 }
