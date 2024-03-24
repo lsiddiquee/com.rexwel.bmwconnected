@@ -6,7 +6,7 @@ import { ConfigurationManager } from '../utils/ConfigurationManager';
 import { CarBrand, ConnectedDrive } from "bmw-connected-drive";
 import { Settings } from '../utils/Settings';
 
-export class ConnectedDriveDriver extends Driver {
+export class ConnectedDriver extends Driver {
   brand: CarBrand = CarBrand.Bmw;
 
   async onPair(session: any) {
@@ -62,23 +62,25 @@ export class ConnectedDriveDriver extends Driver {
 
       const vehicles = await api.getVehicles();
 
-      return Promise.all(vehicles.map(async vehicle => {
-        this.log(`Vehicle detected: ${vehicle.vin}, ${vehicle.attributes.model}`);
+      return vehicles
+        .filter(vehicle => vehicle.attributes.brand === this.brand)
+        .map(vehicle => {
+          this.log(`Vehicle found: ${vehicle.vin}, ${vehicle.attributes.model}`);
 
-        if (!vehicle.vin) {
-          throw new Error("Cannot list vehicle as vin is empty.");
-        }
+          if (!vehicle.vin) {
+            throw new Error("Cannot list vehicle as vin is empty.");
+          }
 
-        const deviceData = new DeviceData();
-        deviceData.id = vehicle.vin;
+          const deviceData = new DeviceData();
+          deviceData.id = vehicle.vin;
 
-        return {
-          "name": `${vehicle.attributes.model} (${vehicle.vin})`,
-          "data": deviceData,
-          "settings": new Settings(),
-          "icon": "icon.svg"
-        };
-      }));
+          return {
+            "name": `${vehicle.attributes.model} (${vehicle.vin})`,
+            "data": deviceData,
+            "settings": new Settings(),
+            "icon": "icon.svg"
+          };
+        });
     });
   }
 }

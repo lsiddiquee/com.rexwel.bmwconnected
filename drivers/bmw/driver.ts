@@ -1,7 +1,7 @@
 import { CarBrand } from 'bmw-connected-drive';
-import { ConnectedDriveDriver } from '../ConnectedDriveDriver';
+import { ConnectedDriver } from '../ConnectedDriver';
 
-class BmwDriver extends ConnectedDriveDriver {
+class BmwDriver extends ConnectedDriver {
     /**
    * onInit is called when the driver is initialized.
    */

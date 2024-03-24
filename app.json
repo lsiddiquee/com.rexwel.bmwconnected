@@ -787,10 +787,10 @@
         ]
       },
       "images": {
-        "small": "/drivers/bmw/assets/images/small.jpeg",
-        "large": "/drivers/bmw/assets/images/large.jpeg",
-        "xlarge": "/drivers/bmw/assets/images/xlarge.jpeg"
+        "small": "/drivers/bmw/assets/images/small.png",
+        "large": "/drivers/bmw/assets/images/large.png"
       },
+      "icon": "/drivers/bmw/assets/icon.svg",
       "pair": [
         {
           "id": "loading",
@@ -800,18 +800,14 @@
           "id": "login_credentials",
           "template": "login_credentials",
           "options": {
-            "logo": "large.png",
-            "title": {
-              "en": "Sign-in to Connected Drive",
-              "nl": "Meld je aan bij Connected Drive"
-            },
+            "logo": "logo.png",
             "usernameLabel": {
               "en": "E-mail address",
               "nl": "E-mailadres"
             },
             "usernamePlaceholder": {
               "en": "john@doe.com",
-              "nl": "jan@doe.nl"
+              "nl": "jan@jansen.nl"
             },
             "passwordLabel": {
               "en": "Password",
@@ -877,10 +873,10 @@
         ]
       },
       "images": {
-        "small": "/drivers/mini/assets/images/small.jpeg",
-        "large": "/drivers/mini/assets/images/large.jpeg",
-        "xlarge": "/drivers/mini/assets/images/xlarge.jpeg"
+        "small": "/drivers/mini/assets/images/small.png",
+        "large": "/drivers/mini/assets/images/large.png"
       },
+      "icon": "/drivers/mini/assets/icon.svg",
       "pair": [
         {
           "id": "loading",
@@ -890,18 +886,14 @@
           "id": "login_credentials",
           "template": "login_credentials",
           "options": {
-            "logo": "large.png",
-            "title": {
-              "en": "Sign-in to Connected Drive",
-              "nl": "Meld je aan bij Connected Drive"
-            },
+            "logo": "logo.png",
             "usernameLabel": {
               "en": "E-mail address",
               "nl": "E-mailadres"
             },
             "usernamePlaceholder": {
               "en": "john@doe.com",
-              "nl": "jan@doe.nl"
+              "nl": "jan@jansen.nl"
             },
             "passwordLabel": {
               "en": "Password",
