@@ -1,7 +1,8 @@
 {
   "type": "number",
   "title": {
-    "en": "Range"
+    "en": "Range",
+    "nl": "Bereik"
   },
   "getable": true,
   "setable": false,

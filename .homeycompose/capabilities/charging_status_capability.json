@@ -1,22 +1,23 @@
 {
   "type": "enum",
   "title": {
-    "en": "Charging Status"
+    "en": "Charging status",
+    "nl": "Laadstatus"
   },
   "values": [
-    { "id": "DEFAULT", "title": { "en": "Default" } },
-    { "id": "CHARGING", "title": { "en": "Charging" } },
-    { "id": "ERROR", "title": { "en": "Error" } },
-    { "id": "COMPLETE", "title": { "en": "Complete" } },
-    { "id": "FULLY_CHARGED", "title": { "en": "Fully Charged" } },
-    { "id": "FINISHED_FULLY_CHARGED", "title": { "en": "Finished Fully Charged" } },
-    { "id": "FINISHED_NOT_FULL", "title": { "en": "Finished Not Full" } },
-    { "id": "INVALID", "title": { "en": "Invalid" } },
-    { "id": "NOT_CHARGING", "title": { "en": "Not Charging" } },
-    { "id": "PLUGGED_IN", "title": { "en": "Plugged In" } },
-    { "id": "WAITING_FOR_CHARGING", "title": { "en": "Waiting For Charging" } },
-    { "id": "TARGET_REACHED", "title": { "en": "Target Reached" } },
-    { "id": "UNKNOWN", "title": { "en": "Unknown" } }
+    { "id": "DEFAULT", "title": { "en": "Default", "nl": "Standaard" } },
+    { "id": "CHARGING", "title": { "en": "Charging", "nl": "Laden" } },
+    { "id": "ERROR", "title": { "en": "Error", "nl": "Fout" } },
+    { "id": "COMPLETE", "title": { "en": "Complete", "nl": "Gereed" } },
+    { "id": "FULLY_CHARGED", "title": { "en": "Fully charged", "nl": "Volledig geladen" } },
+    { "id": "FINISHED_FULLY_CHARGED", "title": { "en": "Finished fully charged", "nl": "Voltooid volledig geladen" } },
+    { "id": "FINISHED_NOT_FULL", "title": { "en": "Finished not full", "nl": "Voltooid niet vol" } },
+    { "id": "INVALID", "title": { "en": "Invalid", "nl": "Ongeldig" } },
+    { "id": "NOT_CHARGING", "title": { "en": "Not charging", "nl": "Niet aan het laden" } },
+    { "id": "PLUGGED_IN", "title": { "en": "Plugged in", "nl": "Ingeplugd" } },
+    { "id": "WAITING_FOR_CHARGING", "title": { "en": "Waiting for charging", "nl": "Wacht op laden" } },
+    { "id": "TARGET_REACHED", "title": { "en": "Target reached", "nl": "Doel bereikt" } },
+    { "id": "UNKNOWN", "title": { "en": "Unknown", "nl": "Onbekend" } }
   ],
   "getable": true,
   "setable": false,

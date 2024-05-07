@@ -2,17 +2,23 @@
   "id": "distanceUnit",
   "type": "dropdown",
   "label": {
-    "en": "Distance Unit"
+    "en": "Distance Unit",
+    "nl": "Afstandseenheid"
   },
   "value": "metric",
   "values": [
     {
       "id": "metric",
-      "label": "KM"
+      "label": {
+        "en": "Kilometers"
+      }
     },
     {
       "id": "miles",
-      "label": "Miles"
+      "label": {
+        "en": "Miles",
+        "nl": "Mijlen"
+      }
     }
   ]
 }
