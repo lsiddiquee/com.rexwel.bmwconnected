@@ -19,7 +19,8 @@ export class Vehicle extends Device {
     settings: Settings = new Settings();
     currentLocation?: LocationType;
     currentMileage?: number;
-    
+    lastUpdatedAt?: Date;
+
     get api(): ConnectedDrive | undefined {
         return this.app.connectedDriveApi;
     }
@@ -237,6 +238,13 @@ export class Vehicle extends Device {
             if (this.api) {
                 const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
 
+                // Skip updating capability values if the vehicle status has not changed.
+                if (this.lastUpdatedAt && vehicle.lastUpdatedAt <= this.lastUpdatedAt) {
+                    return;
+                }
+
+                this.lastUpdatedAt = vehicle.lastUpdatedAt;
+
                 let oldFuelValue = this.hasCapability("remaining_fuel_liters_capability") ?
                     await this.getCapabilityValue("remaining_fuel_liters_capability")
                     : undefined;
@@ -246,7 +254,7 @@ export class Vehicle extends Device {
                 await this.UpdateCapabilityValue("remaining_fuel_liters_capability", vehicle.combustionFuelLevel.remainingFuelLiters);
                 await this.UpdateCapabilityValue("remaining_fuel_capability", UnitConverter.ConvertFuel(vehicle.combustionFuelLevel.remainingFuelLiters, this.settings.fuelUnit));
 
-                const secured: boolean = vehicle.doorsState.combinedSecurityState === "SECURED";
+                const secured: boolean = vehicle.doorsState.combinedSecurityState === "SECURED" || vehicle.doorsState.combinedSecurityState === "LOCKED";
                 await this.UpdateCapabilityValue("alarm_generic", !secured);
 
                 let triggerChargingStatusChange = false;
