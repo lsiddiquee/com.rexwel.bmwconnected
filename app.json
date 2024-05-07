@@ -1,14 +1,15 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "com.rexwel.bmwconnected",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
-    "en": "BMW Connected"
+    "en": "BMW / Mini Connected"
   },
   "description": {
-    "en": "BMW Connected connects you to your BMW and the rest of the world."
+    "en": "BMW / Mini Connected connects you to your BMW and/or Mini and the rest of the world.",
+    "nl": "BMW / Mini Connected verbindt je met je BMW en/of Mini en de rest van de wereld."
   },
   "brandColor": "#009ADA",
   "category": [
@@ -23,6 +24,18 @@
   "author": {
     "name": "Likhan Siddiquee",
     "email": "likhan.siddiquee@gmail.com"
+  },
+  "contributors": {
+    "developers": [
+      {
+        "name": "Sander Schutten"
+      }
+    ],
+    "translators": [
+      {
+        "name": "Sander Schutten"
+      }
+    ]
   },
   "api": {
     "saveSettings": {
@@ -834,7 +847,92 @@
       "name": {
         "en": "BMW"
       },
-      "id": "bmw"
+      "id": "bmw",
+      "settings": [
+        {
+          "id": "distanceUnit",
+          "type": "dropdown",
+          "label": {
+            "en": "Distance Unit",
+            "nl": "Afstandseenheid"
+          },
+          "value": "metric",
+          "values": [
+            {
+              "id": "metric",
+              "label": {
+                "en": "Kilometers"
+              }
+            },
+            {
+              "id": "miles",
+              "label": {
+                "en": "Miles",
+                "nl": "Mijlen"
+              }
+            }
+          ]
+        },
+        {
+          "id": "fuelUnit",
+          "type": "dropdown",
+          "label": {
+            "en": "Fuel unit",
+            "nl": "Brandstofeenheid"
+          },
+          "value": "liter",
+          "values": [
+            {
+              "id": "liter",
+              "label": {
+                "en": "Liter"
+              }
+            },
+            {
+              "id": "gallonUS",
+              "label": {
+                "en": "Gallon (US)"
+              }
+            },
+            {
+              "id": "gallonUK",
+              "label": {
+                "en": "Gallon (UK)"
+              }
+            }
+          ]
+        },
+        {
+          "id": "pollingInterval",
+          "type": "number",
+          "label": {
+            "en": "Polling interval (seconds)",
+            "nl": "Polling interval (seconden)"
+          },
+          "value": 60,
+          "min": 5,
+          "max": 3600,
+          "hint": {
+            "en": "The interval at which the app polls to update the state of the vehicle.",
+            "nl": "Het interval waarmee de app pollt om de status van het voertuig te updaten."
+          }
+        },
+        {
+          "id": "refuellingTriggerThreshold",
+          "type": "number",
+          "label": {
+            "en": "Refuelled trigger threshold (liter)",
+            "nl": "Bijgetankt trigger drempelwaarde (liter)"
+          },
+          "value": 5,
+          "min": 1,
+          "max": 100,
+          "hint": {
+            "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger.",
+            "nl": "Als de brandstofwaarde een positieve verandering heeft die groter of gelijk is aan de drempelwaarde, wordt de Bijgetankt flow trigger geactiveerd."
+          }
+        }
+      ]
     },
     {
       "class": "other",
@@ -920,7 +1018,92 @@
       "name": {
         "en": "Mini"
       },
-      "id": "mini"
+      "id": "mini",
+      "settings": [
+        {
+          "id": "distanceUnit",
+          "type": "dropdown",
+          "label": {
+            "en": "Distance Unit",
+            "nl": "Afstandseenheid"
+          },
+          "value": "metric",
+          "values": [
+            {
+              "id": "metric",
+              "label": {
+                "en": "Kilometers"
+              }
+            },
+            {
+              "id": "miles",
+              "label": {
+                "en": "Miles",
+                "nl": "Mijlen"
+              }
+            }
+          ]
+        },
+        {
+          "id": "fuelUnit",
+          "type": "dropdown",
+          "label": {
+            "en": "Fuel unit",
+            "nl": "Brandstofeenheid"
+          },
+          "value": "liter",
+          "values": [
+            {
+              "id": "liter",
+              "label": {
+                "en": "Liter"
+              }
+            },
+            {
+              "id": "gallonUS",
+              "label": {
+                "en": "Gallon (US)"
+              }
+            },
+            {
+              "id": "gallonUK",
+              "label": {
+                "en": "Gallon (UK)"
+              }
+            }
+          ]
+        },
+        {
+          "id": "pollingInterval",
+          "type": "number",
+          "label": {
+            "en": "Polling interval (seconds)",
+            "nl": "Polling interval (seconden)"
+          },
+          "value": 60,
+          "min": 5,
+          "max": 3600,
+          "hint": {
+            "en": "The interval at which the app polls to update the state of the vehicle.",
+            "nl": "Het interval waarmee de app pollt om de status van het voertuig te updaten."
+          }
+        },
+        {
+          "id": "refuellingTriggerThreshold",
+          "type": "number",
+          "label": {
+            "en": "Refuelled trigger threshold (liter)",
+            "nl": "Bijgetankt trigger drempelwaarde (liter)"
+          },
+          "value": 5,
+          "min": 1,
+          "max": 100,
+          "hint": {
+            "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger.",
+            "nl": "Als de brandstofwaarde een positieve verandering heeft die groter of gelijk is aan de drempelwaarde, wordt de Bijgetankt flow trigger geactiveerd."
+          }
+        }
+      ]
     }
   ],
   "capabilities": {
@@ -936,85 +1119,99 @@
     "charging_status_capability": {
       "type": "enum",
       "title": {
-        "en": "Charging Status"
+        "en": "Charging status",
+        "nl": "Laadstatus"
       },
       "values": [
         {
           "id": "DEFAULT",
           "title": {
-            "en": "Default"
+            "en": "Default",
+            "nl": "Standaard"
           }
         },
         {
           "id": "CHARGING",
           "title": {
-            "en": "Charging"
+            "en": "Charging",
+            "nl": "Laden"
           }
         },
         {
           "id": "ERROR",
           "title": {
-            "en": "Error"
+            "en": "Error",
+            "nl": "Fout"
           }
         },
         {
           "id": "COMPLETE",
           "title": {
-            "en": "Complete"
+            "en": "Complete",
+            "nl": "Gereed"
           }
         },
         {
           "id": "FULLY_CHARGED",
           "title": {
-            "en": "Fully Charged"
+            "en": "Fully charged",
+            "nl": "Volledig geladen"
           }
         },
         {
           "id": "FINISHED_FULLY_CHARGED",
           "title": {
-            "en": "Finished Fully Charged"
+            "en": "Finished fully charged",
+            "nl": "Voltooid volledig geladen"
           }
         },
         {
           "id": "FINISHED_NOT_FULL",
           "title": {
-            "en": "Finished Not Full"
+            "en": "Finished not full",
+            "nl": "Voltooid niet vol"
           }
         },
         {
           "id": "INVALID",
           "title": {
-            "en": "Invalid"
+            "en": "Invalid",
+            "nl": "Ongeldig"
           }
         },
         {
           "id": "NOT_CHARGING",
           "title": {
-            "en": "Not Charging"
+            "en": "Not charging",
+            "nl": "Niet aan het laden"
           }
         },
         {
           "id": "PLUGGED_IN",
           "title": {
-            "en": "Plugged In"
+            "en": "Plugged in",
+            "nl": "Ingeplugd"
           }
         },
         {
           "id": "WAITING_FOR_CHARGING",
           "title": {
-            "en": "Waiting For Charging"
+            "en": "Waiting for charging",
+            "nl": "Wacht op laden"
           }
         },
         {
           "id": "TARGET_REACHED",
           "title": {
-            "en": "Target Reached"
+            "en": "Target reached",
+            "nl": "Doel bereikt"
           }
         },
         {
           "id": "UNKNOWN",
           "title": {
-            "en": "Unknown"
+            "en": "Unknown",
+            "nl": "Onbekend"
           }
         }
       ],
@@ -1026,7 +1223,8 @@
     "climate_now_capability": {
       "type": "boolean",
       "title": {
-        "en": "Climate Now"
+        "en": "Climate now",
+        "nl": "Nu klimatiseren"
       },
       "getable": true,
       "setable": true,
@@ -1045,7 +1243,8 @@
     "mileage_capability": {
       "type": "number",
       "title": {
-        "en": "Mileage"
+        "en": "Mileage",
+        "nl": "Kilometerstand"
       },
       "getable": true,
       "setable": false,
@@ -1066,7 +1265,8 @@
     "range_capability": {
       "type": "number",
       "title": {
-        "en": "Range"
+        "en": "Range",
+        "nl": "Bereik"
       },
       "getable": true,
       "setable": false,
@@ -1078,7 +1278,8 @@
     "remaining_fuel_capability": {
       "type": "number",
       "title": {
-        "en": "Fuel"
+        "en": "Fuel",
+        "nl": "Brandstof"
       },
       "getable": true,
       "setable": false,
