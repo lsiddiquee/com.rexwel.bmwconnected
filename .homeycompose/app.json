@@ -16,9 +16,9 @@
   ],
   "permissions": [],
   "images": {
-    "small": "/assets/images/small.jpeg",
-    "large": "/assets/images/large.jpeg",
-    "xlarge": "/assets/images/xlarge.jpeg"
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
   },
   "author": {
     "name": "Likhan Siddiquee",
@@ -27,12 +27,14 @@
   "contributors": {
     "developers": [
       {
-        "name": "Sander Schutten"
+        "name": "Sander Schutten",
+        "email": "sander@dotnetstudio.nl"
       }
     ],
     "translators": [
       {
-        "name": "Sander Schutten"
+        "name": "Sander Schutten",
+        "email": "sander@dotnetstudio.nl"
       }
     ]
   },
