@@ -1,7 +1,8 @@
 {
   "type": "number",
   "title": {
-    "en": "Mileage"
+    "en": "Mileage",
+    "nl": "Kilometerstand"
   },
   "getable": true,
   "setable": false,

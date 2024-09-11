@@ -1,13 +1,14 @@
 {
   "id": "com.rexwel.bmwconnected",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
-    "en": "BMW Connected"
+    "en": "BMW / Mini Connected"
   },
   "description": {
-    "en": "BMW Connected connects you to your BMW and the rest of the world."
+    "en": "BMW / Mini Connected connects you to your BMW and/or Mini and the rest of the world.",
+    "nl": "BMW / Mini Connected verbindt je met je BMW en/of Mini en de rest van de wereld."
   },
   "brandColor": "#009ADA",
   "category": [
@@ -15,13 +16,27 @@
   ],
   "permissions": [],
   "images": {
-    "small": "/assets/images/small.jpeg",
-    "large": "/assets/images/large.jpeg",
-    "xlarge": "/assets/images/xlarge.jpeg"
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
   },
   "author": {
     "name": "Likhan Siddiquee",
     "email": "likhan.siddiquee@gmail.com"
+  },
+  "contributors": {
+    "developers": [
+      {
+        "name": "Sander Schutten",
+        "email": "sander@dotnetstudio.nl"
+      }
+    ],
+    "translators": [
+      {
+        "name": "Sander Schutten",
+        "email": "sander@dotnetstudio.nl"
+      }
+    ]
   },
   "api": {
     "saveSettings": {

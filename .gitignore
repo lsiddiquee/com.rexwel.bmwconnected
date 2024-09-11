@@ -45,6 +45,7 @@ dist/**/*
 # ignore yarn.lock
 yarn.lock
 
+app.json
 build
 access_token
 sample_responses

@@ -1,0 +1,50 @@
+{
+    "id": "geo_fence_enter",
+    "title": {
+        "en": "Geofence entered",
+        "nl": "Geofence binnengekomen"
+    },
+    "tokens": [
+        {
+            "name": "Label",
+            "type": "string",
+            "title": {
+                "en": "Label"
+            },
+            "example": {
+                "en": "Home",
+                "nl": "Thuis"
+            }
+        },
+        {
+            "name": "Latitude",
+            "type": "number",
+            "title": {
+                "en": "Latitude"
+            },
+            "example": "52.10017398097361"
+        },
+        {
+            "name": "Longitude",
+            "type": "number",
+            "title": {
+                "en": "Longitude"
+            },
+            "example": "5.044052884751771"
+        },
+        {
+            "name": "Address",
+            "type": "string",
+            "title": {
+                "en": "Address",
+                "nl": "Adres"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+        }
+    ],
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini"
+    }]
+}

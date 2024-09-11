@@ -1,0 +1,29 @@
+{
+  "id": "fuelUnit",
+  "type": "dropdown",
+  "label": {
+    "en": "Fuel unit",
+    "nl": "Brandstofeenheid"
+  },
+  "value": "liter",
+  "values": [
+    {
+      "id": "liter",
+      "label": {
+        "en": "Liter"
+      }
+    },
+    {
+      "id": "gallonUS",
+      "label": {
+        "en": "Gallon (US)"
+      }
+    },
+    {
+      "id": "gallonUK",
+      "label": {
+        "en": "Gallon (UK)"
+      }
+    }
+  ]
+}

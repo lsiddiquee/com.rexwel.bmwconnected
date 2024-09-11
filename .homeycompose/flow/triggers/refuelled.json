@@ -1,0 +1,51 @@
+{
+    "id": "refuelled",
+    "title": {
+        "en": "Refuelled",
+        "nl": "Bijgetankt"
+    },
+    "tokens": [
+        {
+            "name": "FuelBeforeRefuelling",
+            "type": "number",
+            "title": {
+                "en": "Remaining fuel prior to refuelling",
+                "nl": "Brandstof voor het tanken"
+            },
+            "example": "9"
+        },
+        {
+            "name": "FuelAfterRefuelling",
+            "type": "number",
+            "title": {
+                "en": "Remaining fuel after refuelling",
+                "nl": "Brandstof na het tanken"
+            },
+            "example": "46"
+        },
+        {
+            "name": "RefuelledLiters",
+            "type": "number",
+            "title": {
+                "en": "Amount refuelled",
+                "nl": "Hoeveelheid getankt"
+            },
+            "example": "37"
+        },
+        {
+            "name": "Location",
+            "type": "string",
+            "title": {
+                "en": "Location",
+                "nl": "Locatie"
+            },
+            "example": "Proostwetering 90, 3543 AJ Utrecht"
+        }
+    ],
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini"
+    }],
+    "$filter": "capabilities=remaining_fuel_capability"
+}

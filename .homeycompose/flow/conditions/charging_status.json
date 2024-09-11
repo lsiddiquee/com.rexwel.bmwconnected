@@ -1,0 +1,120 @@
+{
+    "id": "charging_status",
+    "title": {
+        "en": "Charging Status !{{is|is not}} ..."
+    },
+    "titleFormatted": {
+        "en": "Charging Status !{{is|is not}} '[[charging_state]]'"
+    },
+    "hint": {
+        "en": "Checks if the car is inside/outside a geofence location."
+    },
+    "args": [
+        {
+            "type": "dropdown",
+            "name": "charging_state",
+            "title": {
+                "en": "Charging status",
+                "nl": "Laadstatus"
+            },
+            "values": [
+                {
+                    "id": "DEFAULT",
+                    "title": {
+                        "en": "Default",
+                        "nl": "Standaard"
+                    }
+                },
+                {
+                    "id": "CHARGING",
+                    "title": {
+                        "en": "Charging",
+                        "nl": "Opladen"
+                    }
+                },
+                {
+                    "id": "ERROR",
+                    "title": {
+                        "en": "Error",
+                        "nl": "Fout"
+                    }
+                },
+                {
+                    "id": "COMPLETE",
+                    "title": {
+                        "en": "Complete",
+                        "nl": "Voltooid"
+                    }
+                },
+                {
+                    "id": "FULLY_CHARGED",
+                    "title": {
+                        "en": "Fully charged",
+                        "nl": "Volledig geladen"
+                    }
+                },
+                {
+                    "id": "FINISHED_FULLY_CHARGED",
+                    "title": {
+                        "en": "Finished and fully charged",
+                        "nl": "Afgerond en volledig geladen"
+                    }
+                },
+                {
+                    "id": "FINISHED_NOT_FULL",
+                    "title": {
+                        "en": "Finished but not fully charged",
+                        "nl": "Afgerond maar niet volledig geladen"
+                    }
+                },
+                {
+                    "id": "INVALID",
+                    "title": {
+                        "en": "Invalid",
+                        "nl": "Ongeldig"
+                    }
+                },
+                {
+                    "id": "NOT_CHARGING",
+                    "title": {
+                        "en": "Not charging",
+                        "nl": "Niet aan het laden"
+                    }
+                },
+                {
+                    "id": "PLUGGED_IN",
+                    "title": {
+                        "en": "Plugged in",
+                        "nl": "Aangesloten"
+                    }
+                },
+                {
+                    "id": "WAITING_FOR_CHARGING",
+                    "title": {
+                        "en": "Waiting for charging",
+                        "nl": "Wacht om te laden"
+                    }
+                },
+                {
+                    "id": "TARGET_REACHED",
+                    "title": {
+                        "en": "Target reached",
+                        "nl": "Doel bereikt"
+                    }
+                },
+                {
+                    "id": "UNKNOWN",
+                    "title": {
+                        "en": "Unknown",
+                        "nl": "Onbekend"
+                    }
+                }
+            ]
+        },
+        {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+        }
+    ]
+}

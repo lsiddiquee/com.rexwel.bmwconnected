@@ -1,8 +1,8 @@
 # BMW Connected
 
-Adds support for BMW Connected Drive services to Homey.
+Adds support for BMW and Mini Connected Drive services to Homey.
 
-Before adding a car you need to go to app settings and fill in your username and password for BMW Connected Services.
+Before adding a car you need to go to app settings and fill in your username and password for BMW / Mini Connected Services.
 
 ## Triggers
 - Car location changed (this is only triggered when the car is locked, otherwise the update will be way too frequent.)

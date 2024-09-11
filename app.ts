@@ -2,13 +2,14 @@ import sourceMapSupport from 'source-map-support';
 sourceMapSupport.install();
 
 import Homey from 'homey';
-import { ConnectedDrive, ILogger, Regions } from 'bmw-connected-drive';
+import { CarBrand, ConnectedDrive, ILogger, Regions } from 'bmw-connected-drive';
 import { HomeyTokenStore } from './utils/HomeyTokenStore';
 import { ConfigurationManager } from './utils/ConfigurationManager';
 import { DeviceData } from './utils/DeviceData';
 import { Logger } from './utils/Logger';
 import { Configuration } from './utils/Configuration';
 import { LocationType } from './utils/LocationType';
+import inspector from 'inspector';
 
 // TODO:
 // Window states capability
@@ -27,6 +28,10 @@ export class BMWConnectedDrive extends Homey.App {
    * onInit is called when the app is initialized.
    */
   async onInit(): Promise<void> {
+    if (process.env.DEBUG === '1') {
+			inspector.open(9229, '0.0.0.0', true);
+		}
+
     this.logger = new Logger(this.homey);
     this.tokenStore = new HomeyTokenStore(this.homey);
     let configuration = ConfigurationManager.getConfiguration(this.homey);
@@ -136,7 +141,7 @@ export class BMWConnectedDrive extends Homey.App {
       args.device.log(`Flow triggered send_message for vin ${vin}`);
 
       try {
-        await this.connectedDriveApi?.sendMessage(vin, args.subject, args.message);
+        await this.connectedDriveApi?.sendMessage(vin, CarBrand.Bmw, args.subject, args.message);
       } catch (err) {
         this.logger?.LogError(err);
       }

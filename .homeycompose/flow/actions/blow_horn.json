@@ -1,0 +1,12 @@
+{
+    "id": "blow_horn",
+    "title": {
+        "en": "Blow horn",
+        "nl": "Claxonneren"
+    },
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini"
+    }]
+}

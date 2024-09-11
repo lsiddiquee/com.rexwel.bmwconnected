@@ -1,0 +1,33 @@
+{
+    "id": "geofence",
+    "title": {
+        "en": "!{{Inside|Outside}} of geofence ...",
+        "nl": "!{{Binnen|Buiten}} geofence ..."
+    },
+    "titleFormatted": {
+        "en": "!{{Inside|Outside}} of geofence '[[geo_fence]]'",
+        "nl": "!{{Binnen|Buiten}} geofence '[[geo_fence]]'"
+    },
+    "hint": {
+        "en": "Checks if the car is inside/outside a geofence location.",
+        "nl": "Controleert of de auto binnen/buiten een geofence locatie is."
+    },
+    "args": [
+        {
+            "type": "autocomplete",
+            "name": "geo_fence",
+            "title": {
+                "en": "Geofence label"
+            },
+            "placeholder": {
+                "en": "Selected geofence",
+                "nl": "Geselecteerde geofence"
+            }
+        },
+        {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+        }
+    ]
+}

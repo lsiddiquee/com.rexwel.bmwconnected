@@ -1,0 +1,42 @@
+{
+    "id": "send_message",
+    "title": {
+        "en": "Send message",
+        "nl": "Bericht sturen"
+    },
+    "titleFormatted": {
+        "en": "Send message ([[subject]]) [[message]]",
+        "nl": "Stuur bericht ([[subject]]) [[message]]"
+    },
+    "args": [
+        {
+            "type": "text",
+            "name": "subject",
+            "title": {
+                "en": "Subject",
+                "nl": "Onderwerp"
+            },
+            "placeholder": {
+                "en": "Subject",
+                "nl": "Onderwerp"
+            }
+        },
+        {
+            "type": "text",
+            "name": "message",
+            "title": {
+                "en": "Message",
+                "nl": "Bericht"
+            },
+            "placeholder": {
+                "en": "Message",
+                "nl": "Bericht"
+            }
+        },
+        {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+        }
+    ]
+}
