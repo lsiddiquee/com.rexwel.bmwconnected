@@ -26,4 +26,9 @@ export class HomeyTokenStore implements ITokenStore {
         return token;
     }
 
+    clearToken(): void {
+        let config : Configuration = ConfigurationManager.getConfiguration(this.homey);
+        config.token = undefined;
+        ConfigurationManager.setConfiguration(this.homey, config);
+    }
 }

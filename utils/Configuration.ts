@@ -4,6 +4,7 @@ import { LocationType } from "./LocationType";
 export class Configuration {
     username: string = "";
     password: string = "";
+    captcha?: string;
     region: Regions = Regions.RestOfWorld;
     geofences: LocationType[] = [];
     logEnabled: boolean = false;

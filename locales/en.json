@@ -4,6 +4,7 @@
     "loginLabel": "Login",
     "username": "Username",
     "password": "Password",
+    "captcha": "Captcha Token",
     "region": "Region",
     "region_north_america": "North America",
     "region_rest_of_the_world": "Rest of the World",
@@ -21,6 +22,8 @@
     "enabled": "Enabled",
     "logLevel": "Log Level",
     "logRequestCount": "Number of requests to log (most recent)",
-    "logs": "Logs"
+    "logs": "Logs",
+    "developer": "Developer",
+    "clearToken": "Clear Token"
   }
 }
