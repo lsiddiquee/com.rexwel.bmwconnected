@@ -58,6 +58,10 @@
     "clearTokenStore": {
       "method": "POST",
       "path": "/clearTokenStore"
+    },
+    "getRegisteredDevices": {
+      "method": "GET",
+      "path": "/getRegisteredDevices"
     }
   },
   "bugs": {

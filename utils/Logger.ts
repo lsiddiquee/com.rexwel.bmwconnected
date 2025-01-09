@@ -4,7 +4,6 @@ import { ConfigurationManager } from "./ConfigurationManager";
 
 export class Logger extends LoggerBase {
     homey: Homey;
-    logCount: number = 0;
     logs: string[] = [];
 
     constructor(homey: Homey) {
@@ -18,8 +17,10 @@ export class Logger extends LoggerBase {
         const logMessage = `[${new Date().toISOString()}] ${LogLevel[level]}: ${message}`;
         this.homey.log(logMessage);
         if (configuration.logEnabled || level >= LogLevel.Error) {
-            this.logs[this.logCount] = logMessage;
-            this.logCount = (this.logCount + 1) % configuration.logRequestCount;
+            if (this.logs.length === 50) {
+                this.logs.shift();
+            }
+            this.logs.push(logMessage);
         }
     }
 

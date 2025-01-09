@@ -24,6 +24,8 @@
     "logRequestCount": "Number of requests to log (most recent)",
     "logs": "Logs",
     "developer": "Developer",
-    "clearToken": "Clear Token"
+    "clearToken": "Clear Token",
+    "devicesList": "List of registered VINs",
+    "reloadLogs": "Reload Logs"
   }
 }
