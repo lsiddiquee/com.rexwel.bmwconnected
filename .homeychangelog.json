@@ -58,5 +58,8 @@
   },
   "0.6.2": {
     "en": "Fixed token refresh with captcha"
+  },
+  "0.6.3": {
+    "en": "Adding additional logging to debug missing devices during pairing"
   }
 }
