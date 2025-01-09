@@ -19,7 +19,7 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
     });
 
     const app = (homey.app as BMWConnectedDrive);
-    const api = new ConnectedDrive(body.username, body.password, body.region, app.tokenStore);
+    const api = new ConnectedDrive(body.username, body.password, body.region, app.tokenStore, app.logger, body.captcha);
     ConfigurationManager.setConfiguration(homey, body);
 
     try {
@@ -62,4 +62,11 @@ export async function getCurrentLocation({ homey }: { homey: Homey }): Promise<L
     } catch (err) {
         app.logger?.LogError(err);
     }
+}
+
+export async function clearTokenStore({ homey }: { homey: Homey }): Promise<boolean> {
+    const app = (homey.app as BMWConnectedDrive);
+    app.tokenStore?.clearToken();
+
+    return true;
 }

@@ -50,6 +50,9 @@
     <button class="tablinks" onclick="openTab(event, 'logs')" data-i18n="settings.logs">
       <!-- Translated -->
     </button>
+    <button class="tablinks" onclick="openTab(event, 'developer')" data-i18n="settings.developer">
+      <!-- Translated -->
+    </button>
   </div>
   <div id="settings" class="tabcontent">
 
@@ -65,6 +68,10 @@
       <div class="field row">
         <label for="password" data-i18n="settings.password"></label>
         <input id="password" type="password" value="" />
+      </div>
+      <div class="field row">
+        <label for="captcha" data-i18n="settings.captcha"></label>
+        <input id="captcha" type="text" value="" />
       </div>
       <div class="field row">
         <label for="region" data-i18n="settings.Region"></label>
@@ -154,12 +161,16 @@
     <!-- 
     <button id="refreshLogs" class="right">Refresh Logs</button> -->
   </div>
+  <div id="developer" class="tabcontent">
+    <button type="button" onclick="clearToken()" data-i18n="settings.clearToken"><!-- Translated --></button>
+  </div>
 
   <script type="text/javascript">
     // a method named 'onHomeyReady' must be present in your code
     function onHomeyReady(Homey) {
       var usernameElement = document.getElementById("username");
       var passwordElement = document.getElementById("password");
+      var captchaElement = document.getElementById("captcha");
       var regionElement = document.getElementById("region");
       var geofencesElement = document.getElementById("geofences");
       var logEnabledElement = document.getElementById("logEnabled");
@@ -177,6 +188,7 @@
 
         usernameElement.value = data.username;
         passwordElement.value = data.password;
+        captchaElement.value = "";
         if (data.region) {
           regionElement.value = data.region;
         }
@@ -215,6 +227,7 @@
         Homey.api("POST", "/saveSettings", {
           username: usernameElement.value,
           password: passwordElement.value,
+          captcha: captchaElement.value,
           region: regionElement.value,
           geofences: geofences,
           logEnabled: logEnabledElement.checked,
@@ -275,6 +288,14 @@
           longitudeElement.value = result.Longitude;
           radiusElement.value = "20";
         }
+      });
+    }
+
+    function clearToken() {
+      Homey.api("POST", "/clearTokenStore", {}, function (err, result) {
+        if (err) return Homey.alert(err);
+
+        if (result) return Homey.alert("Token cleared successfully.");
       });
     }
 

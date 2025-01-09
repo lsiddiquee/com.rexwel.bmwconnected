@@ -52,5 +52,11 @@
   },
   "0.5.0": {
     "en": "Added Climate Cancel action card and Climate Started and Stopped trigger cards"
+  },
+  "0.6.1": {
+    "en": "Added support to enter captcha from https://bimmer-connected.readthedocs.io/en/stable/captcha/rest_of_world.html"
+  },
+  "0.6.2": {
+    "en": "Fixed token refresh with captcha"
   }
 }
