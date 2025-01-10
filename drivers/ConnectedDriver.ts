@@ -61,17 +61,14 @@ export class ConnectedDriver extends Driver {
         throw new Error("ConnectedDrive API is not initialized.");
       }
 
-      const vehicles = await api.getVehicles();
+      const vehicles = await api.getVehiclesByBrand(this.brand);
 
       vehicles.forEach(vehicle => {
-        app.logger?.LogInformation(`Vehicle found (Pre filter): ${vehicle.vin}, ${vehicle.attributes.brand} ${vehicle.attributes.model}`);
+        app.logger?.LogInformation(`Vehicle found: ${vehicle.attributes.brand}: ${vehicle.vin}, ${vehicle.attributes.model}`);
       });
 
       return vehicles
-        .filter(vehicle => vehicle.attributes.brand === this.brand)
         .map(vehicle => {
-          app.logger?.LogInformation(`Vehicle found (Post filter): ${vehicle.vin}, ${vehicle.attributes.brand} ${vehicle.attributes.model}`);
-
           if (!vehicle.vin) {
             throw new Error("Cannot list vehicle as vin is empty.");
           }
