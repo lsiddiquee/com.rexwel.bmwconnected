@@ -58,5 +58,8 @@
   },
   "0.6.2": {
     "en": "Fixed token refresh with captcha"
+  },
+  "0.6.4": {
+    "en": "Fixing issue with missing device during pairing caused by brand post filtering."
   }
 }

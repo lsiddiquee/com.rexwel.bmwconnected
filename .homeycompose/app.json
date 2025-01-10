@@ -1,6 +1,6 @@
 {
   "id": "com.rexwel.bmwconnected",
-  "version": "0.6.2",
+  "version": "0.6.4",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -58,6 +58,10 @@
     "clearTokenStore": {
       "method": "POST",
       "path": "/clearTokenStore"
+    },
+    "getRegisteredDevices": {
+      "method": "GET",
+      "path": "/getRegisteredDevices"
     }
   },
   "bugs": {

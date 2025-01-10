@@ -1,10 +1,11 @@
-import { Homey } from "homey";
+import { Driver, Homey } from "homey";
 import { BMWConnectedDrive } from "./app";
 import { Configuration } from "./utils/Configuration";
 import { ConfigurationManager } from "./utils/ConfigurationManager";
-import { ConnectedDrive, Regions } from "bmw-connected-drive";
+import { ConnectedDrive } from "bmw-connected-drive";
 import { GeoLocation } from "./utils/GeoLocation";
 import { LocationType } from "./utils/LocationType";
+import { DeviceData } from "./utils/DeviceData";
 
 export async function saveSettings({ homey, body }: { homey: Homey, body: Configuration }): Promise<boolean> {
 
@@ -66,7 +67,23 @@ export async function getCurrentLocation({ homey }: { homey: Homey }): Promise<L
 
 export async function clearTokenStore({ homey }: { homey: Homey }): Promise<boolean> {
     const app = (homey.app as BMWConnectedDrive);
+    app.logger?.LogInformation("clearTokenStore invoked.");
+
     app.tokenStore?.clearToken();
 
     return true;
+}
+
+export async function getRegisteredDevices({ homey }: { homey: Homey }): Promise<DeviceData[]> {
+    const app = (homey.app as BMWConnectedDrive);
+    app.logger?.LogInformation("getRegisteredDevices invoked.");
+
+    let devices: DeviceData[] = [];
+    let drivers = homey.drivers.getDrivers() as { [key: string]: Driver };
+    for (const key in drivers) {
+        const driver = drivers[key];
+        devices.push(...(driver.getDevices().map(device => device.getData() as DeviceData)));
+    }
+
+    return devices;
 }

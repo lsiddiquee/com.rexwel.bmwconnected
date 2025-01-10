@@ -157,12 +157,22 @@
     <button id="save" class="right">Save changes</button>
   </div>
   <div id="logs" class="tabcontent">
-    <p id="logMessages"></p>
-    <!-- 
-    <button id="refreshLogs" class="right">Refresh Logs</button> -->
+    <div class="field row">
+      <button type="button" onclick="reloadLogs()" data-i18n="settings.reloadLogs"><!-- Translated --></button>
+    </div>
+    <div class="field row">
+      <p id="logMessages"></p>
+    </div>
   </div>
   <div id="developer" class="tabcontent">
     <button type="button" onclick="clearToken()" data-i18n="settings.clearToken"><!-- Translated --></button>
+
+    <div class="field row">
+      <label for="devicesList" data-i18n="settings.devicesList"></label>
+    </div>
+    <div class="field row">
+      <p id="devicesList"></p>
+    </div>
   </div>
 
   <script type="text/javascript">
@@ -175,10 +185,10 @@
       var geofencesElement = document.getElementById("geofences");
       var logEnabledElement = document.getElementById("logEnabled");
       var logRequestCountElement = document.getElementById("logRequestCount");
-      var logMessagesElement = document.getElementById("logMessages");
       var logLevelElement = document.getElementById("logLevel");
       var errorElement = document.getElementById("error");
       var successElement = document.getElementById("success");
+      var devicesListElement = document.getElementById("devicesList");
 
       var initializeSettings = function (err, data) {
         if (err || !data) {
@@ -242,9 +252,12 @@
         });
       });
 
-      Homey.api("GET", "/getLogs", {}, function (err, result) {
+      reloadLogs();
+
+      Homey.api("GET", "/getRegisteredDevices", {}, function (err, result) {
         if (err) return Homey.alert(err);
-        logMessagesElement.innerHTML = result.join('<br/><hr style="border-top: 3px dashed #bbb;">');
+        deviceIds = result.map(item => item.id);
+        devicesListElement.innerHTML = deviceIds.join('<br/><hr style="border-top: 3px dashed #bbb;">');
       });
 
       // Tell Homey we're ready to be displayed
@@ -296,6 +309,14 @@
         if (err) return Homey.alert(err);
 
         if (result) return Homey.alert("Token cleared successfully.");
+      });
+    }
+
+    function reloadLogs() {
+      Homey.api("GET", "/getLogs", {}, function (err, result) {
+        if (err) return Homey.alert(err);
+        var logMessagesElement = document.getElementById("logMessages");
+        logMessagesElement.innerHTML = result.join('<br/><hr style="border-top: 3px dashed #bbb;">');
       });
     }
 

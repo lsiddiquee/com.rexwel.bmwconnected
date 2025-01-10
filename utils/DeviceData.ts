@@ -1,3 +1,7 @@
 export class DeviceData {
-  id!: string;
+  id: string;
+
+  constructor(id: string) {
+    this.id = id;
+  }
 }

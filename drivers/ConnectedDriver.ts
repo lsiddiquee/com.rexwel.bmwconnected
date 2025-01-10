@@ -54,25 +54,26 @@ export class ConnectedDriver extends Driver {
     });
 
     session.setHandler("list_devices", async () => {
-      const api = (this.homey.app as BMWConnectedDrive).connectedDriveApi;
+      const app = (this.homey.app as BMWConnectedDrive);
+      const api = app.connectedDriveApi;
 
       if (!api) {
         throw new Error("ConnectedDrive API is not initialized.");
       }
 
-      const vehicles = await api.getVehicles();
+      const vehicles = await api.getVehiclesByBrand(this.brand);
+
+      vehicles.forEach(vehicle => {
+        app.logger?.LogInformation(`Vehicle found: ${vehicle.attributes.brand}: ${vehicle.vin}, ${vehicle.attributes.model}`);
+      });
 
       return vehicles
-        .filter(vehicle => vehicle.attributes.brand === this.brand)
         .map(vehicle => {
-          this.log(`Vehicle found: ${vehicle.vin}, ${vehicle.attributes.model}`);
-
           if (!vehicle.vin) {
             throw new Error("Cannot list vehicle as vin is empty.");
           }
 
-          const deviceData = new DeviceData();
-          deviceData.id = vehicle.vin;
+          const deviceData = new DeviceData(vehicle.vin);
 
           return {
             "name": `${vehicle.attributes.model} (${vehicle.vin})`,
