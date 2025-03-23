@@ -10,6 +10,7 @@ import { LocationType } from '../utils/LocationType';
 import { ConfigurationManager } from '../utils/ConfigurationManager';
 import { UnitConverter } from '../utils/UnitConverter';
 import * as geo from 'geolocation-utils';
+import * as semver from 'semver';
 
 export class Vehicle extends Device {
 
@@ -34,6 +35,8 @@ export class Vehicle extends Device {
         this.logger = this.app.logger;
         this.deviceData = this.getData() as DeviceData;
         this.settings = this.getSettings() as Settings;
+
+        this.migrateLocationType();
 
         await this.CleanupCapability("measure_battery.actual");
         if (this.hasCapability("remanining_fuel_liters_capability")) {
@@ -76,6 +79,42 @@ export class Vehicle extends Device {
         this.logger?.LogInformation(`${this.getName()} (${this.deviceData.id}) has been initialized`);
     }
 
+    /**
+     * Migrates the currentLocation and geofence properties to the new casing.
+     */
+    migrateLocationType() : void {
+        const configuration = ConfigurationManager.getConfiguration(this.homey);
+
+        if (!configuration.currentVersion) {
+            configuration.currentVersion = "0.0.0";
+        }
+
+        if (semver.lt(configuration.currentVersion, "0.6.5")) {
+            if (this.currentLocation) {
+                var oldLocation: any = this.currentLocation;
+                this.currentLocation = {
+                    label: oldLocation.Label,
+                    latitude: oldLocation.Latitude,
+                    longitude: oldLocation.Longitude,
+                    address: oldLocation.Address
+                };
+            }
+
+            if (configuration.geofences) {
+                configuration.geofences = (configuration.geofences as any[]).map(fence => {
+                    return {
+                        label: fence.Label,
+                        latitude: fence.Latitude,
+                        longitude: fence.Longitude,
+                        radius: fence.Radius
+                    };
+                });
+            }
+        }
+
+        configuration.currentVersion = this.homey.app.manifest.version;
+        ConfigurationManager.setConfiguration(this.homey, configuration);
+    }
     /**
      * onSettings is called when the user updates the device's settings.
      * @param {object} event the onSettings event data
