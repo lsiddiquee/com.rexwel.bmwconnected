@@ -1,16 +1,16 @@
-import { Device } from 'homey';
-import { BMWConnectedDrive } from '../app';
-import { DeviceData } from '../utils/DeviceData';
-import { CarBrand, ConnectedDrive, Utils } from 'bmw-connected-drive';
-import { OpenStreetMap } from '../utils/OpenStreetMap';
-import { Settings } from '../utils/Settings';
-import { Logger } from '../utils/Logger';
-import { nameof } from '../utils/Utils';
-import { LocationType } from '../utils/LocationType';
-import { ConfigurationManager } from '../utils/ConfigurationManager';
-import { UnitConverter } from '../utils/UnitConverter';
+import { CarBrand, ConnectedDrive } from 'bmw-connected-drive';
 import * as geo from 'geolocation-utils';
+import { Device } from 'homey';
 import * as semver from 'semver';
+import { BMWConnectedDrive } from '../app';
+import { Configuration } from '../utils/Configuration';
+import { ConfigurationManager } from '../utils/ConfigurationManager';
+import { DeviceData } from '../utils/DeviceData';
+import { LocationType } from '../utils/LocationType';
+import { Logger } from '../utils/Logger';
+import { Settings } from '../utils/Settings';
+import { UnitConverter } from '../utils/UnitConverter';
+import { nameof } from '../utils/Utils';
 
 export class Vehicle extends Device {
 
@@ -36,7 +36,7 @@ export class Vehicle extends Device {
         this.deviceData = this.getData() as DeviceData;
         this.settings = this.getSettings() as Settings;
 
-        this.migrateLocationType();
+        await this.migrate();
 
         await this.CleanupCapability("measure_battery.actual");
         if (this.hasCapability("remanining_fuel_liters_capability")) {
@@ -80,16 +80,32 @@ export class Vehicle extends Device {
     }
 
     /**
-     * Migrates the currentLocation and geofence properties to the new casing.
+     * Perform migrations to ensure proper functionality after upgrading
      */
-    migrateLocationType() : void {
+    async migrate() {
         const configuration = ConfigurationManager.getConfiguration(this.homey);
 
         if (!configuration.currentVersion) {
             configuration.currentVersion = "0.0.0";
         }
 
+        await this.migrate_0_6_5(configuration);
+
+        configuration.currentVersion = this.homey.app.manifest.version;
+        ConfigurationManager.setConfiguration(this.homey, configuration);
+    }
+
+    /**
+     * Ensures the locationUpdateThreshold setting is set to a default value if not already defined.
+     * Migrates the currentLocation and geofence properties to the new casing.
+     */
+    async migrate_0_6_5(configuration: Configuration) {
         if (semver.lt(configuration.currentVersion, "0.6.5")) {
+            if (this.settings.locationUpdateThreshold === undefined) {
+                this.settings.locationUpdateThreshold = 50;
+                await this.setSettings(this.settings);
+            }
+
             if (this.currentLocation) {
                 var oldLocation: any = this.currentLocation;
                 this.currentLocation = {
@@ -111,10 +127,8 @@ export class Vehicle extends Device {
                 });
             }
         }
-
-        configuration.currentVersion = this.homey.app.manifest.version;
-        ConfigurationManager.setConfiguration(this.homey, configuration);
     }
+
     /**
      * onSettings is called when the user updates the device's settings.
      * @param {object} event the onSettings event data
@@ -274,7 +288,7 @@ export class Vehicle extends Device {
 
     private async updateState() {
         try {
-            this.logger?.LogInformation(`Polling BMW ConnectedDrive for vehicle status updates for ${this.getName()}.`);
+            this.logger?.LogDebug(`Polling BMW ConnectedDrive for vehicle status updates for ${this.getName()}.`);
             if (this.api) {
                 const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
 
