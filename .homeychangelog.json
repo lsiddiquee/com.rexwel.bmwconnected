@@ -61,5 +61,8 @@
   },
   "0.6.4": {
     "en": "Fixing issue with missing device during pairing caused by brand post filtering."
+  },
+  "0.6.5": {
+    "en": "Prevented trip completion from triggering prematurely when the car auto-locks at the start of a drive."
   }
 }
