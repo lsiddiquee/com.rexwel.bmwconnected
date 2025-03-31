@@ -1,13 +1,14 @@
+import { CarBrand, ConnectedDrive } from "bmw-connected-drive";
 import { Driver } from 'homey';
 import { BMWConnectedDrive } from '../app';
-import { DeviceData } from '../utils/DeviceData';
 import { Configuration } from '../utils/Configuration';
 import { ConfigurationManager } from '../utils/ConfigurationManager';
-import { CarBrand, ConnectedDrive } from "bmw-connected-drive";
+import { DeviceData } from '../utils/DeviceData';
 import { Settings } from '../utils/Settings';
 
 export class ConnectedDriver extends Driver {
   brand: CarBrand = CarBrand.Bmw;
+  captchaToken: string | undefined = undefined;
 
   async onPair(session: any) {
     session.setHandler('showView', async (view: string) => {
@@ -30,6 +31,12 @@ export class ConnectedDriver extends Driver {
       }
     });
 
+    session.setHandler('captchaTokenReceived', async (token: string) => {
+      console.info(`Captcha token received: ${token}`);
+      this.captchaToken = token;
+      session.nextView();
+    });
+
     session.setHandler("login", async (data: any) => {
       const app = (this.homey.app as BMWConnectedDrive);
       let configuration = ConfigurationManager.getConfiguration(this.homey);
@@ -43,7 +50,7 @@ export class ConnectedDriver extends Driver {
       ConfigurationManager.setConfiguration(this.homey, configuration);
 
       try {
-        const api = new ConnectedDrive(configuration.username, configuration.password, configuration.region, app.tokenStore);
+        const api = new ConnectedDrive(configuration.username, configuration.password, configuration.region, app.tokenStore, app.logger, this.captchaToken);
         await api.account.getToken();
         app.connectedDriveApi = api;
         return true;

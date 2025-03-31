@@ -45,6 +45,10 @@
             "template": "loading"
         },
         {
+            "id": "captcha",
+            "$template": "captcha"
+        },
+        {
             "id": "login_credentials",
             "template": "login_credentials",
             "options": {

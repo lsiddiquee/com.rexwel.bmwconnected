@@ -45,7 +45,9 @@ dist/**/*
 # ignore yarn.lock
 yarn.lock
 
-app.json
 build
 access_token
 sample_responses
+
+# Ignore files created by homeycompose
+drivers/**/pair/*.html

@@ -1,0 +1,51 @@
+<style>
+    .captcha {
+        min-height: 100%;
+        display: flex;
+    }
+
+    .captcha__form {
+        flex: 1; /* Allow the form to take up available space */
+        display: flex;
+        flex-direction: column;
+    }
+
+    .captcha__center {
+        display: flex;
+        justify-content: center; /* Center the hCaptcha widget horizontally */
+        align-items: center; /* Center the hCaptcha widget vertically */
+        flex-grow: 1; /* Take up remaining space to push footer down */
+    }
+
+    .captcha__footer {
+        display: flex;
+        justify-content: center;
+    }
+</style>
+<div class="captcha">
+    <form id="captcha_form" action="#" method="post" class="captcha__form">
+        <div class="captcha__center">
+            <!-- hCaptcha widget -->
+            <div class="h-captcha" data-sitekey="7244955f-8f30-4445-adff-4fefe059f815"></div><br>
+        </div>
+        <div class="captcha__footer">
+            <button type="submit" class="homey-button-primary-shadow-full">Next</button>
+        </div>
+    </form>
+</div>
+<!-- hCaptcha script -->
+<script src="https://hcaptcha.com/1/api.js" async defer></script>
+<script>
+    document.getElementById('captcha_form').addEventListener('submit', async function (event) {
+        event.preventDefault(); // Prevent the default form submission
+
+        const hCaptchaResponse = document.querySelector('[name="h-captcha-response"]').value;
+        const responseElement = document.getElementById('captchaResponse');
+
+        if (hCaptchaResponse) {
+            await Homey.emit("captchaTokenReceived", hCaptchaResponse);
+        } else {
+            responseElement.innerHTML = 'No hCaptcha response received.';
+        }
+    });
+</script>
