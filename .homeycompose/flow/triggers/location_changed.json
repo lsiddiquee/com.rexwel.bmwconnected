@@ -6,7 +6,7 @@
     },
     "tokens": [
         {
-            "name": "Label",
+            "name": "label",
             "type": "string",
             "title": {
                 "en": "Label"
@@ -17,7 +17,7 @@
             }
         },
         {
-            "name": "Latitude",
+            "name": "latitude",
             "type": "number",
             "title": {
                 "en": "Latitude"
@@ -25,7 +25,7 @@
             "example": "52.10017398097361"
         },
         {
-            "name": "Longitude",
+            "name": "longitude",
             "type": "number",
             "title": {
                 "en": "Longitude"
@@ -33,7 +33,7 @@
             "example": "5.044052884751771"
         },
         {
-            "name": "Address",
+            "name": "address",
             "type": "string",
             "title": {
                 "en": "Address",
