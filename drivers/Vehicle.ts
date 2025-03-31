@@ -101,6 +101,8 @@ export class Vehicle extends Device {
      */
     async migrate_0_6_5(configuration: Configuration) {
         if (semver.lt(configuration.currentVersion, "0.6.5")) {
+            this.logger?.LogInformation("Migrating to version 0.6.5");
+
             if (this.settings.locationUpdateThreshold === undefined) {
                 this.settings.locationUpdateThreshold = 50;
                 await this.setSettings(this.settings);
@@ -122,6 +124,7 @@ export class Vehicle extends Device {
                         label: fence.Label,
                         latitude: fence.Latitude,
                         longitude: fence.Longitude,
+                        address: fence.Address,
                         radius: fence.Radius
                     };
                 });
