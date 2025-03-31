@@ -208,7 +208,7 @@
 
         geofencesElement.innerHTML = "";
         data.geofences.forEach(item => {
-          addGeofenceEntry(item.Label, item.Latitude, item.Longitude, item.Radius, item.Address);
+          addGeofenceEntry(item.label, item.latitude, item.longitude, item.radius, item.address);
         });
       }
 
@@ -226,11 +226,11 @@
 
         var geofences = Array.from(document.getElementById("geofences").rows).map(item => {
           return {
-            Label: item.cells[0].innerText,
-            Latitude: parseFloat(item.cells[1].innerText),
-            Longitude: parseFloat(item.cells[2].innerText),
-            Radius: parseFloat(item.cells[3].innerText),
-            Address: item.cells[4].innerText
+            label: item.cells[0].innerText,
+            latitude: parseFloat(item.cells[1].innerText),
+            longitude: parseFloat(item.cells[2].innerText),
+            radius: parseFloat(item.cells[3].innerText),
+            address: item.cells[4].innerText
           }
         }) ?? [];
 
