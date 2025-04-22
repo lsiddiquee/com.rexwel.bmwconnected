@@ -44,13 +44,15 @@ export class ConnectedDriver extends Driver {
         configuration = new Configuration();
       }
 
+      console.info("login", data);
+
       configuration.username = data.username;
       configuration.password = data.password;
 
       ConfigurationManager.setConfiguration(this.homey, configuration);
 
       try {
-        const api = new ConnectedDrive(configuration.username, configuration.password, configuration.region, app.tokenStore, app.logger, this.captchaToken);
+        const api = new ConnectedDrive(configuration.username, configuration.password, configuration.region, app.tokenStore, app.logger, data.captchaToken);
         await api.account.getToken();
         app.connectedDriveApi = api;
         return true;

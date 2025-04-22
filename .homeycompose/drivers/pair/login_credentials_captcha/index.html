@@ -1,0 +1,175 @@
+<style>
+    @import '/manager/drivers/assets/css/deprecated-login-credentials.css';
+
+    .__private__homey-login-credentials {
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .__private__homey-login-credentials__form {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        flex: 1;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .__private__homey-login-credentials__center {
+        width: 100%;
+        margin-top: auto;
+        margin-bottom: auto;
+    }
+
+    .__private__homey-login-credentials__button {
+        white-space: nowrap;
+        /* Safari fix for strange bug which makes button extra high */
+    }
+
+    .__private__homey-login-credentials__logo.is-visible {
+        display: block;
+        position: relative;
+        width: 66%;
+        height: 100px;
+        margin-left: auto;
+        margin-right: auto;
+        margin-bottom: var(--homey-su-4);
+        background-position: center center;
+        background-repeat: no-repeat;
+        background-size: contain;
+    }
+</style>
+<div class="__private__homey-login-credentials captcha" id=$HY_TMPL_ID>
+    <form id=captcha_form class="__private__homey-login-credentials__form homey-form" action="#" method="post">
+        <div class=__private__homey-login-credentials__center>
+            <div id=login-credentials-logo class=__private__homey-login-credentials__logo></div>
+            <h1 id=login-credentials-title class="homey-title homey-text-align-center"></h1>
+            <div class=homey-form-group-large>
+                <label class=homey-form-label for=username data-i18n=$tmpl.login_credentials.username></label>
+                <input class=homey-form-input-large id=username name=username type=text value=""
+                    data-i18n-placeholder=$tmpl.login_credentials.username>
+            </div>
+            <div class=homey-form-group-large>
+                <label class=homey-form-label for=password data-i18n=$tmpl.login_credentials.password></label>
+                <input class=homey-form-input-large id=password name=password type=password value=""
+                    data-i18n-placeholder=$tmpl.login_credentials.password>
+            </div>
+            <div class=homey-form-group-large>
+                <label class=homey-form-label for=regionSelect data-i18n=$tmpl.login_credentials.region></label>
+                <select id="regionSelect" class="homey-form-select">
+                    <option value="NorthAmerica">North America</option>
+                    <option value="RestOfWorld" selected="selected">Rest of World</option>
+                </select>
+            </div>
+            <div class="captcha homey-form-group-large">
+                <!-- hCaptcha widget -->
+                <div id="hCaptcha" class="h-captcha" data-sitekey="7244955f-8f30-4445-adff-4fefe059f815" data-callback="hCaptchaOnSuccess"></div>
+            <!-- </div> -->
+        </div>
+        <button tabindex=0 class="homey-button-primary-shadow-full __private__homey-login-credentials__button is-disabled"
+            type=submit data-i18n=$tmpl.login_credentials.login></button>
+    </form>
+</div>
+<!-- hCaptcha script -->
+<script src="https://hcaptcha.com/1/api.js" async defer></script>
+<script type=text/javascript>
+    (() => {
+        var e = document.getElementById("$HY_TMPL_ID")
+          , o = e.querySelector("#captcha_form");
+        let l = e.querySelector("#login-credentials-logo")
+          , r = e.querySelector("#login-credentials-title")
+          , t = e.querySelector('input[name="username"]')
+          , n = e.querySelector('label[for="username"]')
+          , a = e.querySelector('input[name="password"]')
+          , i = e.querySelector('label[for="password"]')
+          , s = !1;
+        const regionSelectLabel = e.querySelector('label[for="regionSelect"]');
+        const captchaWidget = e.querySelector("#hCaptcha");
+        const regionSelect = e.querySelector('#regionSelect');
+        const submitButton = e.querySelector('button[type="submit"]');
+
+        Homey.setTitle(null),
+        r.textContent = Homey.__("$tmpl.login_credentials.title"),
+        Homey.getOptions(function(e, o) {
+            if (e)
+                return Homey.error(e);
+            o.title && (r.textContent = Homey.__(o.title)),
+            o.logo && (l.style.backgroundImage = "url(" + o.logo + ")",
+            l.classList.add("is-visible")),
+            o.usernameLabel && (n.textContent = Homey.__(o.usernameLabel)),
+            o.usernamePlaceholder && (t.placeholder = Homey.__(o.usernamePlaceholder)),
+            o.passwordLabel && (i.textContent = Homey.__(o.passwordLabel)),
+            o.passwordPlaceholder && (a.placeholder = Homey.__(o.passwordPlaceholder)),
+            o.regionSelectLabel && (regionSelectLabel.textContent = Homey.__(o.regionSelectLabel))
+        }),
+        o.addEventListener("submit", async function (event) {
+            event.preventDefault(); // Prevent the default form submission
+
+            const hCaptchaResponse = document.querySelector('[name="h-captcha-response"]').value;
+            e = t.value;
+            o = a.value;
+
+            Homey.showLoadingOverlay(Homey.__("$tmpl.login_credentials.loading"));
+            
+            try {
+                result = await Homey.emit("login", {
+                    username: e,
+                    password: o,
+                    captchaToken: hCaptchaResponse
+                });
+
+                result ? Homey.nextView() : Homey.error(Homey.__("$tmpl.login_credentials.invalid_credentials"));
+            }
+            catch(e) {
+                Homey.error(e);
+            }
+            finally {
+                Homey.hideLoadingOverlay();
+            }
+        });
+
+        // Handle region select change
+        regionSelect.addEventListener("change", function () {
+            const selectedRegion = regionSelect.value;
+            if (selectedRegion === "NorthAmerica") {
+                captchaWidget.setAttribute("data-sitekey", "dc24de9a-9844-438b-b542-60067ff4dbe9");
+            } else {
+                captchaWidget.setAttribute("data-sitekey", "7244955f-8f30-4445-adff-4fefe059f815");
+            }
+            // Re-render the hCaptcha widget
+            hcaptcha.reset();
+        });
+
+        // Enable/disable submit button based on input and captcha completion
+        function updateSubmitButtonState() {
+            const usernameFilled = t.value.trim() !== "";
+            const passwordFilled = a.value.trim() !== "";
+            const captchaCompleted = document.querySelector('[name="h-captcha-response"]')?.value.trim() !== "";
+
+            if (usernameFilled && passwordFilled && captchaCompleted) {
+                submitButton.classList.remove("is-disabled");
+                submitButton.disabled = false;
+            } else {
+                submitButton.classList.add("is-disabled");
+                submitButton.disabled = true;
+            }
+        }
+
+        // Add event listeners to inputs and captcha
+        t.addEventListener("input", updateSubmitButtonState);
+        a.addEventListener("input", updateSubmitButtonState);
+        document.addEventListener("hcaptcha-success", updateSubmitButtonState);
+
+        // hCaptcha success callback
+        function hCaptchaOnSuccess() {
+            alert("Captcha completed successfully!");
+            const event = new Event("hcaptcha-success");
+            document.dispatchEvent(event);
+        }
+
+        // Initialize button state
+        updateSubmitButtonState();
+    })();
+</script>
