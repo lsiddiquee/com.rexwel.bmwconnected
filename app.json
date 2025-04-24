@@ -1,0 +1,1312 @@
+{
+  "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
+  "id": "com.rexwel.bmwconnected",
+  "version": "0.6.5",
+  "compatibility": ">=5.0.0",
+  "sdk": 3,
+  "name": {
+    "en": "BMW / Mini Connected"
+  },
+  "description": {
+    "en": "BMW / Mini Connected connects you to your BMW and/or Mini and the rest of the world.",
+    "nl": "BMW / Mini Connected verbindt je met je BMW en/of Mini en de rest van de wereld."
+  },
+  "brandColor": "#009ADA",
+  "category": [
+    "tools"
+  ],
+  "permissions": [],
+  "images": {
+    "small": "/assets/images/small.png",
+    "large": "/assets/images/large.png",
+    "xlarge": "/assets/images/xlarge.png"
+  },
+  "author": {
+    "name": "Likhan Siddiquee",
+    "email": "likhan.siddiquee@gmail.com"
+  },
+  "contributors": {
+    "developers": [
+      {
+        "name": "Sander Schutten",
+        "email": "sander@dotnetstudio.nl"
+      }
+    ],
+    "translators": [
+      {
+        "name": "Sander Schutten",
+        "email": "sander@dotnetstudio.nl"
+      }
+    ]
+  },
+  "api": {
+    "saveSettings": {
+      "method": "POST",
+      "path": "/saveSettings"
+    },
+    "getLogs": {
+      "method": "GET",
+      "path": "/getLogs"
+    },
+    "resolveAddress": {
+      "method": "GET",
+      "path": "/resolveAddress"
+    },
+    "getCurrentLocation": {
+      "method": "GET",
+      "path": "/getCurrentLocation"
+    },
+    "clearTokenStore": {
+      "method": "POST",
+      "path": "/clearTokenStore"
+    },
+    "getRegisteredDevices": {
+      "method": "GET",
+      "path": "/getRegisteredDevices"
+    }
+  },
+  "bugs": {
+    "url": "https://github.com/lsiddiquee/com.rexwel.bmwconnected/issues"
+  },
+  "source": "https://github.com/lsiddiquee/com.rexwel.bmwconnected",
+  "homeyCommunityTopicId": 49199,
+  "contributing": {
+    "donate": {
+      "paypal": {
+        "username": "LikhanSiddiquee"
+      }
+    }
+  },
+  "flow": {
+    "triggers": [
+      {
+        "id": "charging_status_change",
+        "title": {
+          "en": "Charging status changed",
+          "nl": "Laadstatus gewijzigd"
+        },
+        "tokens": [
+          {
+            "name": "charging_status",
+            "type": "string",
+            "title": {
+              "en": "Charging status",
+              "nl": "Laadstatus"
+            },
+            "example": "NOCHARGING"
+          }
+        ],
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "climate_now_started",
+        "title": {
+          "en": "Climate now started",
+          "nl": "Nu klimatiseren gestart"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "climate_now_stopped",
+        "title": {
+          "en": "Climate now stopped",
+          "nl": "Nu klimatiseren gestopt"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "drive_session_completed",
+        "title": {
+          "en": "Drive session completed",
+          "nl": "Rit voltooid"
+        },
+        "tokens": [
+          {
+            "name": "StartLabel",
+            "type": "string",
+            "title": {
+              "en": "Starting label",
+              "nl": "Start label"
+            },
+            "example": {
+              "en": "Home",
+              "nl": "Thuis"
+            }
+          },
+          {
+            "name": "StartLatitude",
+            "type": "number",
+            "title": {
+              "en": "Starting latitude",
+              "nl": "Start latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "StartLongitude",
+            "type": "number",
+            "title": {
+              "en": "Starting longitude",
+              "nl": "Start longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "StartAddress",
+            "type": "string",
+            "title": {
+              "en": "Starting address",
+              "nl": "Start adres"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          },
+          {
+            "name": "StartMileage",
+            "type": "number",
+            "title": {
+              "en": "Starting mileage",
+              "nl": "Start kilometerstand"
+            },
+            "example": "45875"
+          },
+          {
+            "name": "EndLabel",
+            "type": "string",
+            "title": {
+              "en": "End label",
+              "nl": "Eind label"
+            },
+            "example": {
+              "en": "Home",
+              "nl": "Thuis"
+            }
+          },
+          {
+            "name": "EndLatitude",
+            "type": "number",
+            "title": {
+              "en": "End latitude",
+              "nl": "Eind latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "EndLongitude",
+            "type": "number",
+            "title": {
+              "en": "End longitude",
+              "nl": "Eind longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "EndAddress",
+            "type": "string",
+            "title": {
+              "en": "End address",
+              "nl": "Eind adres"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          },
+          {
+            "name": "EndMileage",
+            "type": "number",
+            "title": {
+              "en": "End mileage",
+              "nl": "Eind kilometerstand"
+            },
+            "example": "45875"
+          }
+        ],
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "geo_fence_enter",
+        "title": {
+          "en": "Geofence entered",
+          "nl": "Geofence binnengekomen"
+        },
+        "tokens": [
+          {
+            "name": "label",
+            "type": "string",
+            "title": {
+              "en": "Label"
+            },
+            "example": {
+              "en": "Home",
+              "nl": "Thuis"
+            }
+          },
+          {
+            "name": "latitude",
+            "type": "number",
+            "title": {
+              "en": "Latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "longitude",
+            "type": "number",
+            "title": {
+              "en": "Longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "address",
+            "type": "string",
+            "title": {
+              "en": "Address",
+              "nl": "Adres"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          }
+        ],
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "geo_fence_exit",
+        "title": {
+          "en": "Geofence exited",
+          "nl": "Geofence verlaten"
+        },
+        "tokens": [
+          {
+            "name": "label",
+            "type": "string",
+            "title": {
+              "en": "Label"
+            },
+            "example": {
+              "en": "Home",
+              "nl": "Thuis"
+            }
+          },
+          {
+            "name": "latitude",
+            "type": "number",
+            "title": {
+              "en": "Latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "longitude",
+            "type": "number",
+            "title": {
+              "en": "Longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "address",
+            "type": "string",
+            "title": {
+              "en": "Address",
+              "nl": "Adres"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          }
+        ],
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "location_changed",
+        "title": {
+          "en": "Location changed",
+          "nl": "Locatie gewijzigd"
+        },
+        "tokens": [
+          {
+            "name": "label",
+            "type": "string",
+            "title": {
+              "en": "Label"
+            },
+            "example": {
+              "en": "Home",
+              "nl": "Thuis"
+            }
+          },
+          {
+            "name": "latitude",
+            "type": "number",
+            "title": {
+              "en": "Latitude"
+            },
+            "example": "52.10017398097361"
+          },
+          {
+            "name": "longitude",
+            "type": "number",
+            "title": {
+              "en": "Longitude"
+            },
+            "example": "5.044052884751771"
+          },
+          {
+            "name": "address",
+            "type": "string",
+            "title": {
+              "en": "Address",
+              "nl": "Adres"
+            },
+            "example": "Vleutensebaan, 3544 Utrecht, Nederland"
+          }
+        ],
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "refuelled",
+        "title": {
+          "en": "Refuelled",
+          "nl": "Bijgetankt"
+        },
+        "tokens": [
+          {
+            "name": "FuelBeforeRefuelling",
+            "type": "number",
+            "title": {
+              "en": "Remaining fuel prior to refuelling",
+              "nl": "Brandstof voor het tanken"
+            },
+            "example": "9"
+          },
+          {
+            "name": "FuelAfterRefuelling",
+            "type": "number",
+            "title": {
+              "en": "Remaining fuel after refuelling",
+              "nl": "Brandstof na het tanken"
+            },
+            "example": "46"
+          },
+          {
+            "name": "RefuelledLiters",
+            "type": "number",
+            "title": {
+              "en": "Amount refuelled",
+              "nl": "Hoeveelheid getankt"
+            },
+            "example": "37"
+          },
+          {
+            "name": "Location",
+            "type": "string",
+            "title": {
+              "en": "Location",
+              "nl": "Locatie"
+            },
+            "example": "Proostwetering 90, 3543 AJ Utrecht"
+          }
+        ],
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      }
+    ],
+    "conditions": [
+      {
+        "id": "battery_percentage",
+        "title": {
+          "en": "Battery charge is !{{less than|more than or equal to}} ...",
+          "nl": "Batterijlading is !{{minder dan|meer dan of gelijk aan}} ..."
+        },
+        "titleFormatted": {
+          "en": "Battery charge is !{{less than|more than or equal to}} '[[battery_charge_test]]'%",
+          "nl": "Batterijlading is !{{minder dan|meer dan of gelijk aan}} '[[battery_charge_test]]'%"
+        },
+        "hint": {
+          "en": "Checks if battery charge is less/more than or equal to a given percentage.",
+          "nl": "Controleert of de batterijlading minder/meer dan of gelijk is aan een gegeven percentage."
+        },
+        "args": [
+          {
+            "type": "number",
+            "name": "battery_charge_test",
+            "title": {
+              "en": "Charge",
+              "nl": "Lading"
+            },
+            "placeholder": {
+              "en": "50"
+            },
+            "min": 0,
+            "max": 100
+          },
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "charging_status",
+        "title": {
+          "en": "Charging Status !{{is|is not}} ..."
+        },
+        "titleFormatted": {
+          "en": "Charging Status !{{is|is not}} '[[charging_state]]'"
+        },
+        "hint": {
+          "en": "Checks if the car is inside/outside a geofence location."
+        },
+        "args": [
+          {
+            "type": "dropdown",
+            "name": "charging_state",
+            "title": {
+              "en": "Charging status",
+              "nl": "Laadstatus"
+            },
+            "values": [
+              {
+                "id": "DEFAULT",
+                "title": {
+                  "en": "Default",
+                  "nl": "Standaard"
+                }
+              },
+              {
+                "id": "CHARGING",
+                "title": {
+                  "en": "Charging",
+                  "nl": "Opladen"
+                }
+              },
+              {
+                "id": "ERROR",
+                "title": {
+                  "en": "Error",
+                  "nl": "Fout"
+                }
+              },
+              {
+                "id": "COMPLETE",
+                "title": {
+                  "en": "Complete",
+                  "nl": "Voltooid"
+                }
+              },
+              {
+                "id": "FULLY_CHARGED",
+                "title": {
+                  "en": "Fully charged",
+                  "nl": "Volledig geladen"
+                }
+              },
+              {
+                "id": "FINISHED_FULLY_CHARGED",
+                "title": {
+                  "en": "Finished and fully charged",
+                  "nl": "Afgerond en volledig geladen"
+                }
+              },
+              {
+                "id": "FINISHED_NOT_FULL",
+                "title": {
+                  "en": "Finished but not fully charged",
+                  "nl": "Afgerond maar niet volledig geladen"
+                }
+              },
+              {
+                "id": "INVALID",
+                "title": {
+                  "en": "Invalid",
+                  "nl": "Ongeldig"
+                }
+              },
+              {
+                "id": "NOT_CHARGING",
+                "title": {
+                  "en": "Not charging",
+                  "nl": "Niet aan het laden"
+                }
+              },
+              {
+                "id": "PLUGGED_IN",
+                "title": {
+                  "en": "Plugged in",
+                  "nl": "Aangesloten"
+                }
+              },
+              {
+                "id": "WAITING_FOR_CHARGING",
+                "title": {
+                  "en": "Waiting for charging",
+                  "nl": "Wacht om te laden"
+                }
+              },
+              {
+                "id": "TARGET_REACHED",
+                "title": {
+                  "en": "Target reached",
+                  "nl": "Doel bereikt"
+                }
+              },
+              {
+                "id": "UNKNOWN",
+                "title": {
+                  "en": "Unknown",
+                  "nl": "Onbekend"
+                }
+              }
+            ]
+          },
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "geofence",
+        "title": {
+          "en": "!{{Inside|Outside}} of geofence ...",
+          "nl": "!{{Binnen|Buiten}} geofence ..."
+        },
+        "titleFormatted": {
+          "en": "!{{Inside|Outside}} of geofence '[[geo_fence]]'",
+          "nl": "!{{Binnen|Buiten}} geofence '[[geo_fence]]'"
+        },
+        "hint": {
+          "en": "Checks if the car is inside/outside a geofence location.",
+          "nl": "Controleert of de auto binnen/buiten een geofence locatie is."
+        },
+        "args": [
+          {
+            "type": "autocomplete",
+            "name": "geo_fence",
+            "title": {
+              "en": "Geofence label"
+            },
+            "placeholder": {
+              "en": "Selected geofence",
+              "nl": "Geselecteerde geofence"
+            }
+          },
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      }
+    ],
+    "actions": [
+      {
+        "id": "blow_horn",
+        "title": {
+          "en": "Blow horn",
+          "nl": "Claxonneren"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "climate_cancel",
+        "title": {
+          "en": "Climate cancel",
+          "nl": "Klimatiseren stoppen"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "climate_now",
+        "title": {
+          "en": "Climate now",
+          "nl": "Nu klimatiseren"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "flash_lights",
+        "title": {
+          "en": "Flash lights",
+          "nl": "Lichten knipperen"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "lock_vehicle",
+        "title": {
+          "en": "Lock",
+          "nl": "Vergrendelen"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "send_message",
+        "title": {
+          "en": "Send message",
+          "nl": "Bericht sturen"
+        },
+        "titleFormatted": {
+          "en": "Send message ([[subject]]) [[message]]",
+          "nl": "Stuur bericht ([[subject]]) [[message]]"
+        },
+        "args": [
+          {
+            "type": "text",
+            "name": "subject",
+            "title": {
+              "en": "Subject",
+              "nl": "Onderwerp"
+            },
+            "placeholder": {
+              "en": "Subject",
+              "nl": "Onderwerp"
+            }
+          },
+          {
+            "type": "text",
+            "name": "message",
+            "title": {
+              "en": "Message",
+              "nl": "Bericht"
+            },
+            "placeholder": {
+              "en": "Message",
+              "nl": "Bericht"
+            }
+          },
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "unlock_vehicle",
+        "title": {
+          "en": "Unlock",
+          "nl": "Ontgrendelen"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      }
+    ]
+  },
+  "drivers": [
+    {
+      "class": "other",
+      "connectivity": [
+        "cloud"
+      ],
+      "capabilities": [
+        "alarm_generic",
+        "locked",
+        "mileage_capability",
+        "range_capability",
+        "climate_now_capability",
+        "measure_battery",
+        "measure_battery.actual",
+        "range_capability.battery",
+        "range_capability.fuel",
+        "charging_status_capability"
+      ],
+      "capabilitiesOptions": {
+        "alarm_generic": {
+          "title": {
+            "en": "Alarm disarmed",
+            "nl": "Alarm uitgeschakeld"
+          }
+        },
+        "measure_battery.actual": {
+          "title": {
+            "en": "Actual battery",
+            "nl": "Huidige batterij"
+          }
+        }
+      },
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "images": {
+        "small": "/drivers/bmw/assets/images/small.png",
+        "large": "/drivers/bmw/assets/images/large.png"
+      },
+      "icon": "/drivers/bmw/assets/icon.svg",
+      "pair": [
+        {
+          "id": "loading",
+          "template": "loading"
+        },
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "logo": "logo.png",
+            "usernameLabel": {
+              "en": "E-mail address",
+              "nl": "E-mailadres"
+            },
+            "usernamePlaceholder": {
+              "en": "john@doe.com",
+              "nl": "jan@jansen.nl"
+            },
+            "passwordLabel": {
+              "en": "Password",
+              "nl": "Wachtwoord"
+            },
+            "passwordPlaceholder": {
+              "en": "Password",
+              "nl": "Wachtwoord"
+            }
+          }
+        },
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "name": {
+        "en": "BMW"
+      },
+      "id": "bmw",
+      "settings": [
+        {
+          "id": "distanceUnit",
+          "type": "dropdown",
+          "label": {
+            "en": "Distance Unit",
+            "nl": "Afstandseenheid"
+          },
+          "value": "metric",
+          "values": [
+            {
+              "id": "metric",
+              "label": {
+                "en": "Kilometers"
+              }
+            },
+            {
+              "id": "miles",
+              "label": {
+                "en": "Miles",
+                "nl": "Mijlen"
+              }
+            }
+          ]
+        },
+        {
+          "id": "fuelUnit",
+          "type": "dropdown",
+          "label": {
+            "en": "Fuel unit",
+            "nl": "Brandstofeenheid"
+          },
+          "value": "liter",
+          "values": [
+            {
+              "id": "liter",
+              "label": {
+                "en": "Liter"
+              }
+            },
+            {
+              "id": "gallonUS",
+              "label": {
+                "en": "Gallon (US)"
+              }
+            },
+            {
+              "id": "gallonUK",
+              "label": {
+                "en": "Gallon (UK)"
+              }
+            }
+          ]
+        },
+        {
+          "id": "pollingInterval",
+          "type": "number",
+          "label": {
+            "en": "Polling interval (seconds)",
+            "nl": "Polling interval (seconden)"
+          },
+          "value": 60,
+          "min": 5,
+          "max": 3600,
+          "hint": {
+            "en": "The interval at which the app polls to update the state of the vehicle.",
+            "nl": "Het interval waarmee de app pollt om de status van het voertuig te updaten."
+          }
+        },
+        {
+          "id": "refuellingTriggerThreshold",
+          "type": "number",
+          "label": {
+            "en": "Refuelled trigger threshold (liter)",
+            "nl": "Bijgetankt trigger drempelwaarde (liter)"
+          },
+          "value": 5,
+          "min": 1,
+          "max": 100,
+          "hint": {
+            "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger.",
+            "nl": "Als de brandstofwaarde een positieve verandering heeft die groter of gelijk is aan de drempelwaarde, wordt de Bijgetankt flow trigger geactiveerd."
+          }
+        }
+      ]
+    },
+    {
+      "class": "other",
+      "connectivity": [
+        "cloud"
+      ],
+      "capabilities": [
+        "alarm_generic",
+        "locked",
+        "mileage_capability",
+        "range_capability",
+        "climate_now_capability",
+        "measure_battery",
+        "measure_battery.actual",
+        "range_capability.battery",
+        "range_capability.fuel",
+        "charging_status_capability"
+      ],
+      "capabilitiesOptions": {
+        "alarm_generic": {
+          "title": {
+            "en": "Alarm disarmed",
+            "nl": "Alarm uitgeschakeld"
+          }
+        },
+        "measure_battery.actual": {
+          "title": {
+            "en": "Actual battery",
+            "nl": "Huidige batterij"
+          }
+        }
+      },
+      "energy": {
+        "batteries": [
+          "OTHER"
+        ]
+      },
+      "images": {
+        "small": "/drivers/mini/assets/images/small.png",
+        "large": "/drivers/mini/assets/images/large.png"
+      },
+      "icon": "/drivers/mini/assets/icon.svg",
+      "pair": [
+        {
+          "id": "loading",
+          "template": "loading"
+        },
+        {
+          "id": "login_credentials",
+          "template": "login_credentials",
+          "options": {
+            "logo": "logo.png",
+            "usernameLabel": {
+              "en": "E-mail address",
+              "nl": "E-mailadres"
+            },
+            "usernamePlaceholder": {
+              "en": "john@doe.com",
+              "nl": "jan@jansen.nl"
+            },
+            "passwordLabel": {
+              "en": "Password",
+              "nl": "Wachtwoord"
+            },
+            "passwordPlaceholder": {
+              "en": "Password",
+              "nl": "Wachtwoord"
+            }
+          }
+        },
+        {
+          "id": "list_devices",
+          "template": "list_devices",
+          "navigation": {
+            "next": "add_devices"
+          }
+        },
+        {
+          "id": "add_devices",
+          "template": "add_devices"
+        }
+      ],
+      "name": {
+        "en": "Mini"
+      },
+      "id": "mini",
+      "settings": [
+        {
+          "id": "distanceUnit",
+          "type": "dropdown",
+          "label": {
+            "en": "Distance Unit",
+            "nl": "Afstandseenheid"
+          },
+          "value": "metric",
+          "values": [
+            {
+              "id": "metric",
+              "label": {
+                "en": "Kilometers"
+              }
+            },
+            {
+              "id": "miles",
+              "label": {
+                "en": "Miles",
+                "nl": "Mijlen"
+              }
+            }
+          ]
+        },
+        {
+          "id": "fuelUnit",
+          "type": "dropdown",
+          "label": {
+            "en": "Fuel unit",
+            "nl": "Brandstofeenheid"
+          },
+          "value": "liter",
+          "values": [
+            {
+              "id": "liter",
+              "label": {
+                "en": "Liter"
+              }
+            },
+            {
+              "id": "gallonUS",
+              "label": {
+                "en": "Gallon (US)"
+              }
+            },
+            {
+              "id": "gallonUK",
+              "label": {
+                "en": "Gallon (UK)"
+              }
+            }
+          ]
+        },
+        {
+          "id": "pollingInterval",
+          "type": "number",
+          "label": {
+            "en": "Polling interval (seconds)",
+            "nl": "Polling interval (seconden)"
+          },
+          "value": 60,
+          "min": 5,
+          "max": 3600,
+          "hint": {
+            "en": "The interval at which the app polls to update the state of the vehicle.",
+            "nl": "Het interval waarmee de app pollt om de status van het voertuig te updaten."
+          }
+        },
+        {
+          "id": "refuellingTriggerThreshold",
+          "type": "number",
+          "label": {
+            "en": "Refuelled trigger threshold (liter)",
+            "nl": "Bijgetankt trigger drempelwaarde (liter)"
+          },
+          "value": 5,
+          "min": 1,
+          "max": 100,
+          "hint": {
+            "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger.",
+            "nl": "Als de brandstofwaarde een positieve verandering heeft die groter of gelijk is aan de drempelwaarde, wordt de Bijgetankt flow trigger geactiveerd."
+          }
+        }
+      ]
+    }
+  ],
+  "capabilities": {
+    "address_capability": {
+      "type": "string",
+      "title": {
+        "en": "address_capability"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": null
+    },
+    "charging_status_capability": {
+      "type": "enum",
+      "title": {
+        "en": "Charging status",
+        "nl": "Laadstatus"
+      },
+      "values": [
+        {
+          "id": "DEFAULT",
+          "title": {
+            "en": "Default",
+            "nl": "Standaard"
+          }
+        },
+        {
+          "id": "CHARGING",
+          "title": {
+            "en": "Charging",
+            "nl": "Laden"
+          }
+        },
+        {
+          "id": "ERROR",
+          "title": {
+            "en": "Error",
+            "nl": "Fout"
+          }
+        },
+        {
+          "id": "COMPLETE",
+          "title": {
+            "en": "Complete",
+            "nl": "Gereed"
+          }
+        },
+        {
+          "id": "FULLY_CHARGED",
+          "title": {
+            "en": "Fully charged",
+            "nl": "Volledig geladen"
+          }
+        },
+        {
+          "id": "FINISHED_FULLY_CHARGED",
+          "title": {
+            "en": "Finished fully charged",
+            "nl": "Voltooid volledig geladen"
+          }
+        },
+        {
+          "id": "FINISHED_NOT_FULL",
+          "title": {
+            "en": "Finished not full",
+            "nl": "Voltooid niet vol"
+          }
+        },
+        {
+          "id": "INVALID",
+          "title": {
+            "en": "Invalid",
+            "nl": "Ongeldig"
+          }
+        },
+        {
+          "id": "NOT_CHARGING",
+          "title": {
+            "en": "Not charging",
+            "nl": "Niet aan het laden"
+          }
+        },
+        {
+          "id": "PLUGGED_IN",
+          "title": {
+            "en": "Plugged in",
+            "nl": "Ingeplugd"
+          }
+        },
+        {
+          "id": "WAITING_FOR_CHARGING",
+          "title": {
+            "en": "Waiting for charging",
+            "nl": "Wacht op laden"
+          }
+        },
+        {
+          "id": "TARGET_REACHED",
+          "title": {
+            "en": "Target reached",
+            "nl": "Doel bereikt"
+          }
+        },
+        {
+          "id": "UNKNOWN",
+          "title": {
+            "en": "Unknown",
+            "nl": "Onbekend"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/evcharging.svg"
+    },
+    "climate_now_capability": {
+      "type": "boolean",
+      "title": {
+        "en": "Climate now",
+        "nl": "Nu klimatiseren"
+      },
+      "getable": true,
+      "setable": true,
+      "uiComponent": "toggle",
+      "icon": "/assets/airco.svg"
+    },
+    "location_capability": {
+      "type": "string",
+      "title": {
+        "en": "location_capability"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": null
+    },
+    "mileage_capability": {
+      "type": "number",
+      "title": {
+        "en": "Mileage",
+        "nl": "Kilometerstand"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/speedometer.svg",
+      "units": "km",
+      "insights": true
+    },
+    "only_lock_unlock_flow_capability": {
+      "type": "boolean",
+      "title": {
+        "en": "only_lock_unlock_flow_capability"
+      },
+      "getable": false,
+      "setable": false,
+      "uiComponent": null
+    },
+    "range_capability": {
+      "type": "number",
+      "title": {
+        "en": "Range",
+        "nl": "Bereik"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/map-marker-distance.svg",
+      "units": "km",
+      "insights": true
+    },
+    "remaining_fuel_capability": {
+      "type": "number",
+      "title": {
+        "en": "Fuel",
+        "nl": "Brandstof"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/gas-station.svg",
+      "units": "l",
+      "insights": true
+    },
+    "remaining_fuel_liters_capability": {
+      "type": "number",
+      "title": {
+        "en": "remaining_fuel_liters_capability"
+      },
+      "getable": true,
+      "setable": false,
+      "units": "l",
+      "uiComponent": null
+    }
+  }
+}

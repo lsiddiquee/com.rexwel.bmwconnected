@@ -1,14 +1,16 @@
-import { Device } from 'homey';
-import { BMWConnectedDrive } from '../app';
-import { DeviceData } from '../utils/DeviceData';
 import { CarBrand, ConnectedDrive } from 'bmw-connected-drive';
-import { GeoLocation } from '../utils/GeoLocation';
-import { Settings } from '../utils/Settings';
-import { Logger } from '../utils/Logger';
-import { nameof } from '../utils/Utils';
-import { LocationType } from '../utils/LocationType';
+import * as geo from 'geolocation-utils';
+import { Device } from 'homey';
+import * as semver from 'semver';
+import { BMWConnectedDrive } from '../app';
+import { Configuration } from '../utils/Configuration';
 import { ConfigurationManager } from '../utils/ConfigurationManager';
+import { DeviceData } from '../utils/DeviceData';
+import { LocationType } from '../utils/LocationType';
+import { Logger } from '../utils/Logger';
+import { Settings } from '../utils/Settings';
 import { UnitConverter } from '../utils/UnitConverter';
+import { nameof } from '../utils/Utils';
 
 export class Vehicle extends Device {
 
@@ -34,6 +36,8 @@ export class Vehicle extends Device {
         this.deviceData = this.getData() as DeviceData;
         this.settings = this.getSettings() as Settings;
 
+        await this.migrate();
+
         await this.CleanupCapability("measure_battery.actual");
         if (this.hasCapability("remanining_fuel_liters_capability")) {
             let oldFuelValue = await this.CleanupCapability("remanining_fuel_liters_capability");
@@ -54,9 +58,9 @@ export class Vehicle extends Device {
                 const splitString = coordinate.split(":");
                 if (splitString.length === 2) {
                     this.currentLocation = {
-                        Latitude: parseFloat(splitString[0]) ?? 0,
-                        Longitude: parseFloat(splitString[1]) ?? 0,
-                        Address: await this.getCapabilityValue("address_capability")
+                        latitude: parseFloat(splitString[0]) ?? 0,
+                        longitude: parseFloat(splitString[1]) ?? 0,
+                        address: await this.getCapabilityValue("address_capability")
                     };
                     this.checkGeofence(this.currentLocation);
                     this.app.currentLocation = this.currentLocation;
@@ -73,6 +77,59 @@ export class Vehicle extends Device {
         this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
 
         this.logger?.LogInformation(`${this.getName()} (${this.deviceData.id}) has been initialized`);
+    }
+
+    /**
+     * Perform migrations to ensure proper functionality after upgrading
+     */
+    async migrate() {
+        const configuration = ConfigurationManager.getConfiguration(this.homey);
+
+        if (!configuration.currentVersion) {
+            configuration.currentVersion = "0.0.0";
+        }
+
+        await this.migrate_0_6_5(configuration);
+
+        configuration.currentVersion = this.homey.app.manifest.version;
+        ConfigurationManager.setConfiguration(this.homey, configuration);
+    }
+
+    /**
+     * Ensures the locationUpdateThreshold setting is set to a default value if not already defined.
+     * Migrates the currentLocation and geofence properties to the new casing.
+     */
+    async migrate_0_6_5(configuration: Configuration) {
+        if (semver.lt(configuration.currentVersion, "0.6.5")) {
+            this.logger?.LogInformation("Migrating to version 0.6.5");
+
+            if (this.settings.locationUpdateThreshold === undefined) {
+                this.settings.locationUpdateThreshold = 50;
+                await this.setSettings(this.settings);
+            }
+
+            if (this.currentLocation) {
+                var oldLocation: any = this.currentLocation;
+                this.currentLocation = {
+                    label: oldLocation.Label,
+                    latitude: oldLocation.Latitude,
+                    longitude: oldLocation.Longitude,
+                    address: oldLocation.Address
+                };
+            }
+
+            if (configuration.geofences) {
+                configuration.geofences = (configuration.geofences as any[]).map(fence => {
+                    return {
+                        label: fence.Label,
+                        latitude: fence.Latitude,
+                        longitude: fence.Longitude,
+                        address: fence.Address,
+                        radius: fence.Radius
+                    };
+                });
+            }
+        }
     }
 
     /**
@@ -175,15 +232,15 @@ export class Vehicle extends Device {
         if (configuration?.geofences) {
             this.logger?.LogInformation("Checking geofences.")
             // Checking if the position is inside a geofence.
-            const position = configuration.geofences.find(fence => GeoLocation.IsInsideGeofence(location, fence));
+            const position = configuration.geofences.find(fence => geo.insideCircle(location, fence, fence.radius ?? 20));
             if (position) {
-                this.logger?.LogInformation(`Inside geofence '${position.Label}'.`)
-                location.Label = position.Label;
+                this.logger?.LogInformation(`Inside geofence '${position.label}'.`)
+                location.label = position.label;
                 return;
             }
         }
 
-        location.Label = "";
+        location.label = "";
     }
 
     private async onLocationChanged(newLocation: LocationType) {
@@ -195,19 +252,19 @@ export class Vehicle extends Device {
         const oldLocation = this.currentLocation;
         this.currentLocation = newLocation;
         this.currentMileage = this.getCapabilityValue("mileage_capability");
-        await this.UpdateCapabilityValue("location_capability", `${newLocation.Latitude}:${newLocation.Longitude}`);
-        await this.UpdateCapabilityValue("address_capability", newLocation.Address);
+        await this.UpdateCapabilityValue("location_capability", `${newLocation.latitude}:${newLocation.longitude}`);
+        await this.UpdateCapabilityValue("address_capability", newLocation.address);
         const locationChangedFlowCard: any = this.homey.flow.getDeviceTriggerCard("location_changed");
         locationChangedFlowCard.trigger(this, newLocation, {});
 
-        if (oldLocation?.Label !== newLocation.Label) {
-            this.logger?.LogInformation(`Geofence changed. Old Location: [${oldLocation?.Label}]. New Location: [${newLocation.Label}]`)
-            if (newLocation?.Label) {
+        if (oldLocation?.label !== newLocation.label) {
+            this.logger?.LogInformation(`Geofence changed. Old Location: [${oldLocation?.label}]. New Location: [${newLocation.label}]`)
+            if (newLocation?.label) {
                 this.logger?.LogInformation("Entered geofence.")
                 const geoFenceEnter: any = this.homey.flow.getDeviceTriggerCard("geo_fence_enter");
                 geoFenceEnter.trigger(this, newLocation, {});
             }
-            if (oldLocation?.Label) {
+            if (oldLocation?.label) {
                 this.logger?.LogInformation("Exit geofence.")
                 const geoFenceExit: any = this.homey.flow.getDeviceTriggerCard("geo_fence_exit");
                 geoFenceExit.trigger(this, oldLocation, {});
@@ -219,15 +276,15 @@ export class Vehicle extends Device {
         // Currently onLocationChanged is only triggered if location changed and the door is locked.
         const driveSessionCompletedFlowCard: any = this.homey.flow.getDeviceTriggerCard("drive_session_completed");
         driveSessionCompletedFlowCard.trigger(this, {
-            StartLabel: oldLocation?.Label ?? "",
-            StartLatitude: oldLocation?.Latitude ?? 0,
-            StartLongitude: oldLocation?.Longitude ?? 0,
-            StartAddress: oldLocation?.Address ?? "",
+            StartLabel: oldLocation?.label ?? "",
+            StartLatitude: oldLocation?.latitude ?? 0,
+            StartLongitude: oldLocation?.longitude ?? 0,
+            StartAddress: oldLocation?.address ?? "",
             StartMileage: oldMileage ?? 0,
-            EndLabel: newLocation?.Label ?? "",
-            EndLatitude: newLocation?.Latitude ?? 0,
-            EndLongitude: newLocation?.Longitude ?? 0,
-            EndAddress: newLocation?.Address ?? "",
+            EndLabel: newLocation?.label ?? "",
+            EndLatitude: newLocation?.latitude ?? 0,
+            EndLongitude: newLocation?.longitude ?? 0,
+            EndAddress: newLocation?.address ?? "",
             EndMileage: this.currentMileage ?? 0
         }, {});
     }
@@ -284,9 +341,10 @@ export class Vehicle extends Device {
                     }
                 }
 
+                // Trigger location changed when the vehicle is locked and the location has changed by a minimum threshold
                 if (secured && vehicle.location.coordinates.latitude && vehicle.location.coordinates.longitude) {
-                    if (this.currentLocation?.Latitude !== vehicle.location.coordinates.latitude || this.currentLocation?.Longitude !== vehicle.location.coordinates.longitude) {
-                        this.onLocationChanged({ Label: "", Latitude: vehicle.location.coordinates.latitude, Longitude: vehicle.location.coordinates.longitude, Address: vehicle.location.address.formatted });
+                    if (this.currentLocation == undefined || geo.distanceTo(vehicle.location.coordinates, this.currentLocation) > this.settings.locationUpdateThreshold) {
+                        this.onLocationChanged({ label: "", latitude: vehicle.location.coordinates.latitude, longitude: vehicle.location.coordinates.longitude, address: vehicle.location.address.formatted });
                     }
                 }
 

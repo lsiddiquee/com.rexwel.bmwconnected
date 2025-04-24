@@ -149,7 +149,7 @@ export class BMWConnectedDrive extends Homey.App {
     geofenceCard.registerArgumentAutocompleteListener("geo_fence", async (query: any, args: any) => {
       const configuration = ConfigurationManager.getConfiguration(this.homey);
       if (configuration?.geofences) {
-        const geofences = configuration.geofences.map(item => ({name: item.Label, id: item.Label}));
+        const geofences = configuration.geofences.map(item => ({name: item.label, id: item.label}));
         return geofences.filter(result => result.name?.toLowerCase().includes(query.toLowerCase()));
       }
 
@@ -157,7 +157,7 @@ export class BMWConnectedDrive extends Homey.App {
     });
     geofenceCard.registerRunListener(async (args: any, state: any) => {
       const app = this.homey.app as BMWConnectedDrive
-      return (app.currentLocation && args.geo_fence.id && app.currentLocation.Label === args.geo_fence.id);
+      return (app.currentLocation && args.geo_fence.id && app.currentLocation.label === args.geo_fence.id);
     });
 
     this.homey.flow.getConditionCard('battery_percentage').registerRunListener(async (args: any, _: any) => {

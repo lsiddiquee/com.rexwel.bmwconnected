@@ -3,7 +3,7 @@ import { BMWConnectedDrive } from "./app";
 import { Configuration } from "./utils/Configuration";
 import { ConfigurationManager } from "./utils/ConfigurationManager";
 import { ConnectedDrive } from "bmw-connected-drive";
-import { GeoLocation } from "./utils/GeoLocation";
+import { OpenStreetMap } from "./utils/OpenStreetMap";
 import { LocationType } from "./utils/LocationType";
 import { DeviceData } from "./utils/DeviceData";
 
@@ -14,7 +14,7 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
     }
 
     body.geofences.forEach(fence => {
-        if (!fence.Label || !fence.Latitude || !fence.Longitude || !fence.Radius) {
+        if (!fence.label || !fence.latitude || !fence.longitude || !fence.radius) {
             throw new Error("Geofence information cannot be empty.");
         }
     });
@@ -51,7 +51,7 @@ export async function resolveAddress({ homey, query }: { homey: Homey, query: an
     if (isNaN(latitude) || isNaN(longitude)) {
         throw new Error("Latitude and longitude must be valid numbers.");
     }
-    return await GeoLocation.GetAddress({ Latitude: query.latitude, Longitude: query.longitude }, app.logger);
+    return await OpenStreetMap.GetAddress({ latitude: query.latitude, longitude: query.longitude }, app.logger);
 }
 
 export async function getCurrentLocation({ homey }: { homey: Homey }): Promise<LocationType | undefined> {
