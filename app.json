@@ -834,6 +834,15 @@
           "template": "add_devices"
         }
       ],
+      "repair": [
+        {
+          "id": "loading",
+          "template": "loading"
+        },
+        {
+          "id": "custom_login"
+        }
+      ],
       "name": {
         "en": "BMW"
       },
@@ -983,6 +992,15 @@
         {
           "id": "add_devices",
           "template": "add_devices"
+        }
+      ],
+      "repair": [
+        {
+          "id": "loading",
+          "template": "loading"
+        },
+        {
+          "id": "custom_login"
         }
       ],
       "name": {

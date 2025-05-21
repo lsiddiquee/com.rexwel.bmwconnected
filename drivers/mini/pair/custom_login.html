@@ -2,34 +2,34 @@
   <div>
     <img src="logo.png" class="logo" alt="App Logo">
     <header class="homey-header">
-      <h1 class="homey-title" data-i18n="login.title">Log in with your credentials</h1>
+      <h1 class="homey-title" data-i18n="login.title"></h1>
     </header>
     <fieldset class="homey-form-fieldset">
-      <legend class="homey-form-legend">Login data</legend>
+      <legend class="homey-form-legend" data-i18n="login.loginLabel"></legend>
 
       <div class="homey-form-group">
-        <label class="homey-form-label" for="email">Email Address</label>
+        <label class="homey-form-label" for="email" data-i18n="login.email"></label>
         <input class="homey-form-input" id="email" type="text" value=""/>
       </div>
       <div class="homey-form-group">
-        <label class="homey-form-label" for="password">Password</label>
+        <label class="homey-form-label" for="password" data-i18n="login.password"></label>
         <input class="homey-form-input" id="password" type="password" value=""/>
       </div>
       <div class="homey-form-group">
-        <label class="homey-form-label" for="region">Region</label>
+        <label class="homey-form-label" for="region" data-i18n="login.region.label"></label>
         <select class="homey-form-select" name="region" id="region" onchange="regionChanged()">
-          <option value="invalid" data-i18n="settings.nonexistent">Please select a region</option>
-          <option value="NorthAmerica" data-i18n="settings.region_north_america"></option>
-          <option value="RestOfWorld" data-i18n="settings.region_rest_of_the_world"></option>
+          <option value="invalid" data-i18n="login.region.select_region"></option>
+          <option value="NorthAmerica" data-i18n="login.region.north_america"></option>
+          <option value="RestOfWorld" data-i18n="login.region.rest_of_the_world"></option>
         </select>
       </div>
       <div id="captchaResponse" class="homey-form-group" style="display: none;">
-        <label class="homey-form-label" for="captcha">Captcha</label>
+        <label class="homey-form-label" for="captcha" data-i18n="login.captcha"></label>
         <div id="captchaDiv" class="h-captcha" data-sitekey="7244955f-8f30-4445-adff-4fefe059f815" style="text-align: center;"></div>
       </div>
     </fieldset>
 
-    <button class="homey-button-primary-full" id="loginButton" data-i18n="pair.login_button" onclick="login()">Log In</button>
+    <button class="homey-button-primary-full" id="loginButton" data-i18n="login.button" onclick="login()" data-i18n="login.title"></button>
   </div>
 
   <script type="application/javascript">
@@ -38,25 +38,23 @@
       const regionElement = document.getElementById('region');
       const region = regionElement.value;
       const captchaResponse = document.getElementById('captchaResponse');
-      if (region === "invalid") {
-        captchaResponse.style.display = 'none';
-        return;
-      }
 
-      captchaResponse.style.display = 'block';
-      regionElement.disabled = true;
       const captchaDiv = document.getElementById('captchaDiv');
       if (region === 'NorthAmerica') {
         captchaDiv.setAttribute('data-sitekey', 'dc24de9a-9844-438b-b542-60067ff4dbe9');
       } else if (region === 'RestOfWorld') {
         captchaDiv.setAttribute('data-sitekey', '7244955f-8f30-4445-adff-4fefe059f815');
       } else {
-        Homey.alert("Invalid region selected");
+        Homey.alert(Homey.__('login.region.select_region'));
+        captchaResponse.style.display = 'none';
+        return;
       }
+      captchaResponse.style.display = 'block';
+      regionElement.disabled = true;
 
       const scriptElement = document.createElement('script');
       scriptElement.id = 'hCaptcha_script';
-      scriptElement.src = "https://hcaptcha.com/1/api.js";
+      scriptElement.src = 'https://hcaptcha.com/1/api.js';
       scriptElement.async = true;
       scriptElement.defer = true;
       captchaResponse.appendChild(scriptElement);
@@ -67,28 +65,27 @@
       const password = document.getElementById('password').value.trim();
       const region = document.getElementById('region').value;
       if (region === 'invalid') {
-        Homey.alert("Select a region");
+        Homey.alert(Homey.__('login.region.select_region'));
         return;
       }
 
       if (!email || !password) {
-        Homey.alert("Fill in all fields");
-        // Homey.alert(Homey.__('pair.fill_in_fields'));
+        Homey.alert(Homey.__('login.error.invalidCredentials'));
         return;
       }
 
       const captcha = document.querySelector('[name="h-captcha-response"]').value;
       if (!captcha) {
-        Homey.alert("Captcha not completed");
+        Homey.alert(Homey.__('login.error.captchaInvalid'));
         return;
       }
 
       const loginButton = document.getElementById('loginButton');
-      loginButton.classList.add("is-loading");
+      loginButton.classList.add('is-loading');
       Homey.emit('login', { "email": email, "password": password, "captcha": captcha, "region": region }, (err, result) => {
-        loginButton.classList.remove("is-loading");
+        loginButton.classList.remove('is-loading');
         if (err || !result) {
-          Homey.alert(Homey.__('pair.login_failed'));
+          Homey.alert(Homey.__('login.error.loginFailed'));
         } else {
           Homey.nextView();
         }

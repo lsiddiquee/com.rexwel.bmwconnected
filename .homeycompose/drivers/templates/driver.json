@@ -59,5 +59,15 @@
             "id": "add_devices",
             "template": "add_devices"
         }
+    ],
+    "repair": [
+        {
+            "id": "loading",
+            "template": "loading"
+        },
+        {
+            "id": "custom_login",
+            "$template": "custom_login"
+        }
     ]
 }
