@@ -85,6 +85,8 @@ export class Vehicle extends Device {
      */
     async migrate() {
         const configuration = ConfigurationManager.getConfiguration(this.homey);
+        this.logger?.LogInformation(`Homey version is ${this.homey.version}.`);
+        this.logger?.LogInformation(`Configuration version is ${configuration.currentVersion}.`);
 
         if (!configuration.currentVersion) {
             configuration.currentVersion = "0.0.0";
@@ -92,9 +94,35 @@ export class Vehicle extends Device {
 
         await this.migrate_0_6_5(configuration);
         await this.migrate_0_6_6(configuration);
+        await this.migrate_0_6_7(configuration);
 
         configuration.currentVersion = this.homey.app.manifest.version;
         ConfigurationManager.setConfiguration(this.homey, configuration);
+
+        await this.migrate_capabilities();
+    }
+
+    async migrate_capabilities() {
+        if (semver.gte(this.homey.version, "12.0.0")) {
+            if (this.getClass() === "other") {
+                this.logger?.LogInformation("Migrating device class to car");
+                await this.setClass("car");
+            }
+
+            if (semver.gte(this.homey.version, "12.4.5")) {
+                if (this.hasCapability("measure_battery")) {
+                    if (!this.hasCapability("ev_charging_state")) {
+                        this.logger?.LogInformation("Adding ev_charging_state capability");
+                        await this.addCapability("ev_charging_state");
+
+                        await this.setEnergy({
+                            "batteries": ["INTERNAL"],
+                            "electricCar": true,
+                        });
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -150,6 +178,15 @@ export class Vehicle extends Device {
             delete (configuration as any).username;
             delete (configuration as any).password;
             delete (configuration as any).captcha;
+        }
+    }
+
+    /**
+     * Migrate configuration from earlier version to 0.6.7
+     */
+    async migrate_0_6_7(configuration: Configuration) {
+        if (semver.lt(configuration.currentVersion, "0.6.7")) {
+            this.logger?.LogInformation("Migrating to version 0.6.7");
         }
     }
 
@@ -377,6 +414,11 @@ export class Vehicle extends Device {
                     }
                 }
 
+                this.logger?.LogInformation(`charging_status: ${vehicle.electricChargingState.chargingStatus}.`);
+                if (this.hasCapability("ev_charging_state") && vehicle.electricChargingState.chargingStatus) {
+                    await this.UpdateCapabilityValue("ev_charging_state", this.convertChargingStatus(vehicle.electricChargingState.chargingStatus));
+                }
+
                 if (this.hasCapability("locked")) {
                     await this.setCapabilityValue("locked", vehicle.doorsState.combinedSecurityState === "LOCKED"
                         || vehicle.doorsState.combinedSecurityState === "SECURED");
@@ -488,5 +530,28 @@ export class Vehicle extends Device {
         this.logger?.LogInformation(`Setting fuel unit to ${fuelUnit}`);
 
         await this.setCapabilityOptions("remaining_fuel_capability", { "units": fuelUnit === "liter" ? "l" : "gal" });
+    }
+
+    private convertChargingStatus(chargingStatus: string): string {
+        // DEFAULT = "DEFAULT"
+        // ERROR = "ERROR"
+        // INVALID = "INVALID"
+        // UNKNOWN = "UNKNOWN"
+
+        switch (chargingStatus) {
+            case "CHARGING":
+                return "plugged_in_charging";
+            case "COMPLETE":
+            case "FULLY_CHARGED":
+            case "FINISHED_FULLY_CHARGED":
+            case "FINISHED_NOT_FULL":
+            case "NOT_CHARGING":
+            case "PLUGGED_IN":
+            case "WAITING_FOR_CHARGING":
+            case "TARGET_REACHED":
+                return "plugged_in";
+            default:
+                return "plugged_out";
+        }
     }
 }
