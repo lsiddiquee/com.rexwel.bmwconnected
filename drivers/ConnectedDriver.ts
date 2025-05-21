@@ -1,8 +1,6 @@
 import { Driver } from 'homey';
 import { BMWConnectedDrive } from '../app';
 import { DeviceData } from '../utils/DeviceData';
-import { Configuration } from '../utils/Configuration';
-import { ConfigurationManager } from '../utils/ConfigurationManager';
 import { CarBrand, ConnectedDrive } from "bmw-connected-drive";
 import { Settings } from '../utils/Settings';
 
@@ -32,18 +30,13 @@ export class ConnectedDriver extends Driver {
 
     session.setHandler("login", async (data: any) => {
       const app = (this.homey.app as BMWConnectedDrive);
-      let configuration = ConfigurationManager.getConfiguration(this.homey);
-      if (!configuration) {
-        configuration = new Configuration();
+      app.logger?.LogTrace("Email: " + data.email + " Password: **** Region: " + data.region + " Captcha: " + data.captcha);
+      if (!data.email || !data.password || !data.region || !data.captcha) {
+        return false;
       }
 
-      configuration.username = data.username;
-      configuration.password = data.password;
-
-      ConfigurationManager.setConfiguration(this.homey, configuration);
-
       try {
-        const api = new ConnectedDrive(configuration.username, configuration.password, configuration.region, app.tokenStore);
+        const api = new ConnectedDrive(data.email, data.password, data.region, app.tokenStore, app.logger, data.captcha);
         await api.account.getToken();
         app.connectedDriveApi = api;
         return true;
