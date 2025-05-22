@@ -64,5 +64,8 @@
   },
   "0.6.5": {
     "en": "Prevented trip completion from triggering prematurely when the car auto-locks at the start of a drive."
+  },
+  "0.7.0": {
+    "en": "Improved login flow. Added device repair capability. Removed username and password from configuration and is no longer persisted."
   }
 }
