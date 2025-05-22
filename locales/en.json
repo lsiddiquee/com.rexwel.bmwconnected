@@ -1,14 +1,6 @@
 {
   "settings": {
     "title": "Settings",
-    "loginLabel": "Login",
-    "username": "Username",
-    "password": "Password",
-    "captcha": "Captcha Token",
-    "region": "Region",
-    "region_north_america": "North America",
-    "region_rest_of_the_world": "Rest of the World",
-    "region_china": "China",
     "geofence": "Geofence",
     "useCurrentLocation": "Use Current Location",
     "label": "Label",
@@ -27,5 +19,25 @@
     "clearToken": "Clear Token",
     "devicesList": "List of registered VINs",
     "reloadLogs": "Reload Logs"
+  },
+  "login": {
+    "title": "Log in with your credentials",
+    "loginLabel": "Login",
+    "email": "Email",
+    "password": "Password",
+    "region": {
+      "label": "Region",
+      "select_region": "Please select a region",
+      "north_america": "North America",
+      "rest_of_the_world": "Rest of the World",
+      "china": "China"
+    },
+    "captcha": "Captcha",
+    "button": "Login",
+    "error": {
+      "invalidCredentials": "Invalid username or password.",
+      "captchaInvalid": "Invalid captcha token.",
+      "loginFailed": "Login failed."
+    }
   }
 }

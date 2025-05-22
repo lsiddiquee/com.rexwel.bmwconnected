@@ -2,16 +2,12 @@ import { Driver, Homey } from "homey";
 import { BMWConnectedDrive } from "./app";
 import { Configuration } from "./utils/Configuration";
 import { ConfigurationManager } from "./utils/ConfigurationManager";
-import { ConnectedDrive } from "bmw-connected-drive";
 import { OpenStreetMap } from "./utils/OpenStreetMap";
 import { LocationType } from "./utils/LocationType";
 import { DeviceData } from "./utils/DeviceData";
+import { Regions } from "bmw-connected-drive";
 
 export async function saveSettings({ homey, body }: { homey: Homey, body: Configuration }): Promise<boolean> {
-
-    if (!body.username || !body.password || !body.region) {
-        throw new Error("Username, password and region cannot be empty.");
-    }
 
     body.geofences.forEach(fence => {
         if (!fence.label || !fence.latitude || !fence.longitude || !fence.radius) {
@@ -19,19 +15,10 @@ export async function saveSettings({ homey, body }: { homey: Homey, body: Config
         }
     });
 
-    const app = (homey.app as BMWConnectedDrive);
-    const api = new ConnectedDrive(body.username, body.password, body.region, app.tokenStore, app.logger, body.captcha);
+    const previous_configuration = ConfigurationManager.getConfiguration(homey);
+    body.region = previous_configuration?.region ?? Regions.RestOfWorld;
     ConfigurationManager.setConfiguration(homey, body);
 
-    try {
-        await api.account.getToken();
-        app.connectedDriveApi = api;
-    } catch (err) {
-        app.logger?.LogError(err);
-        return false;
-    }
-
-    app.logger?.LogInformation("Login successful");
     return true;
 }
 

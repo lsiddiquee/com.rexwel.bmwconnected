@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "com.rexwel.bmwconnected",
-  "version": "0.6.5",
+  "version": "0.7.0",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -820,27 +820,7 @@
           "template": "loading"
         },
         {
-          "id": "login_credentials",
-          "template": "login_credentials",
-          "options": {
-            "logo": "logo.png",
-            "usernameLabel": {
-              "en": "E-mail address",
-              "nl": "E-mailadres"
-            },
-            "usernamePlaceholder": {
-              "en": "john@doe.com",
-              "nl": "jan@jansen.nl"
-            },
-            "passwordLabel": {
-              "en": "Password",
-              "nl": "Wachtwoord"
-            },
-            "passwordPlaceholder": {
-              "en": "Password",
-              "nl": "Wachtwoord"
-            }
-          }
+          "id": "custom_login"
         },
         {
           "id": "list_devices",
@@ -852,6 +832,15 @@
         {
           "id": "add_devices",
           "template": "add_devices"
+        }
+      ],
+      "repair": [
+        {
+          "id": "loading",
+          "template": "loading"
+        },
+        {
+          "id": "custom_login"
         }
       ],
       "name": {
@@ -991,27 +980,7 @@
           "template": "loading"
         },
         {
-          "id": "login_credentials",
-          "template": "login_credentials",
-          "options": {
-            "logo": "logo.png",
-            "usernameLabel": {
-              "en": "E-mail address",
-              "nl": "E-mailadres"
-            },
-            "usernamePlaceholder": {
-              "en": "john@doe.com",
-              "nl": "jan@jansen.nl"
-            },
-            "passwordLabel": {
-              "en": "Password",
-              "nl": "Wachtwoord"
-            },
-            "passwordPlaceholder": {
-              "en": "Password",
-              "nl": "Wachtwoord"
-            }
-          }
+          "id": "custom_login"
         },
         {
           "id": "list_devices",
@@ -1023,6 +992,15 @@
         {
           "id": "add_devices",
           "template": "add_devices"
+        }
+      ],
+      "repair": [
+        {
+          "id": "loading",
+          "template": "loading"
+        },
+        {
+          "id": "custom_login"
         }
       ],
       "name": {

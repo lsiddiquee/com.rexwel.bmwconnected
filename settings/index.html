@@ -57,33 +57,6 @@
   <div id="settings" class="tabcontent">
 
     <fieldset>
-      <legend data-i18n="settings.loginLabel">
-        <!-- Translated -->
-      </legend>
-
-      <div class="field row">
-        <label for="username" data-i18n="settings.username"></label>
-        <input id="username" type="text" value="" />
-      </div>
-      <div class="field row">
-        <label for="password" data-i18n="settings.password"></label>
-        <input id="password" type="password" value="" />
-      </div>
-      <div class="field row">
-        <label for="captcha" data-i18n="settings.captcha"></label>
-        <input id="captcha" type="text" value="" />
-      </div>
-      <div class="field row">
-        <label for="region" data-i18n="settings.Region"></label>
-        <select name="region" id="region">
-          <option value="NorthAmerica" data-i18n="settings.region_north_america"></option>
-          <option value="RestOfWorld" data-i18n="settings.region_rest_of_the_world"></option>
-          <!-- <option value="China" data-i18n="settings.region_china"></option> -->
-        </select>
-      </div>
-    </fieldset>
-
-    <fieldset>
       <legend data-i18n="settings.geofence">
         <!-- Translated -->
       </legend>
@@ -178,10 +151,6 @@
   <script type="text/javascript">
     // a method named 'onHomeyReady' must be present in your code
     function onHomeyReady(Homey) {
-      var usernameElement = document.getElementById("username");
-      var passwordElement = document.getElementById("password");
-      var captchaElement = document.getElementById("captcha");
-      var regionElement = document.getElementById("region");
       var geofencesElement = document.getElementById("geofences");
       var logEnabledElement = document.getElementById("logEnabled");
       var logRequestCountElement = document.getElementById("logRequestCount");
@@ -196,12 +165,6 @@
           return;
         }
 
-        usernameElement.value = data.username;
-        passwordElement.value = data.password;
-        captchaElement.value = "";
-        if (data.region) {
-          regionElement.value = data.region;
-        }
         logEnabledElement.checked = data.logEnabled;
         logLevel.value = data.logLevel;
         logRequestCountElement.value = data.logRequestCount;
@@ -235,19 +198,15 @@
         }) ?? [];
 
         Homey.api("POST", "/saveSettings", {
-          username: usernameElement.value,
-          password: passwordElement.value,
-          captcha: captchaElement.value,
-          region: regionElement.value,
           geofences: geofences,
           logEnabled: logEnabledElement.checked,
           logLevel: (parseInt(logLevelElement.value) ?? 3)
         }, function (err, result) {
           if (err) return Homey.alert(err);
           if (result === true) {
-            successElement.innerHTML = 'Login Successful. Settings saved.';
+            successElement.innerHTML = 'Settings saved.';
           } else {
-            errorElement.innerHTML = 'Login Failed';
+            errorElement.innerHTML = 'Failed';
           }
         });
       });

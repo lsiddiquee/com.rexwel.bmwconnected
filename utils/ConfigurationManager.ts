@@ -16,7 +16,6 @@ export class ConfigurationManager {
             // Token value is empty, most likely configuration is being saved from the app, hence, copying the old token.
             value.token = this.configurationCache?.token;
         }
-        value.captcha = undefined; // Clear captcha value as this is short lived.
         this.configurationCache = value;
         homey.settings.set(ConfigurationManager._settingsKey, value);
     }
