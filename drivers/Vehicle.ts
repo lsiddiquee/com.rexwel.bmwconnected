@@ -90,24 +90,26 @@ export class Vehicle extends Device {
         }
 
         await this.migrate_0_6_5(configuration);
+        await this.migrate_0_6_6(configuration);
 
         configuration.currentVersion = this.homey.app.manifest.version;
         ConfigurationManager.setConfiguration(this.homey, configuration);
     }
 
     /**
-     * Ensures the locationUpdateThreshold setting is set to a default value if not already defined.
-     * Migrates the currentLocation and geofence properties to the new casing.
+     * Migrate configuration from earlier version to 0.6.5
      */
     async migrate_0_6_5(configuration: Configuration) {
         if (semver.lt(configuration.currentVersion, "0.6.5")) {
             this.logger?.LogInformation("Migrating to version 0.6.5");
 
+            // Setting default value for locationUpdateThreshold if not already defined
             if (this.settings.locationUpdateThreshold === undefined) {
                 this.settings.locationUpdateThreshold = 50;
                 await this.setSettings(this.settings);
             }
 
+            // Migrating currentLocation properties to the new casing
             if (this.currentLocation) {
                 var oldLocation: any = this.currentLocation;
                 this.currentLocation = {
@@ -118,6 +120,7 @@ export class Vehicle extends Device {
                 };
             }
 
+            // Migrating geofences properties to the new casing
             if (configuration.geofences) {
                 configuration.geofences = (configuration.geofences as any[]).map(fence => {
                     return {
@@ -129,6 +132,21 @@ export class Vehicle extends Device {
                     };
                 });
             }
+        }
+    }
+
+    /**
+     * Migrate configuration from earlier version to 0.6.6
+     */
+    async migrate_0_6_6(configuration: Configuration) {
+        if (semver.lt(configuration.currentVersion, "0.6.6")) {
+            this.logger?.LogInformation("Migrating to version 0.6.6");
+
+            // Removing username, password and captcha from the configuration
+            // as they are no longer persisted in the application.
+            delete (configuration as any).username;
+            delete (configuration as any).password;
+            delete (configuration as any).captcha;
         }
     }
 

@@ -3,6 +3,8 @@ import { BMWConnectedDrive } from '../app';
 import { DeviceData } from '../utils/DeviceData';
 import { CarBrand, ConnectedDrive } from "bmw-connected-drive";
 import { Settings } from '../utils/Settings';
+import { ConfigurationManager } from '../utils/ConfigurationManager';
+import { Configuration } from '../utils/Configuration';
 
 export class ConnectedDriver extends Driver {
   brand: CarBrand = CarBrand.Bmw;
@@ -40,6 +42,12 @@ export class ConnectedDriver extends Driver {
         const api = new ConnectedDrive(data.email, data.password, data.region, app.tokenStore, app.logger, data.captcha);
         await api.account.getToken();
         app.connectedDriveApi = api;
+
+        // Update the configuration with the region
+        const configuration = ConfigurationManager.getConfiguration(this.homey) ?? new Configuration();
+        configuration.region = data.region;
+        ConfigurationManager.setConfiguration(this.homey, configuration);
+
         return true;
       } catch (err) {
         app.logger?.LogError(err);
@@ -113,7 +121,15 @@ export class ConnectedDriver extends Driver {
         const api = new ConnectedDrive(data.email, data.password, data.region, app.tokenStore, app.logger, data.captcha);
         await api.account.getToken();
         app.connectedDriveApi = api;
+
+        // Update the configuration with the region
+        const configuration = ConfigurationManager.getConfiguration(this.homey) ?? new Configuration();
+        configuration.region = data.region;
+        ConfigurationManager.setConfiguration(this.homey, configuration);
+
+        // Enable the device
         await device.setAvailable(); // TODO: Set other devices as well.
+
         return true;
       } catch (err) {
         app.logger?.LogError(err);

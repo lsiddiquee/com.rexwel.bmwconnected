@@ -35,9 +35,11 @@ export class BMWConnectedDrive extends Homey.App {
       configuration = new Configuration();
       ConfigurationManager.setConfiguration(this.homey, configuration);
     }
-    if (configuration.username && configuration.password) {
-      this.connectedDriveApi = new ConnectedDrive(configuration.username, configuration.password, configuration.region, this.tokenStore, this.logger);
-    }
+
+    // Using dummy credentials to initialize the ConnectedDrive API
+    // The actual credentials are not stored in the app, only the token.
+    // The authentication happens in the login flow, and the token is persisted.
+    this.connectedDriveApi = new ConnectedDrive("dummy_user", "false_password", configuration.region, this.tokenStore, this.logger);
     this.logger.LogInformation('BMWConnectedDrive app has been initialized');
 
     this.registerActionCards();
