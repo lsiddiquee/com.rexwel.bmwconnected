@@ -37,13 +37,8 @@ export class Vehicle extends Device {
         this.deviceData = this.getData() as DeviceData;
         this.settings = this.getSettings() as Settings;
 
-        await this.migrate();
-
-        await this.CleanupCapability("measure_battery.actual");
-        if (this.hasCapability("remanining_fuel_liters_capability")) {
-            let oldFuelValue = await this.CleanupCapability("remanining_fuel_liters_capability");
-            await this.UpdateCapabilityValue("remaining_fuel_liters_capability", oldFuelValue);
-        }
+        await this.migrate_settings();
+        await this.migrate_capabilities();
 
         // register a capability listener
         if (this.hasCapability("locked")) {
@@ -80,29 +75,13 @@ export class Vehicle extends Device {
         this.logger?.LogInformation(`${this.getName()} (${this.deviceData.id}) has been initialized`);
     }
 
-    /**
-     * Perform migrations to ensure proper functionality after upgrading
-     */
-    async migrate() {
-        const configuration = ConfigurationManager.getConfiguration(this.homey);
-        this.logger?.LogInformation(`Homey version is ${this.homey.version}.`);
-        this.logger?.LogInformation(`Configuration version is ${configuration.currentVersion}.`);
-
-        if (!configuration.currentVersion) {
-            configuration.currentVersion = "0.0.0";
+    async migrate_capabilities() {
+        await this.CleanupCapability("measure_battery.actual");
+        if (this.hasCapability("remanining_fuel_liters_capability")) {
+            let oldFuelValue = await this.CleanupCapability("remanining_fuel_liters_capability");
+            await this.UpdateCapabilityValue("remaining_fuel_liters_capability", oldFuelValue);
         }
 
-        await this.migrate_0_6_5(configuration);
-        await this.migrate_0_6_6(configuration);
-        await this.migrate_0_6_7(configuration);
-
-        configuration.currentVersion = this.homey.app.manifest.version;
-        ConfigurationManager.setConfiguration(this.homey, configuration);
-
-        await this.migrate_capabilities();
-    }
-
-    async migrate_capabilities() {
         if (semver.gte(this.homey.version, "12.0.0")) {
             if (this.getClass() === "other") {
                 this.logger?.LogInformation("Migrating device class to car");
@@ -126,10 +105,27 @@ export class Vehicle extends Device {
     }
 
     /**
-     * Migrate configuration from earlier version to 0.6.5
+     * Migrate settings to ensure proper functionality after upgrading
      */
-    async migrate_0_6_5(configuration: Configuration) {
-        if (semver.lt(configuration.currentVersion, "0.6.5")) {
+    async migrate_settings() {
+        const settings = this.settings;
+        this.logger?.LogInformation(`Settings version is ${settings.currentVersion}.`);
+
+        if (!settings.currentVersion) {
+            settings.currentVersion = "0.0.0";
+        }
+
+        await this.migrate_0_6_5(settings);
+
+        settings.currentVersion = this.homey.app.manifest.version;
+        await this.setSettings(settings);
+    }
+
+    /**
+     * Migrate settings from earlier version to 0.6.5
+     */
+    async migrate_0_6_5(settings: Settings) {
+        if (semver.lt(settings.currentVersion, "0.6.5")) {
             this.logger?.LogInformation("Migrating to version 0.6.5");
 
             // Setting default value for locationUpdateThreshold if not already defined
@@ -143,50 +139,15 @@ export class Vehicle extends Device {
             // Migrating currentLocation properties to the new casing
             if (this.currentLocation) {
                 var oldLocation: any = this.currentLocation;
-                this.currentLocation = {
-                    label: oldLocation.Label,
-                    latitude: oldLocation.Latitude,
-                    longitude: oldLocation.Longitude,
-                    address: oldLocation.Address
-                };
-            }
-
-            // Migrating geofences properties to the new casing
-            if (configuration.geofences) {
-                configuration.geofences = (configuration.geofences as any[]).map(fence => {
-                    return {
-                        label: fence.Label,
-                        latitude: fence.Latitude,
-                        longitude: fence.Longitude,
-                        address: fence.Address,
-                        radius: fence.Radius
+                if (oldLocation.Latitude && oldLocation.Longitude) {
+                    this.currentLocation = {
+                        label: oldLocation.Label,
+                        latitude: oldLocation.Latitude,
+                        longitude: oldLocation.Longitude,
+                        address: oldLocation.Address
                     };
-                });
+                }
             }
-        }
-    }
-
-    /**
-     * Migrate configuration from earlier version to 0.6.6
-     */
-    async migrate_0_6_6(configuration: Configuration) {
-        if (semver.lt(configuration.currentVersion, "0.6.6")) {
-            this.logger?.LogInformation("Migrating to version 0.6.6");
-
-            // Removing username, password and captcha from the configuration
-            // as they are no longer persisted in the application.
-            delete (configuration as any).username;
-            delete (configuration as any).password;
-            delete (configuration as any).captcha;
-        }
-    }
-
-    /**
-     * Migrate configuration from earlier version to 0.6.7
-     */
-    async migrate_0_6_7(configuration: Configuration) {
-        if (semver.lt(configuration.currentVersion, "0.6.7")) {
-            this.logger?.LogInformation("Migrating to version 0.6.7");
         }
     }
 

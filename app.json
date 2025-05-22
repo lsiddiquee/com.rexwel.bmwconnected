@@ -785,7 +785,6 @@
         "range_capability",
         "climate_now_capability",
         "measure_battery",
-        "measure_battery.actual",
         "range_capability.battery",
         "range_capability.fuel",
         "charging_status_capability"
@@ -796,17 +795,11 @@
             "en": "Alarm disarmed",
             "nl": "Alarm uitgeschakeld"
           }
-        },
-        "measure_battery.actual": {
-          "title": {
-            "en": "Actual battery",
-            "nl": "Huidige batterij"
-          }
         }
       },
       "energy": {
         "batteries": [
-          "OTHER"
+          "INTERNAL"
         ]
       },
       "images": {
@@ -945,7 +938,6 @@
         "range_capability",
         "climate_now_capability",
         "measure_battery",
-        "measure_battery.actual",
         "range_capability.battery",
         "range_capability.fuel",
         "charging_status_capability"
@@ -956,17 +948,11 @@
             "en": "Alarm disarmed",
             "nl": "Alarm uitgeschakeld"
           }
-        },
-        "measure_battery.actual": {
-          "title": {
-            "en": "Actual battery",
-            "nl": "Huidige batterij"
-          }
         }
       },
       "energy": {
         "batteries": [
-          "OTHER"
+          "INTERNAL"
         ]
       },
       "images": {
