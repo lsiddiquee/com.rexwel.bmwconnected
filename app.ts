@@ -10,6 +10,7 @@ import { Logger } from './utils/Logger';
 import { Configuration } from './utils/Configuration';
 import { LocationType } from './utils/LocationType';
 import * as semver from 'semver';
+import { ConnectedDriver } from './drivers/ConnectedDriver';
 
 // TODO:
 // Window states capability
@@ -135,6 +136,7 @@ export class BMWConnectedDrive extends Homey.App {
         });
 
         this.homey.flow.getActionCard('send_message').registerRunListener(async (args: any) => {
+            const brand = (args.device?.driver as ConnectedDriver)?.brand ?? CarBrand.Bmw;
             const vin = (args.device?.deviceData as DeviceData)?.id;
             if (!vin) {
                 throw new Error("VIN not found while send_message flow triggered.");
@@ -142,7 +144,7 @@ export class BMWConnectedDrive extends Homey.App {
             args.device.log(`Flow triggered send_message for vin ${vin}`);
 
             try {
-                await this.connectedDriveApi?.sendMessage(vin, CarBrand.Bmw, args.subject, args.message);
+                await this.connectedDriveApi?.sendMessage(vin, brand, args.subject, args.message);
             } catch (err) {
                 this.logger?.LogError(err);
             }

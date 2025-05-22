@@ -3,7 +3,6 @@ import * as geo from 'geolocation-utils';
 import { Device } from 'homey';
 import * as semver from 'semver';
 import { BMWConnectedDrive } from '../app';
-import { Configuration } from '../utils/Configuration';
 import { ConfigurationManager } from '../utils/ConfigurationManager';
 import { DeviceData } from '../utils/DeviceData';
 import { LocationType } from '../utils/LocationType';
@@ -11,6 +10,7 @@ import { Logger } from '../utils/Logger';
 import { Settings } from '../utils/Settings';
 import { UnitConverter } from '../utils/UnitConverter';
 import { nameof } from '../utils/Utils';
+import { ConnectedDriver } from './ConnectedDriver';
 
 export class Vehicle extends Device {
 
@@ -65,7 +65,7 @@ export class Vehicle extends Device {
         }
 
         await this.setDistanceUnits(this.settings.distanceUnit);
-        //await this.setFuelUnits(this.settings.fuelUnit);
+        await this.setFuelUnits(this.settings.fuelUnit);
 
         await this.updateState();
         this.currentMileage = this.getCapabilityValue("mileage_capability");
@@ -234,13 +234,13 @@ export class Vehicle extends Device {
 
     // this method is called when the Device has requested a state change (turned on or off)
     private async onCapabilityLocked(value: boolean) {
-
+        const brand = (this.driver as ConnectedDriver)?.brand ?? CarBrand.Bmw;
         if (this.api) {
             try {
                 if (value) {
-                    await this.api.lockDoors(this.deviceData.id, CarBrand.Mini, true);
+                    await this.api.lockDoors(this.deviceData.id, brand, true);
                 } else {
-                    await this.api.unlockDoors(this.deviceData.id, CarBrand.Mini, true);
+                    await this.api.unlockDoors(this.deviceData.id, brand, true);
                 }
             } catch (err) {
                 this.logger?.LogError(err);
