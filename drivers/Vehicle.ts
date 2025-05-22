@@ -292,6 +292,12 @@ export class Vehicle extends Device {
     private async updateState() {
         try {
             this.logger?.LogInformation(`Polling BMW ConnectedDrive for vehicle status updates for ${this.getName()}.`);
+
+            if (!this.getAvailable()) {
+                this.logger?.LogInformation(`Device is unavailable. Skipping update.`);
+                return;
+            }
+
             if (this.api) {
                 const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
 
