@@ -380,7 +380,8 @@ export class Vehicle extends Device {
                 }
             }
         } catch (err) {
-            await this.setUnavailable();
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            await this.setUnavailable(errorMessage);
             this.log("Error occurred while attempting to update device state.", err);
             this.logger?.LogError(err);
         }
