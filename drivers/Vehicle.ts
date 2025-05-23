@@ -250,7 +250,7 @@ export class Vehicle extends Device {
         if (configuration?.geofences) {
             this.logger?.LogInformation("Checking geofences.")
             // Checking if the position is inside a geofence.
-            const position = configuration.geofences.find(fence => geo.insideCircle(location, fence, fence.radius ?? 20));
+            const position = configuration.geofences.find(fence => fence?.longitude && fence?.longitude && geo.insideCircle(location, fence, fence.radius ?? 20));
             if (position) {
                 this.logger?.LogInformation(`Inside geofence '${position.label}'.`)
                 location.label = position.label;
