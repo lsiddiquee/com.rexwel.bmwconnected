@@ -496,7 +496,6 @@ export class Vehicle extends Device {
     private convertChargingStatus(chargingStatus: string): string {
         // DEFAULT = "DEFAULT"
         // ERROR = "ERROR"
-        // INVALID = "INVALID"
         // UNKNOWN = "UNKNOWN"
 
         switch (chargingStatus) {
@@ -511,6 +510,7 @@ export class Vehicle extends Device {
             case "WAITING_FOR_CHARGING":
             case "TARGET_REACHED":
                 return "plugged_in";
+            case "INVALID":
             default:
                 return "plugged_out";
         }
