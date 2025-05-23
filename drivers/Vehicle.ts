@@ -22,6 +22,7 @@ export class Vehicle extends Device {
     currentLocation?: LocationType;
     currentMileage?: number;
     lastUpdatedAt?: Date;
+    retryCount: number = 0;
 
     get api(): ConnectedDrive | undefined {
         return this.app.connectedDriveApi;
@@ -312,9 +313,11 @@ export class Vehicle extends Device {
             this.logger?.LogInformation(`Polling BMW ConnectedDrive for vehicle status updates for ${this.getName()}.`);
 
             if (!this.getAvailable()) {
-                this.logger?.LogInformation(`Device is unavailable. Skipping update.`);
+                this.logger?.LogInformation(`Device '${this.getName()}' is unavailable. Skipping update.`);
                 return;
             }
+
+            this.retryCount++;
 
             if (this.api) {
                 const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
@@ -397,9 +400,12 @@ export class Vehicle extends Device {
                     }, {});
                 }
             }
+            this.retryCount = 0;
         } catch (err) {
-            const errorMessage = err instanceof Error ? err.message : String(err);
-            await this.setUnavailable(errorMessage);
+            if (this.retryCount > 3) {
+                const errorMessage = err instanceof Error ? err.message : String(err);
+                await this.setUnavailable(errorMessage);
+            }
             this.log("Error occurred while attempting to update device state.", err);
             this.logger?.LogError(err);
         }

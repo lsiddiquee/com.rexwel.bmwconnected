@@ -70,5 +70,8 @@
   },
   "0.7.1": {
     "en": "Fixing app crash caused by geo fencing detection code"
+  },
+  "0.7.2": {
+    "en": "Improve device error handling."
   }
 }
