@@ -162,11 +162,7 @@ export class Vehicle extends Device {
         this.settings = newSettings;
 
         if (changedKeys.includes(nameof<Settings>("pollingInterval"))) {
-            if (this.deviceStatusPoller) {
-                clearInterval(this.deviceStatusPoller);
-            }
-            this.app.logger?.LogInformation(`setting polling interval to ${this.settings.pollingInterval} seconds`);
-            this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
+            this.updatePollingInterval();
         }
 
         let shouldUpdateState = false;
@@ -188,6 +184,14 @@ export class Vehicle extends Device {
         if (shouldUpdateState) {
             await this.updateState();
         }
+    }
+
+    private updatePollingInterval() {
+        if (this.deviceStatusPoller) {
+            clearInterval(this.deviceStatusPoller);
+        }
+        this.app.logger?.LogInformation(`setting polling interval to ${this.settings.pollingInterval} seconds`);
+        this.deviceStatusPoller = setInterval(this.updateState.bind(this), this.settings.pollingInterval * 1000);
     }
 
     /**
@@ -402,12 +406,26 @@ export class Vehicle extends Device {
             }
             this.retryCount = 0;
         } catch (err) {
-            if (this.retryCount > 3) {
-                const errorMessage = err instanceof Error ? err.message : String(err);
-                await this.setUnavailable(errorMessage);
+            if (this.settings.pollingInterval < 300) {
+                this.logger?.LogInformation(`Polling interval is too low (${this.settings.pollingInterval} seconds). Setting to 5 minutes.`);
+                this.settings.pollingInterval = 300;
+                await this.setSettings(this.settings);
+                this.updatePollingInterval();
             }
+            
             this.log("Error occurred while attempting to update device state.", err);
             this.logger?.LogError(err);
+            if (this.retryCount > 5) {
+                const errorMessage = err instanceof Error ? err.message : String(err);
+                if (errorMessage.includes("408") && this.retryCount < 15) {
+                    // If the error is a timeout, we can retry the update.
+                    // This is useful for cases where the API is temporarily unavailable.
+
+                    this.logger?.LogInformation(`Timeout occurred retrying. Detailed error: ${errorMessage}`);
+                    return;
+                }
+                await this.setUnavailable(errorMessage);
+            }
         }
     }
 
