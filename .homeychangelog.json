@@ -76,5 +76,8 @@
   },
   "0.7.3": {
     "en": "Improved handling of request timeout"
+  },
+  "0.7.4": {
+    "en": "Fixes issue where non (B/PH)EV might be detected as one."
   }
 }
