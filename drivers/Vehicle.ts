@@ -107,7 +107,9 @@ export class Vehicle extends Device {
             // Setting default value for locationUpdateThreshold if not already defined
             if (this.settings.locationUpdateThreshold === undefined) {
                 this.settings.locationUpdateThreshold = 50;
-                await this.setSettings(this.settings);
+                await this.setSettings({
+                    locationUpdateThreshold: this.settings.locationUpdateThreshold
+                });
             }
 
             // Migrating currentLocation properties to the new casing
@@ -427,7 +429,9 @@ export class Vehicle extends Device {
             if (this.settings.pollingInterval < 300) {
                 this.logger?.LogInformation(`Polling interval is too low (${this.settings.pollingInterval} seconds). Setting to 5 minutes.`);
                 this.settings.pollingInterval = 300;
-                await this.setSettings(this.settings);
+                await this.setSettings({
+                    pollingInterval: this.settings.pollingInterval
+                });
                 this.updatePollingInterval();
             }
             
