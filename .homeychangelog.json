@@ -82,5 +82,8 @@
   },
   "0.7.5": {
     "en": "Fixing an issue while updating settings."
+  },
+  "0.7.6": {
+    "en": "Fixing readonly issue while updating settings"
   }
 }
