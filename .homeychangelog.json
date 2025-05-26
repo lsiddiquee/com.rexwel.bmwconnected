@@ -76,5 +76,14 @@
   },
   "0.7.3": {
     "en": "Improved handling of request timeout"
+  },
+  "0.7.4": {
+    "en": "Fixes issue where non (B/PH)EV might be detected as one."
+  },
+  "0.7.5": {
+    "en": "Fixing an issue while updating settings."
+  },
+  "0.7.6": {
+    "en": "Fixing readonly issue while updating settings"
   }
 }

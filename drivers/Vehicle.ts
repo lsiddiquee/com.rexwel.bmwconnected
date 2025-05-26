@@ -107,7 +107,9 @@ export class Vehicle extends Device {
             // Setting default value for locationUpdateThreshold if not already defined
             if (this.settings.locationUpdateThreshold === undefined) {
                 this.settings.locationUpdateThreshold = 50;
-                await this.setSettings(this.settings);
+                await this.setSettings({
+                    locationUpdateThreshold: this.settings.locationUpdateThreshold
+                });
             }
 
             // Migrating currentLocation properties to the new casing
@@ -347,13 +349,31 @@ export class Vehicle extends Device {
 
                 let triggerChargingStatusChange = false;
                 if (this.hasCapability("measure_battery")) {
-                    await this.UpdateCapabilityValue("measure_battery", vehicle.electricChargingState.chargingLevelPercent);
-                    await this.UpdateCapabilityValue("range_capability.battery", UnitConverter.ConvertDistance(vehicle.electricChargingState.range, this.settings.distanceUnit));
-                    await this.UpdateCapabilityValue("range_capability.fuel", UnitConverter.ConvertDistance(vehicle.combustionFuelLevel.range, this.settings.distanceUnit));
-                    const oldChargingStatus = this.getCapabilityValue("charging_status_capability");
-                    await this.UpdateCapabilityValue("charging_status_capability", vehicle.electricChargingState.chargingStatus);
-                    if (oldChargingStatus !== vehicle.electricChargingState.chargingStatus) {
-                        triggerChargingStatusChange = true;
+                    if (!vehicle.electricChargingState?.chargingLevelPercent) {
+                        await this.removeCapability("measure_battery");
+                        this.logger?.LogInformation("Removing measure_battery capability as chargingLevelPercent is not available.");
+                        if (this.hasCapability("range_capability.battery")) {
+                            await this.removeCapability("range_capability.battery");
+                            this.logger?.LogInformation("Removing range_capability.battery capability as chargingLevelPercent is not available.");
+                        }
+                        if (this.hasCapability("range_capability.fuel")) {
+                            await this.removeCapability("range_capability.fuel");
+                            this.logger?.LogInformation("Removing range_capability.fuel capability as chargingLevelPercent is not available.");
+                        }
+                        if (this.hasCapability("charging_status_capability")) {
+                            await this.removeCapability("charging_status_capability");
+                            this.logger?.LogInformation("Removing charging_status_capability capability as chargingLevelPercent is not available.");
+                        }
+                    }
+                    else {
+                        await this.UpdateCapabilityValue("measure_battery", vehicle.electricChargingState.chargingLevelPercent);
+                        await this.UpdateCapabilityValue("range_capability.battery", UnitConverter.ConvertDistance(vehicle.electricChargingState.range, this.settings.distanceUnit));
+                        await this.UpdateCapabilityValue("range_capability.fuel", UnitConverter.ConvertDistance(vehicle.combustionFuelLevel.range, this.settings.distanceUnit));
+                        const oldChargingStatus = this.getCapabilityValue("charging_status_capability");
+                        await this.UpdateCapabilityValue("charging_status_capability", vehicle.electricChargingState.chargingStatus);
+                        if (oldChargingStatus !== vehicle.electricChargingState.chargingStatus) {
+                            triggerChargingStatusChange = true;
+                        }
                     }
                 }
 
@@ -408,8 +428,10 @@ export class Vehicle extends Device {
         } catch (err) {
             if (this.settings.pollingInterval < 300) {
                 this.logger?.LogInformation(`Polling interval is too low (${this.settings.pollingInterval} seconds). Setting to 5 minutes.`);
-                this.settings.pollingInterval = 300;
-                await this.setSettings(this.settings);
+                await this.setSettings({
+                    pollingInterval: 300
+                });
+                this.settings = this.getSettings() as Settings;
                 this.updatePollingInterval();
             }
             
