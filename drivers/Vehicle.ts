@@ -428,10 +428,10 @@ export class Vehicle extends Device {
         } catch (err) {
             if (this.settings.pollingInterval < 300) {
                 this.logger?.LogInformation(`Polling interval is too low (${this.settings.pollingInterval} seconds). Setting to 5 minutes.`);
-                this.settings.pollingInterval = 300;
                 await this.setSettings({
-                    pollingInterval: this.settings.pollingInterval
+                    pollingInterval: 300
                 });
+                this.settings = this.getSettings() as Settings;
                 this.updatePollingInterval();
             }
             
