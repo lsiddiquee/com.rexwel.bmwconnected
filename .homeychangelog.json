@@ -85,5 +85,8 @@
   },
   "0.7.6": {
     "en": "Fixing readonly issue while updating settings"
+  },
+  "0.7.7": {
+    "en": "Changing device class and adding electric drive-train capabilities to support energy tab."
   }
 }
