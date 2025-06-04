@@ -923,6 +923,15 @@
             "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger.",
             "nl": "Als de brandstofwaarde een positieve verandering heeft die groter of gelijk is aan de drempelwaarde, wordt de Bijgetankt flow trigger geactiveerd."
           }
+        },
+        {
+          "id": "autoRetry",
+          "type": "checkbox",
+          "value": false,
+          "label": {
+            "en": "Retry even when device is unavailable",
+            "nl": "Probeer opnieuw, zelfs als het apparaat niet beschikbaar is"
+          }
         }
       ]
     },
@@ -1075,6 +1084,15 @@
           "hint": {
             "en": "If fuel value has a positive change which is greater or equal to the threshold, it will trigger Refuelled flow trigger.",
             "nl": "Als de brandstofwaarde een positieve verandering heeft die groter of gelijk is aan de drempelwaarde, wordt de Bijgetankt flow trigger geactiveerd."
+          }
+        },
+        {
+          "id": "autoRetry",
+          "type": "checkbox",
+          "value": false,
+          "label": {
+            "en": "Retry even when device is unavailable",
+            "nl": "Probeer opnieuw, zelfs als het apparaat niet beschikbaar is"
           }
         }
       ]

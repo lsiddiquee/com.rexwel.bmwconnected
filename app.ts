@@ -29,7 +29,7 @@ export class BMWConnectedDrive extends Homey.App {
      * onInit is called when the app is initialized.
      */
     async onInit(): Promise<void> {
-        this.logger = new Logger(this.homey);
+        this.logger = new Logger(this.homey, () => ConfigurationManager.getConfiguration(this.homey).logLevel);
         this.tokenStore = new HomeyTokenStore(this.homey);
         let configuration = ConfigurationManager.getConfiguration(this.homey);
         if (!configuration) {

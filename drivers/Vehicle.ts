@@ -33,7 +33,7 @@ export class Vehicle extends Device {
      */
     async onInit() {
         this.app = this.homey.app as BMWConnectedDrive;
-        this.logger = this.app.logger;
+        this.logger = new Logger(this, () => ConfigurationManager.getConfiguration(this.homey).logLevel);
         this.deviceData = this.getData() as DeviceData;
         this.settings = this.getSettings() as Settings;
 
@@ -353,7 +353,7 @@ export class Vehicle extends Device {
         try {
             this.logger?.LogInformation(`Polling BMW ConnectedDrive for vehicle status updates for '${this.getName()}'.`);
 
-            if (!this.getAvailable()) {
+            if (!this.getAvailable() && !this.settings.autoRetry) {
                 this.logger?.LogInformation(`Device '${this.getName()}' is unavailable. Skipping update.`);
                 return;
             }
@@ -362,6 +362,12 @@ export class Vehicle extends Device {
 
             if (this.api) {
                 const vehicle = await this.api.getVehicleStatus(this.deviceData.id);
+
+                this.retryCount = 0;
+                if (!this.getAvailable()) {
+                    this.logger?.LogInformation(`Device '${this.getName()}' is now available.`);
+                    await this.setAvailable();
+                }
 
                 // Skip updating capability values if the vehicle status has not changed.
                 if (this.lastUpdatedAt && vehicle.lastUpdatedAt <= this.lastUpdatedAt) {
@@ -441,7 +447,14 @@ export class Vehicle extends Device {
                     }, {});
                 }
             }
-            this.retryCount = 0;
+            else {
+                this.logger?.LogError("API is not available. Cannot update vehicle state.");
+                if (this.getAvailable()) {
+                    this.logger?.LogInformation(`Device '${this.getName()}' is now unavailable.`);
+                    await this.setUnavailable("API is not available.");
+                }
+                return;
+            }
         } catch (err) {
             if (this.settings.pollingInterval < 300) {
                 this.logger?.LogInformation(`Polling interval is too low (${this.settings.pollingInterval} seconds). Setting to 5 minutes.`);
@@ -452,18 +465,13 @@ export class Vehicle extends Device {
                 this.updatePollingInterval();
             }
             
-            this.log("Error occurred while attempting to update device state.", err);
             this.logger?.LogError(err);
-            if (this.retryCount > 5) {
-                const errorMessage = err instanceof Error ? err.message : String(err);
-                if (errorMessage.includes("408") && this.retryCount < 15) {
-                    // If the error is a timeout, we can retry the update.
-                    // This is useful for cases where the API is temporarily unavailable.
-
-                    this.logger?.LogInformation(`Timeout occurred retrying. Detailed error: ${errorMessage}`);
-                    return;
-                }
-                await this.setUnavailable(errorMessage);
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            if (this.settings.autoRetry || this.retryCount > 5) {
+                // If autoRetry is enabled we can set it to unavailable as it will retry again,
+                // Or retry count exceeds 5, set the device as unavailable
+                await this.setUnavailable(`Error occurred while attempting to update device state: ${errorMessage}`);
+                return;
             }
         }
     }

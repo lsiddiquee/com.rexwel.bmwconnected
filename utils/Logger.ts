@@ -1,36 +1,32 @@
 import { LoggerBase, LogLevel } from "bmw-connected-drive";
-import { Homey } from "homey";
-import { ConfigurationManager } from "./ConfigurationManager";
+import { SimpleClass } from "homey";
 
 export class Logger extends LoggerBase {
-    homey: Homey;
+    logger: SimpleClass;
+    getLogLevel: () => LogLevel;
     logs: string[] = [];
 
-    constructor(homey: Homey) {
+    constructor(logger: SimpleClass, getLogLevel: () => LogLevel) {
         super();
-        this.homey = homey;
+        this.logger = logger;
+        this.getLogLevel = getLogLevel;
     }
 
     Log(level: LogLevel, message: string): void {
-        const configuration = ConfigurationManager.getConfiguration(this.homey);
-        if (level < configuration.logLevel && level < LogLevel.Error) return;
-        const logMessage = `[${new Date().toISOString()}] ${LogLevel[level]}: ${message}`;
-        this.homey.log(logMessage);
-        if (configuration.logEnabled || level >= LogLevel.Error) {
+        const logLevel = this.getLogLevel();
+        if (level < logLevel && level < LogLevel.Error) return;
+        if (level === LogLevel.Error) this.logger.error(message);
+        else this.logger.log(`${LogLevel[level]}: ${message}`);
+        if (logLevel || level >= LogLevel.Error) {
             if (this.logs.length === 50) {
                 this.logs.shift();
             }
-            this.logs.push(logMessage);
+            this.logs.push(`[${new Date().toISOString()}] ${LogLevel[level]}: ${message}`);
         }
     }
 
     LogError(err: any): void {
-        if (typeof err === "string") {
-            this.Log(LogLevel.Error, err);
-        } else if (err instanceof Error) {
-            this.Log(LogLevel.Error, err.message);
-        } else {
-            this.Log(LogLevel.Error, String(err));
-        }
+        const message = err instanceof Error ? err.message : String(err);
+        this.Log(LogLevel.Error, message);
     }
 }

@@ -1,0 +1,9 @@
+{
+  "id": "autoRetry",
+  "type": "checkbox",
+  "value": false,
+  "label": {
+    "en": "Retry even when device is unavailable",
+    "nl": "Probeer opnieuw, zelfs als het apparaat niet beschikbaar is"
+  }
+}
