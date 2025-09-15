@@ -5,12 +5,18 @@ import { CarBrand, ConnectedDrive } from "bmw-connected-drive";
 import { Settings } from '../utils/Settings';
 import { ConfigurationManager } from '../utils/ConfigurationManager';
 import { Configuration } from '../utils/Configuration';
+import { Logger } from '../utils/Logger';
 
 export class ConnectedDriver extends Driver {
+  logger?: Logger;
   brand: CarBrand = CarBrand.Bmw;
 
+  async onInit() {
+    this.logger = new Logger(this, () => ConfigurationManager.getConfiguration(this.homey).logLevel);
+  }
+
   async onPair(session: any) {
-    this.homey.log("Pairing started");
+    this.logger?.LogInformation("Pairing started");
     session.setHandler('showView', async (view: string) => {
       if (view === 'loading') {
         const app = (this.homey.app as BMWConnectedDrive);
@@ -22,7 +28,7 @@ export class ConnectedDriver extends Driver {
             await session.showView('list_devices');
             return;
           } catch (err) {
-            this.log(err);
+            this.logger?.LogError(err);
           }
         }
 
@@ -33,7 +39,7 @@ export class ConnectedDriver extends Driver {
 
     session.setHandler("login", async (data: any) => {
       const app = (this.homey.app as BMWConnectedDrive);
-      app.logger?.LogTrace("Email: " + data.email + " Password: **** Region: " + data.region + " Captcha: " + data.captcha);
+      this.logger?.LogTrace("Email: " + data.email + " Password: **** Region: " + data.region + " Captcha: " + data.captcha);
       if (!data.email || !data.password || !data.region || !data.captcha) {
         return false;
       }
@@ -50,7 +56,7 @@ export class ConnectedDriver extends Driver {
 
         return true;
       } catch (err) {
-        app.logger?.LogError(err);
+        this.logger?.LogError(err);
         return false;
       }
     });
@@ -66,7 +72,7 @@ export class ConnectedDriver extends Driver {
       const vehicles = await api.getVehiclesByBrand(this.brand);
 
       vehicles.forEach(vehicle => {
-        app.logger?.LogInformation(`Vehicle found: ${vehicle.attributes.brand}: ${vehicle.vin}, ${vehicle.attributes.model}`);
+        this.logger?.LogInformation(`Vehicle found: ${vehicle.attributes.brand}: ${vehicle.vin}, ${vehicle.attributes.model}`);
       });
 
       return vehicles
@@ -112,7 +118,7 @@ export class ConnectedDriver extends Driver {
 
     session.setHandler("login", async (data: any) => {
       const app = (this.homey.app as BMWConnectedDrive);
-      app.logger?.LogTrace("Email: " + data.email + " Password: **** Region: " + data.region + " Captcha: " + data.captcha);
+      this.logger?.LogTrace("Email: " + data.email + " Password: **** Region: " + data.region + " Captcha: " + data.captcha);
       if (!data.email || !data.password || !data.region || !data.captcha) {
         return false;
       }
@@ -132,7 +138,7 @@ export class ConnectedDriver extends Driver {
 
         return true;
       } catch (err) {
-        app.logger?.LogError(err);
+        this.logger?.LogError(err);
         return false;
       }
     });

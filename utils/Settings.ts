@@ -3,7 +3,10 @@ export class Settings {
     refuellingTriggerThreshold: number = 5;
     distanceUnit: string = "metric";
     fuelUnit: string = "liter";
+    autoRetry: boolean = false;
 
-    // Distance in meters travelled before a location update is triggered
+    // Distance in meters traveled before a location update is triggered
     locationUpdateThreshold: number = 50;
+
+    currentVersion: string = "0.0.0";
 }

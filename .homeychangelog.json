@@ -85,5 +85,11 @@
   },
   "0.7.6": {
     "en": "Fixing readonly issue while updating settings"
+  },
+  "0.7.7": {
+    "en": "Changing device class and adding electric drive-train capabilities to support energy tab."
+  },
+  "0.7.8": {
+    "en": "Added device setting to auto retry when device is unavailable. This allows to heal the device incase the api starts to respond again."
   }
 }
