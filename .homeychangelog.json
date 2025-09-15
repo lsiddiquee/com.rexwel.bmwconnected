@@ -91,5 +91,8 @@
   },
   "0.7.8": {
     "en": "Added device setting to auto retry when device is unavailable. This allows to heal the device incase the api starts to respond again."
+  },
+  "0.7.9": {
+    "en": "Fixed quota blocking by updating the library"
   }
 }
