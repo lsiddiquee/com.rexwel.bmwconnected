@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "com.rexwel.bmwconnected",
-  "version": "0.7.9",
+  "version": "0.8.0",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -668,7 +668,7 @@
           {
             "name": "device",
             "type": "device",
-            "filter": "driver_id=bmw|mini"
+            "filter": "driver_id=bmw|mini&capabilities=climate_now_capability"
           }
         ]
       },
@@ -682,7 +682,7 @@
           {
             "name": "device",
             "type": "device",
-            "filter": "driver_id=bmw|mini"
+            "filter": "driver_id=bmw|mini&capabilities=climate_now_capability"
           }
         ]
       },
@@ -709,8 +709,7 @@
         "args": [
           {
             "name": "device",
-            "type": "device",
-            "filter": "driver_id=bmw|mini"
+            "type": "device"
           }
         ]
       },
@@ -757,6 +756,34 @@
         ]
       },
       {
+        "id": "start_charging",
+        "title": {
+          "en": "Start charging",
+          "nl": "Start opladen"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini&capabilities=start_charging_capability"
+          }
+        ]
+      },
+      {
+        "id": "stop_charging",
+        "title": {
+          "en": "Stop charging",
+          "nl": "Stop opladen"
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini&capabilities=stop_charging_capability"
+          }
+        ]
+      },
+      {
         "id": "unlock_vehicle",
         "title": {
           "en": "Unlock",
@@ -766,7 +793,7 @@
           {
             "name": "device",
             "type": "device",
-            "filter": "driver_id=bmw|mini"
+            "filter": "driver_id=bmw|mini&capabilities=only_lock_unlock_flow_capability"
           }
         ]
       }
@@ -1108,6 +1135,17 @@
       "setable": false,
       "uiComponent": null
     },
+    "charging_control_capability": {
+      "type": "boolean",
+      "title": {
+        "en": "Charging control",
+        "nl": "Laadcontrole"
+      },
+      "getable": true,
+      "setable": true,
+      "uiComponent": "toggle",
+      "icon": "/assets/evcharging.svg"
+    },
     "charging_status_capability": {
       "type": "enum",
       "title": {
@@ -1289,6 +1327,28 @@
       "setable": false,
       "units": "l",
       "uiComponent": null
+    },
+    "start_charging_capability": {
+      "type": "boolean",
+      "title": {
+        "en": "Start charging",
+        "nl": "Start opladen"
+      },
+      "getable": false,
+      "setable": false,
+      "uiComponent": null,
+      "icon": "/assets/evcharging.svg"
+    },
+    "stop_charging_capability": {
+      "type": "boolean",
+      "title": {
+        "en": "Stop charging",
+        "nl": "Stop opladen"
+      },
+      "getable": false,
+      "setable": false,
+      "uiComponent": null,
+      "icon": "/assets/evcharging.svg"
     }
   }
 }

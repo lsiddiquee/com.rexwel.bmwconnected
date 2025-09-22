@@ -39,6 +39,74 @@
       border: 1px solid #ccc;
       border-top: none;
     }
+
+    /* Hierarchical device-capability styling */
+    .device-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .device-item {
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: #f9f9f9;
+    }
+
+    .device-header {
+      padding: 10px;
+      background-color: #e9e9e9;
+      border-bottom: 1px solid #ddd;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    .device-header:hover {
+      background-color: #d9d9d9;
+    }
+
+    .capabilities-list {
+      padding: 0;
+      margin: 0;
+      list-style: none;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .capability-item {
+      padding: 8px 15px;
+      border-bottom: 1px dashed #ccc;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .capability-item:last-child {
+      border-bottom: none;
+    }
+
+    .capability-name {
+      font-weight: 500;
+    }
+
+    .capability-value {
+      color: #666;
+      font-size: 0.9em;
+      font-family: monospace;
+    }
+
+    .collapsed .capabilities-list {
+      display: none;
+    }
+
+    .expand-icon {
+      float: right;
+      transition: transform 0.2s;
+    }
+
+    .collapsed .expand-icon {
+      transform: rotate(-90deg);
+    }
   </style>
 </head>
 
@@ -140,12 +208,14 @@
   <div id="developer" class="tabcontent">
     <button type="button" onclick="clearToken()" data-i18n="settings.clearToken"><!-- Translated --></button>
 
-    <div class="field row">
-      <label for="devicesList" data-i18n="settings.devicesList"></label>
-    </div>
-    <div class="field row">
-      <p id="devicesList"></p>
-    </div>
+    <fieldset>
+      <legend data-i18n="settings.devicesList">
+        <!-- Translated -->
+      </legend>
+      <div class="field row">
+        <p id="devicesList"></p>
+      </div>
+    </fieldset>
   </div>
 
   <script type="text/javascript">
@@ -213,10 +283,18 @@
 
       reloadLogs();
 
+      // Fetch devices with their capabilities in one call
       Homey.api("GET", "/getRegisteredDevices", {}, function (err, result) {
-        if (err) return Homey.alert(err);
-        deviceIds = result.map(item => item.id);
-        devicesListElement.innerHTML = deviceIds.join('<br/><hr style="border-top: 3px dashed #bbb;">');
+        if (err) {
+          Homey.alert(err);
+          devicesListElement.innerHTML = "Failed to load devices.";
+          return;
+        }
+
+        var deviceCapabilities = result || [];
+
+        // Render hierarchical capabilities structure
+        renderDeviceCapabilities(deviceCapabilities, devicesListElement);
       });
 
       // Tell Homey we're ready to be displayed
@@ -335,6 +413,48 @@
         return false;
       };
       newCell.appendChild(button);
+    }
+
+    function renderDeviceCapabilities(deviceCapabilities, containerElement) {
+      if (!deviceCapabilities || deviceCapabilities.length === 0) {
+        containerElement.innerHTML = "No devices or capabilities registered yet.";
+        return;
+      }
+
+      var html = '<ul class="device-list">';
+      
+      deviceCapabilities.forEach(device => {
+        html += `
+          <li class="device-item">
+            <div class="device-header" onclick="toggleDeviceCapabilities('${device.deviceId}')">
+              <span class="expand-icon">▼</span>
+              ${device.deviceId} - ${device.deviceName}
+              <small style="color: #666; font-weight: normal;"> (${device.capabilities.length} capabilities)</small>
+            </div>
+            <ul class="capabilities-list" id="caps-${device.deviceId}">`;
+        
+        if (device.capabilities.length === 0) {
+          html += '<li class="capability-item"><span style="color: #888; font-style: italic;">No capabilities</span></li>';
+        } else {
+          device.capabilities.forEach(capability => {
+            html += `
+              <li class="capability-item">
+                <span class="capability-name">${capability.name}</span>
+                <span class="capability-value">${capability.value}</span>
+              </li>`;
+          });
+        }
+        
+        html += '</ul></li>';
+      });
+      
+      html += '</ul>';
+      containerElement.innerHTML = html;
+    }
+
+    function toggleDeviceCapabilities(deviceId) {
+      var deviceItem = document.getElementById(`caps-${deviceId}`).parentElement;
+      deviceItem.classList.toggle('collapsed');
     }
   </script>
 </body>

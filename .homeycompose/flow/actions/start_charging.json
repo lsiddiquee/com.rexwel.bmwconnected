@@ -1,0 +1,12 @@
+{
+    "id": "start_charging",
+    "title": {
+        "en": "Start charging",
+        "nl": "Start opladen"
+    },
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini&capabilities=start_charging_capability"
+    }]
+}

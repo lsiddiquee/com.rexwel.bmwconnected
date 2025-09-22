@@ -61,16 +61,32 @@ export async function clearTokenStore({ homey }: { homey: Homey }): Promise<bool
     return true;
 }
 
-export async function getRegisteredDevices({ homey }: { homey: Homey }): Promise<DeviceData[]> {
+export class DeviceCapabilities {
+  deviceId: string;
+  deviceName: string;
+  capabilities: { id: string, name: string, value: string }[];
+
+  constructor(deviceId: string, deviceName: string, capabilities: { id: string, name: string, value: string }[]) {
+    this.deviceId = deviceId;
+    this.deviceName = deviceName;
+    this.capabilities = capabilities;
+  }
+}
+
+export async function getRegisteredDevices({ homey }: { homey: Homey }): Promise<DeviceCapabilities[]> {
     const app = (homey.app as BMWConnectedDrive);
     app.logger?.LogInformation("getRegisteredDevices invoked.");
 
-    let devices: DeviceData[] = [];
+    let devicesCapabilities: DeviceCapabilities[] = [];
+
     let drivers = homey.drivers.getDrivers() as { [key: string]: Driver };
     for (const key in drivers) {
         const driver = drivers[key];
-        devices.push(...(driver.getDevices().map(device => device.getData() as DeviceData)));
+        for (const device of driver.getDevices()) {
+            const data = device.getData() as DeviceData;
+            devicesCapabilities.push(new DeviceCapabilities(data.id, device.getName(), device.getCapabilities().map(cap => ({ id: cap, name: cap, value: device.getCapabilityValue(cap)?.toString() ?? 'N/A' }))));
+        }
     }
 
-    return devices;
+    return devicesCapabilities;
 }

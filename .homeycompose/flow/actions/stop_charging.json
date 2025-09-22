@@ -1,0 +1,12 @@
+{
+    "id": "stop_charging",
+    "title": {
+        "en": "Stop charging",
+        "nl": "Stop opladen"
+    },
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini&capabilities=stop_charging_capability"
+    }]
+}
