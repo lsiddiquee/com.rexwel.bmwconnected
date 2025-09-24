@@ -1,6 +1,6 @@
 {
   "id": "com.rexwel.bmwconnected",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -62,6 +62,14 @@
     "getRegisteredDevices": {
       "method": "GET",
       "path": "/getRegisteredDevices"
+    },
+    "getDeviceStatus": {
+      "method": "GET",
+      "path": "/getDeviceStatus"
+    },
+    "getDeviceCapabilities": {
+      "method": "GET",
+      "path": "/getDeviceCapabilities"
     }
   },
   "bugs": {

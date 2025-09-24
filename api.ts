@@ -5,7 +5,8 @@ import { ConfigurationManager } from "./utils/ConfigurationManager";
 import { OpenStreetMap } from "./utils/OpenStreetMap";
 import { LocationType } from "./utils/LocationType";
 import { DeviceData } from "./utils/DeviceData";
-import { Regions } from "bmw-connected-drive";
+import { Capabilities, CarBrand, Regions, VehicleStatus } from "bmw-connected-drive";
+import { Vehicle } from "./drivers/Vehicle";
 
 export async function saveSettings({ homey, body }: { homey: Homey, body: Configuration }): Promise<boolean> {
 
@@ -62,11 +63,13 @@ export async function clearTokenStore({ homey }: { homey: Homey }): Promise<bool
 }
 
 export class DeviceCapabilities {
+  brand: CarBrand;
   deviceId: string;
   deviceName: string;
   capabilities: { id: string, name: string, value: string }[];
 
-  constructor(deviceId: string, deviceName: string, capabilities: { id: string, name: string, value: string }[]) {
+  constructor(brand: CarBrand, deviceId: string, deviceName: string, capabilities: { id: string, name: string, value: string }[]) {
+    this.brand = brand;
     this.deviceId = deviceId;
     this.deviceName = deviceName;
     this.capabilities = capabilities;
@@ -84,9 +87,36 @@ export async function getRegisteredDevices({ homey }: { homey: Homey }): Promise
         const driver = drivers[key];
         for (const device of driver.getDevices()) {
             const data = device.getData() as DeviceData;
-            devicesCapabilities.push(new DeviceCapabilities(data.id, device.getName(), device.getCapabilities().map(cap => ({ id: cap, name: cap, value: device.getCapabilityValue(cap)?.toString() ?? 'N/A' }))));
+            devicesCapabilities.push(new DeviceCapabilities(
+                (device as Vehicle).brand,
+                data.id,
+                device.getName(),
+                device.getCapabilities().map(cap => ({ id: cap, name: cap, value: device.getCapabilityValue(cap)?.toString() ?? 'N/A' }))
+            ));
         }
     }
 
     return devicesCapabilities;
+}
+
+export async function getDeviceStatus({ homey, query }: { homey: Homey, query: { brand: CarBrand, deviceId: string } }): Promise<VehicleStatus> {
+    const app = (homey.app as BMWConnectedDrive);
+    app.logger?.LogInformation(`getDeviceStatus invoked. Brand: ${query.brand}, DeviceId: ${query.deviceId}`);
+
+    if (!app.connectedDriveApi) {
+        throw new Error("ConnectedDrive API is not available.");
+    }
+
+    return await app.connectedDriveApi.getVehicleStatus(query.deviceId, query.brand);
+}
+
+export async function getDeviceCapabilities({ homey, query }: { homey: Homey, query: { brand: CarBrand, deviceId: string } }): Promise<Capabilities> {
+    const app = (homey.app as BMWConnectedDrive);
+    app.logger?.LogInformation(`getDeviceCapabilities invoked. Brand: ${query.brand}, DeviceId: ${query.deviceId}`);
+
+    if (!app.connectedDriveApi) {
+        throw new Error("ConnectedDrive API is not available.");
+    }
+
+    return await app.connectedDriveApi.getVehicleCapabilities(query.deviceId, query.brand);
 }

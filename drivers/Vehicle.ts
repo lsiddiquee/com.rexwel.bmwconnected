@@ -11,7 +11,6 @@ import { Logger } from '../utils/Logger';
 import { Settings } from '../utils/Settings';
 import { UnitConverter } from '../utils/UnitConverter';
 import { nameof } from '../utils/Utils';
-import { ConnectedDriver } from './ConnectedDriver';
 
 export class Vehicle extends Device {
 

@@ -64,6 +64,40 @@
       font-family: monospace;
       opacity: 0.7;
     }
+
+    .json-display {
+      background-color: var(--homey-form-input-background-color, #f8f8f8);
+      border: 1px solid var(--homey-form-input-border-color, #ddd);
+      border-radius: 4px;
+      padding: 12px;
+      margin: 8px 0;
+      font-family: 'Monaco', 'Menlo', 'Consolas', 'Courier New', monospace;
+      font-size: 11px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      max-height: 400px;
+      overflow-y: auto;
+      color: var(--homey-text-color, #333);
+      user-select: text;
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      cursor: text;
+    }
+
+    .json-display.error {
+      background-color: var(--homey-color-error-background, #fee);
+      border-color: var(--homey-color-error, #d00);
+      color: var(--homey-color-error, #d00);
+    }
+
+    .device-buttons {
+      margin: 8px 0 12px 0;
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
   </style>
 </head>
 
@@ -273,10 +307,10 @@
           return;
         }
 
-        var deviceCapabilities = result || [];
+        var deviceDetails = result || [];
 
         // Render hierarchical capabilities structure
-        renderDeviceCapabilities(deviceCapabilities, devicesListElement);
+        renderDeviceDetails(deviceDetails, devicesListElement);
       });
 
       // Tell Homey we're ready to be displayed
@@ -397,7 +431,7 @@
       newCell.appendChild(button);
     }
 
-    function renderDeviceCapabilities(deviceCapabilities, containerElement) {
+    function renderDeviceDetails(deviceCapabilities, containerElement) {
       if (!deviceCapabilities || deviceCapabilities.length === 0) {
         containerElement.innerHTML = "No devices or capabilities registered yet.";
         return;
@@ -408,12 +442,21 @@
       deviceCapabilities.forEach(device => {
         html += `
           <fieldset class="homey-form-fieldset">
-            <legend class="homey-form-legend" onclick="toggleDeviceCapabilities('${device.deviceId}')" style="cursor: pointer;">
+            <legend class="homey-form-legend" onclick="toggleDeviceDetails('${device.deviceId}')" style="cursor: pointer;">
               <span class="expand-icon">▼</span>
               ${device.deviceId} - ${device.deviceName}
               <small style="opacity: 0.7; font-weight: normal;"> (${device.capabilities.length} capabilities)</small>
             </legend>
-            <div class="capabilities-list" id="caps-${device.deviceId}">`;
+            <div class="capabilities-list" id="caps-${device.deviceId}">
+              <div class="homey-form-group">
+                <button type="button" class="homey-button-secondary" onclick="getDeviceJson('/getDeviceStatus', 'status-json-${device.deviceId}', '${device.brand}', '${device.deviceId}')">Get Device Status</button>
+                <div id="status-json-${device.deviceId}" class="json-display" style="display: none;"></div>
+              </div>
+              
+              <div class="homey-form-group">
+                <button type="button" class="homey-button-secondary" onclick="getDeviceJson('/getDeviceCapabilities', 'capabilities-json-${device.deviceId}', '${device.brand}', '${device.deviceId}')">Get Device Capabilities</button>
+                <div id="capabilities-json-${device.deviceId}" class="json-display" style="display: none;"></div>
+              </div>`;
         
         if (device.capabilities.length === 0) {
           html += '<div class="homey-form-group"><span style="opacity: 0.7; font-style: italic;">No capabilities</span></div>';
@@ -436,10 +479,28 @@
       containerElement.innerHTML = html;
     }
 
-    function toggleDeviceCapabilities(deviceId) {
+    function toggleDeviceDetails(deviceId) {
       var capabilitiesDiv = document.getElementById(`caps-${deviceId}`);
       var fieldset = capabilitiesDiv.parentElement;
       fieldset.classList.toggle('collapsed');
+    }
+
+    function getDeviceJson(apiEndpoint, containerId, brand, deviceId) {
+      var container = document.getElementById(containerId);
+      container.innerHTML = 'Loading...';
+      container.className = 'json-display';
+      container.style.display = 'block';
+
+      Homey.api("GET", `${apiEndpoint}?brand=${brand}&deviceId=${deviceId}`, {}, function (err, result) {
+        if (err) {
+          container.innerHTML = `Error: ${err.message || err}`;
+          container.className = 'json-display error';
+          return;
+        }
+        
+        container.className = 'json-display';
+        container.innerHTML = JSON.stringify(result, null, 2);
+      });
     }
   </script>
 </body>
