@@ -40,61 +40,7 @@
       border-top: none;
     }
 
-    /* Hierarchical device-capability styling */
-    .device-list {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .device-item {
-      margin: 10px 0;
-      border: 1px solid #ddd;
-      border-radius: 4px;
-      background-color: #f9f9f9;
-    }
-
-    .device-header {
-      padding: 10px;
-      background-color: #e9e9e9;
-      border-bottom: 1px solid #ddd;
-      font-weight: bold;
-      cursor: pointer;
-    }
-
-    .device-header:hover {
-      background-color: #d9d9d9;
-    }
-
-    .capabilities-list {
-      padding: 0;
-      margin: 0;
-      list-style: none;
-      max-height: 200px;
-      overflow-y: auto;
-    }
-
-    .capability-item {
-      padding: 8px 15px;
-      border-bottom: 1px dashed #ccc;
-      display: flex;
-      justify-content: space-between;
-    }
-
-    .capability-item:last-child {
-      border-bottom: none;
-    }
-
-    .capability-name {
-      font-weight: 500;
-    }
-
-    .capability-value {
-      color: #666;
-      font-size: 0.9em;
-      font-family: monospace;
-    }
-
+    /* Minimal custom styles for device capabilities using Homey classes */
     .collapsed .capabilities-list {
       display: none;
     }
@@ -106,6 +52,17 @@
 
     .collapsed .expand-icon {
       transform: rotate(-90deg);
+    }
+
+    .capability-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+
+    .capability-value {
+      font-family: monospace;
+      opacity: 0.7;
     }
   </style>
 </head>
@@ -123,99 +80,124 @@
     </button>
   </div>
   <div id="settings" class="tabcontent">
+    <form class="homey-form">
+      <fieldset class="homey-form-fieldset">
+        <legend class="homey-form-legend" data-i18n="settings.geofence">
+          <!-- Translated -->
+        </legend>
 
-    <fieldset>
-      <legend data-i18n="settings.geofence">
-        <!-- Translated -->
-      </legend>
+        <div class="homey-form-group">
+          <p>Currently geofencing works by manually entering the latitude and longitude of a location.</p>
+        </div>
+        
+        <div class="homey-form-group">
+          <button type="button" class="homey-button-secondary" onclick="useCurrentLocation()" data-i18n="settings.useCurrentLocation">useCurrentLocation</button>
+        </div>
+        
+        <div class="homey-form-group">
+          <label class="homey-form-label" for="locationLabel" data-i18n="settings.label">label</label>
+          <input class="homey-form-input" id="locationLabel" type="text" value="" />
+        </div>
+        
+        <div class="homey-form-group">
+          <label class="homey-form-label" for="latitude" data-i18n="settings.latitude">latitude</label>
+          <input class="homey-form-input" id="latitude" type="text" value="" />
+        </div>
+        
+        <div class="homey-form-group">
+          <label class="homey-form-label" for="longitude" data-i18n="settings.longitude">longitude</label>
+          <input class="homey-form-input" id="longitude" type="text" value="" />
+        </div>
+        
+        <div class="homey-form-group">
+          <label class="homey-form-label" for="radius" data-i18n="settings.radius">radius</label>
+          <input class="homey-form-input" id="radius" type="text" value="20" />
+        </div>
+        
+        <div class="homey-form-group">
+          <button type="button" class="homey-button-primary" onclick="addGeofence()" data-i18n="settings.add">add</button>
+        </div>
+        
+        <div class="homey-form-group">
+          <table>
+            <thead>
+              <tr>
+                <th data-i18n="settings.label">label</th>
+                <th data-i18n="settings.latitude">latitude</th>
+                <th data-i18n="settings.longitude">longitude</th>
+                <th data-i18n="settings.radius">radius</th>
+                <th data-i18n="settings.address">address</th>
+                <th data-i18n="settings.remove">remove</th>
+              </tr>
+            </thead>
+            <tbody id="geofences" name="geofences">
+            </tbody>
+          </table>
+        </div>
+      </fieldset>
 
-      <div class="field row">
-        <p>Currently geofencing works by manually entering the latitude and longitude of a location.</p>
-      </div>
-      <div class="field row">
-        <button type="button" onclick="useCurrentLocation()" data-i18n="settings.useCurrentLocation">useCurrentLocation</button>
-      </div>
-      <div class="field row">
-        <label for="locationLabel" data-i18n="settings.label">label</label>
-        <input id="locationLabel" type="text" value="" />
-        <label for="latitude" data-i18n="settings.latitude">latitude</label>
-        <input id="latitude" type="text" value="" />
-        <label for="longitude" data-i18n="settings.longitude">longitude</label>
-        <input id="longitude" type="text" value="" />
-        <label for="radius" data-i18n="settings.radius">radius</label>
-        <input id="radius" type="text" value="20" />
-        <button type="button" onclick="addGeofence()" data-i18n="settings.add">add</button>
-      </div>
-      <div class="field row">
-        <table>
-          <thead>
-            <tr>
-              <th data-i18n="settings.label">label</th>
-              <th data-i18n="settings.latitude">latitude</th>
-              <th data-i18n="settings.longitude">longitude</th>
-              <th data-i18n="settings.radius">radius</th>
-              <th data-i18n="settings.address">address</th>
-              <th data-i18n="settings.remove">remove</th>
-            </tr>
-          </thead>
-          <tbody id="geofences" name="geofences">
-          </tbody>
-        </table>
-      </div>
-    </fieldset>
+      <fieldset class="homey-form-fieldset">
+        <legend class="homey-form-legend" data-i18n="settings.logLabel">
+          <!-- Translated -->
+        </legend>
 
-    <fieldset>
-      <legend data-i18n="settings.logLabel">
-        <!-- Translated -->
-      </legend>
+        <div class="homey-form-group">
+          <label class="homey-form-checkbox">
+            <input class="homey-form-checkbox-input" id="logEnabled" type="checkbox" />
+            <span class="homey-form-checkbox-checkmark"></span>
+            <span class="homey-form-checkbox-text" data-i18n="settings.enabled"></span>
+          </label>
+        </div>
 
-      <div class="field row">
-        <label for="logEnabled" data-i18n="settings.enabled"></label>
-        <input id="logEnabled" type="checkbox" />
-      </div>
+        <div class="homey-form-group">
+          <label class="homey-form-label" for="logLevel" data-i18n="settings.logLevel"></label>
+          <select class="homey-form-select" name="logLevel" id="logLevel">
+            <option value="0">Trace</option>
+            <option value="1">Debug</option>
+            <option value="2">Information</option>
+            <option value="3">Warning</option>
+            <option value="4">Error</option>
+            <option value="5">Critical</option>
+          </select>
+        </div>
 
-      <div class="field row">
-        <label for="logLevel" data-i18n="settings.logLevel"></label>
-        <select name="logLevel" id="logLevel">
-          <option value="0">Trace</option>
-          <option value="1">Debug</option>
-          <option value="2">Information</option>
-          <option value="3">Warning</option>
-          <option value="4">Error</option>
-          <option value="5">Critical</option>
-        </select>
-      </div>
+        <div class="homey-form-group" style="display: none;">
+          <label class="homey-form-label" for="logRequestCount" data-i18n="settings.logRequestCount"></label>
+          <input class="homey-form-input" id="logRequestCount" type="number" min="5" max="50" />
+        </div>
+      </fieldset>
 
-      <div class="field row" style="display: none;">
-        <label for="logRequestCount" data-i18n="settings.logRequestCount"></label>
-        <input id="logRequestCount" type="number" min="5" max="50" />
-      </div>
-    </fieldset>
+      <p id="error" style="color: red;"></p>
+      <p id="success" style="color: #5fd225;"></p>
 
-    <p id="error" style="color: red;"></p>
-    <p id="success" style="color: #5fd225;"></p>
-
-    <button id="save" class="right">Save changes</button>
+      <button id="save" class="homey-button-primary-full">Save changes</button>
+    </form>
   </div>
   <div id="logs" class="tabcontent">
-    <div class="field row">
-      <button type="button" onclick="reloadLogs()" data-i18n="settings.reloadLogs"><!-- Translated --></button>
-    </div>
-    <div class="field row">
-      <p id="logMessages"></p>
+    <div class="homey-form">
+      <div class="homey-form-group">
+        <button type="button" class="homey-button-secondary" onclick="reloadLogs()" data-i18n="settings.reloadLogs"><!-- Translated --></button>
+      </div>
+      <div class="homey-form-group">
+        <p id="logMessages"></p>
+      </div>
     </div>
   </div>
   <div id="developer" class="tabcontent">
-    <button type="button" onclick="clearToken()" data-i18n="settings.clearToken"><!-- Translated --></button>
-
-    <fieldset>
-      <legend data-i18n="settings.devicesList">
-        <!-- Translated -->
-      </legend>
-      <div class="field row">
-        <p id="devicesList"></p>
+    <div class="homey-form">
+      <div class="homey-form-group">
+        <button type="button" class="homey-button-danger" onclick="clearToken()" data-i18n="settings.clearToken"><!-- Translated --></button>
       </div>
-    </fieldset>
+
+      <fieldset class="homey-form-fieldset">
+        <legend class="homey-form-legend" data-i18n="settings.devicesList">
+          <!-- Translated -->
+        </legend>
+        <div class="homey-form-group">
+          <p id="devicesList"></p>
+        </div>
+      </fieldset>
+    </div>
   </div>
 
   <script type="text/javascript">
@@ -332,10 +314,10 @@
       Homey.api("GET", "/getCurrentLocation", {}, function (err, result) {
         if (err) return Homey.alert(err);
 
-        if (result && result.Latitude && result.Longitude) {
+        if (result && result.latitude && result.longitude) {
           labelElement.value = "";
-          latitudeElement.value = result.Latitude;
-          longitudeElement.value = result.Longitude;
+          latitudeElement.value = result.latitude;
+          longitudeElement.value = result.longitude;
           radiusElement.value = "20";
         }
       });
@@ -421,40 +403,43 @@
         return;
       }
 
-      var html = '<ul class="device-list">';
+      var html = '<div class="homey-form">';
       
       deviceCapabilities.forEach(device => {
         html += `
-          <li class="device-item">
-            <div class="device-header" onclick="toggleDeviceCapabilities('${device.deviceId}')">
+          <fieldset class="homey-form-fieldset">
+            <legend class="homey-form-legend" onclick="toggleDeviceCapabilities('${device.deviceId}')" style="cursor: pointer;">
               <span class="expand-icon">▼</span>
               ${device.deviceId} - ${device.deviceName}
-              <small style="color: #666; font-weight: normal;"> (${device.capabilities.length} capabilities)</small>
-            </div>
-            <ul class="capabilities-list" id="caps-${device.deviceId}">`;
+              <small style="opacity: 0.7; font-weight: normal;"> (${device.capabilities.length} capabilities)</small>
+            </legend>
+            <div class="capabilities-list" id="caps-${device.deviceId}">`;
         
         if (device.capabilities.length === 0) {
-          html += '<li class="capability-item"><span style="color: #888; font-style: italic;">No capabilities</span></li>';
+          html += '<div class="homey-form-group"><span style="opacity: 0.7; font-style: italic;">No capabilities</span></div>';
         } else {
           device.capabilities.forEach(capability => {
             html += `
-              <li class="capability-item">
-                <span class="capability-name">${capability.name}</span>
-                <span class="capability-value">${capability.value}</span>
-              </li>`;
+              <div class="homey-form-group">
+                <div class="capability-item">
+                  <span class="capability-name">${capability.name}</span>
+                  <span class="capability-value">${capability.value}</span>
+                </div>
+              </div>`;
           });
         }
         
-        html += '</ul></li>';
+        html += '</div></fieldset>';
       });
       
-      html += '</ul>';
+      html += '</div>';
       containerElement.innerHTML = html;
     }
 
     function toggleDeviceCapabilities(deviceId) {
-      var deviceItem = document.getElementById(`caps-${deviceId}`).parentElement;
-      deviceItem.classList.toggle('collapsed');
+      var capabilitiesDiv = document.getElementById(`caps-${deviceId}`);
+      var fieldset = capabilitiesDiv.parentElement;
+      fieldset.classList.toggle('collapsed');
     }
   </script>
 </body>
