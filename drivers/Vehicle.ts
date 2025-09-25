@@ -1,4 +1,4 @@
-import { Capabilities as VehicleCapabilities, CarBrand, ConnectedDrive, RemoteServices, VehicleStatus } from 'bmw-connected-drive';
+import { Capabilities as VehicleCapabilities, CarBrand, ConnectedDrive, VehicleStatus } from 'bmw-connected-drive';
 import * as geo from 'geolocation-utils';
 import { Device } from 'homey';
 import * as semver from 'semver';
@@ -165,14 +165,14 @@ export class Vehicle extends Device {
         const chargingControlCapability = this.capabilities?.remoteChargingCommands.chargingControl;
         if (chargingControlCapability) {
             let hasChargingControlCapability = false;
-            if (chargingControlCapability.find((c: any) => c === RemoteServices.ChargeStart)) {
+            if (chargingControlCapability.find(c => c.toUpperCase() === "START")) {
                 await this.addCapabilitySafe(Capabilities.START_CHARGING);
                 hasChargingControlCapability = true;
             }
             else
                 await this.removeCapabilitySafe(Capabilities.START_CHARGING);
 
-            if (chargingControlCapability.find((c: any) => c === RemoteServices.ChargeStop)) {
+            if (chargingControlCapability.find(c => c.toUpperCase() === "STOP")) {
                 await this.addCapabilitySafe(Capabilities.STOP_CHARGING);
                 hasChargingControlCapability = true;
             }

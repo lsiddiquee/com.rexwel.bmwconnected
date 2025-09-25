@@ -100,5 +100,8 @@
   },
   "0.8.1": {
     "en": "Additional developer control to get status and capabilities"
+  },
+  "0.8.2": {
+    "en": "Add support for basic charging control (Fix)"
   }
 }
