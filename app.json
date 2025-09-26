@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "com.rexwel.bmwconnected",
-  "version": "0.8.2",
+  "version": "0.8.3",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -1134,6 +1134,43 @@
     }
   ],
   "capabilities": {
+    "ac_charging_limit_capability": {
+      "type": "enum",
+      "title": {
+        "en": "AC Charging limit",
+        "nl": "AC Laadlimiet"
+      },
+      "getable": true,
+      "setable": true,
+      "uiComponent": "picker",
+      "values": [
+        {
+          "id": "6",
+          "title": "6 A"
+        },
+        {
+          "id": "10",
+          "title": "10 A"
+        },
+        {
+          "id": "12",
+          "title": "13 A"
+        },
+        {
+          "id": "16",
+          "title": "16 A"
+        },
+        {
+          "id": "20",
+          "title": "20 A"
+        },
+        {
+          "id": "32",
+          "title": "32 A"
+        }
+      ],
+      "icon": "/assets/evcharging.svg"
+    },
     "address_capability": {
       "type": "string",
       "title": {
@@ -1256,6 +1293,21 @@
       "getable": true,
       "setable": false,
       "uiComponent": "sensor",
+      "icon": "/assets/evcharging.svg"
+    },
+    "charging_target_soc_capability": {
+      "type": "number",
+      "title": {
+        "en": "Charging Target SoC",
+        "nl": "Oplaaddoel SoC"
+      },
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "decimals": 0,
+      "getable": true,
+      "setable": true,
+      "uiComponent": "slider",
       "icon": "/assets/evcharging.svg"
     },
     "climate_now_capability": {

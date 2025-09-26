@@ -1,0 +1,15 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Charging Target SoC",
+    "nl": "Oplaaddoel SoC"
+  },
+  "min": 0,
+  "max": 100,
+  "step": 1,
+  "decimals": 0,
+  "getable": true,
+  "setable": true,
+  "uiComponent": "slider",
+  "icon": "/assets/evcharging.svg"
+}

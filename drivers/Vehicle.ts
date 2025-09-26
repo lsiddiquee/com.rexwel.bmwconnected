@@ -1,4 +1,4 @@
-import { Capabilities as VehicleCapabilities, CarBrand, ConnectedDrive, VehicleStatus } from 'bmw-connected-drive';
+import { Capabilities as VehicleCapabilities, CarBrand, ConnectedDrive, VehicleStatus, ChargingDetailsResponse } from 'bmw-connected-drive';
 import * as geo from 'geolocation-utils';
 import { Device } from 'homey';
 import * as semver from 'semver';
@@ -15,6 +15,7 @@ import { nameof } from '../utils/Utils';
 export class Vehicle extends Device {
 
     CAPABILITIES_STORE_KEY = "capabilities";
+    CHARGING_DETAILS_STORE_KEY = "charging_details";
 
     brand: CarBrand = CarBrand.Bmw;
 
@@ -28,6 +29,7 @@ export class Vehicle extends Device {
     lastUpdatedAt?: Date;
     retryCount: number = 0;
     capabilities?: VehicleCapabilities;
+    chargingDetails?: ChargingDetailsResponse;
 
     get api(): ConnectedDrive | undefined {
         return this.app.connectedDriveApi;
@@ -43,6 +45,7 @@ export class Vehicle extends Device {
         this.settings = this.getSettings() as Settings;
 
         this.capabilities = this.getStoreValue(this.CAPABILITIES_STORE_KEY) as VehicleCapabilities;
+        this.chargingDetails = this.getStoreValue(this.CHARGING_DETAILS_STORE_KEY) as ChargingDetailsResponse;
 
         if (!this.capabilities) {
             this.logger?.LogInformation(`Fetching vehicle capabilities for '${this.getName()}'`);
@@ -53,6 +56,18 @@ export class Vehicle extends Device {
                 }
             } catch (err) {
                 this.logger?.LogError(`Failed to get vehicle capabilities for '${this.getName()}': ${err}`);
+            }
+        }
+
+        if (this.capabilities?.isChargingPowerLimitEnabled && !this.chargingDetails) {
+            this.logger?.LogInformation(`Fetching vehicle charging details for '${this.getName()}'`);
+            try {
+                this.chargingDetails = await this.api?.getChargingDetails(this.deviceData.id, this.brand, true);
+                if (this.chargingDetails) {
+                    this.setStoreValue(this.CHARGING_DETAILS_STORE_KEY, this.chargingDetails);
+                }
+            } catch (err) {
+                this.logger?.LogError(`Failed to get vehicle charging settings for '${this.getName()}': ${err}`);
             }
         }
 
@@ -68,6 +83,12 @@ export class Vehicle extends Device {
         }
         if (this.hasCapability(Capabilities.CHARGING_CONTROL)) {
             this.registerCapabilityListener(Capabilities.CHARGING_CONTROL, this.onCapabilityChargingControl.bind(this))
+        }
+        if (this.hasCapability(Capabilities.AC_CHARGING_LIMIT)) {
+            this.registerCapabilityListener(Capabilities.AC_CHARGING_LIMIT, this.onCapabilityACChargingLimit.bind(this));
+        }
+        if (this.hasCapability(Capabilities.CHARGING_TARGET_SOC)) {
+            this.registerCapabilityListener(Capabilities.CHARGING_TARGET_SOC, this.onCapabilityChargingTargetSoc.bind(this));
         }
 
         if (this.hasCapability(Capabilities.LOCATION)) {
@@ -189,6 +210,40 @@ export class Vehicle extends Device {
             await this.removeCapabilitySafe(Capabilities.START_CHARGING);
             await this.removeCapabilitySafe(Capabilities.STOP_CHARGING);
             await this.removeCapabilitySafe(Capabilities.CHARGING_CONTROL);
+        }
+
+        // this.capabilities!.isChargingPowerLimitEnabled = true;
+        // this.capabilities!.isChargingTargetSocEnabled = true;
+        // const availableChargingLimitValues = [ 6, 8, 10, 13, 16, 20, 25, 32 ];
+
+        const availableChargingLimitValues = this.chargingDetails?.chargingSettingsDetail?.acLimit?.values;
+        if (this.capabilities?.isChargingPowerLimitEnabled && availableChargingLimitValues && availableChargingLimitValues.length > 0) {
+            await this.addCapabilitySafe(Capabilities.AC_CHARGING_LIMIT);
+
+            let charging_limit_options = [];
+            
+            for (let value of availableChargingLimitValues) {
+                if (value) {
+                    charging_limit_options.push({
+                        "id": `${value}`,
+                        "title": `${value} A`
+                    });
+                }
+            }
+
+            if (charging_limit_options.length > 0) {
+                this.setCapabilityOptions(Capabilities.AC_CHARGING_LIMIT, { "values": charging_limit_options});
+            }
+        }
+        else {
+            await this.removeCapabilitySafe(Capabilities.AC_CHARGING_LIMIT);
+        }
+
+        if (this.capabilities?.isChargingTargetSocEnabled) {
+            await this.addCapabilitySafe(Capabilities.CHARGING_TARGET_SOC);
+        }
+        else {
+            await this.removeCapabilitySafe(Capabilities.CHARGING_TARGET_SOC);
         }
     }
 
@@ -321,6 +376,23 @@ export class Vehicle extends Device {
     }
 
     // this method is called when the Device has requested a state change (turned on or off)
+    private async onCapabilityLocked(value: boolean) {
+        if (this.api) {
+            try {
+                if (value) {
+                    await this.api.lockDoors(this.deviceData.id, this.brand, true);
+                } else {
+                    await this.api.unlockDoors(this.deviceData.id, this.brand, true);
+                }
+            } catch (err) {
+                this.logger?.LogError(err);
+            }
+        } else {
+            throw new Error("API is not available.");
+        }
+    }
+
+    // this method is called when the Device has requested a state change (turned on or off)
     private async onCapabilityChargingControl(value: boolean) {
 
         if (this.api) {
@@ -339,14 +411,32 @@ export class Vehicle extends Device {
         }
     }
 
-    // this method is called when the Device has requested a state change (turned on or off)
-    private async onCapabilityLocked(value: boolean) {
+    // this method is called when the Device has requested a state change
+    private async onCapabilityACChargingLimit(value: string) {
+
         if (this.api) {
             try {
-                if (value) {
-                    await this.api.lockDoors(this.deviceData.id, this.brand, true);
-                } else {
-                    await this.api.unlockDoors(this.deviceData.id, this.brand, true);
+                const acLimit = Number(value);
+                if (acLimit && acLimit > 0) {
+                    this.logger?.LogInformation(`Setting AC charging limit to ${acLimit}A.`);
+                    await this.api.setChargingSettings(this.deviceData.id, this.brand, { acLimitValue: acLimit }, true);
+                }
+            } catch (err) {
+                this.logger?.LogError(err);
+            }
+        } else {
+            throw new Error("API is not available.");
+        }
+    }
+
+    // this method is called when the Device has requested a state change
+    private async onCapabilityChargingTargetSoc(socLimit: number) {
+
+        if (this.api) {
+            try {
+                if (socLimit && socLimit > 0) {
+                    this.logger?.LogInformation(`Setting SoC limit to ${socLimit}%.`);
+                    await this.api.setChargingSettings(this.deviceData.id, this.brand, { chargingTarget: socLimit }, true);
                 }
             } catch (err) {
                 this.logger?.LogError(err);
@@ -452,7 +542,8 @@ export class Vehicle extends Device {
                 await this.updateCapabilityValue(Capabilities.RANGE, UnitConverter.ConvertDistance(vehicle.range, this.settings.distanceUnit));
 
                 await this.updateCapabilityValue(Capabilities.REMAINING_FUEL_LITERS, vehicle.combustionFuelLevel.remainingFuelLiters);
-                await this.updateCapabilityValue(Capabilities.REMAINING_FUEL, UnitConverter.ConvertFuel(vehicle.combustionFuelLevel.remainingFuelLiters, this.settings.fuelUnit));
+                await this.updateCapabilityValue(Capabilities.REMAINING_FUEL, vehicle.combustionFuelLevel.remainingFuelLiters
+                    ? UnitConverter.ConvertFuel(vehicle.combustionFuelLevel.remainingFuelLiters, this.settings.fuelUnit) : null);
 
                 const secured: boolean = vehicle.doorsState.combinedSecurityState === "SECURED" || vehicle.doorsState.combinedSecurityState === "LOCKED";
                 await this.updateCapabilityValue(Capabilities.ALARM_GENERIC, !secured);
@@ -467,6 +558,14 @@ export class Vehicle extends Device {
                         triggerChargingStatusChange = true;
                     }
                     await this.updateCapabilityValue(Capabilities.EV_CHARGING_STATE, this.convertChargingStatus(vehicle.electricChargingState.chargingStatus));
+                }
+
+                if (this.hasCapability(Capabilities.AC_CHARGING_LIMIT) && vehicle.chargingProfile.chargingSettings.acCurrentLimit) {
+                    await this.updateCapabilityValue(Capabilities.AC_CHARGING_LIMIT, vehicle.chargingProfile.chargingSettings.acCurrentLimit);
+                }
+
+                if (this.hasCapability(Capabilities.CHARGING_TARGET_SOC) && vehicle.chargingProfile.chargingSettings.targetSoc) {
+                    await this.updateCapabilityValue(Capabilities.CHARGING_TARGET_SOC, vehicle.chargingProfile.chargingSettings.targetSoc);
                 }
 
                 if (this.hasCapability(Capabilities.LOCKED)) {
