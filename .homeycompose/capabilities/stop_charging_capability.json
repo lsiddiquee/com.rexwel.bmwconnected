@@ -1,0 +1,11 @@
+{
+  "type": "boolean",
+  "title": {
+    "en": "Stop charging",
+    "nl": "Stop opladen"
+  },
+  "getable": false,
+  "setable": false,
+  "uiComponent": null,
+  "icon": "/assets/evcharging.svg"
+}

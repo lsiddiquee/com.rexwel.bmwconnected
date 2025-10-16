@@ -94,5 +94,17 @@
   },
   "0.7.9": {
     "en": "Fixed quota blocking by updating the library"
+  },
+  "0.8.0": {
+    "en": "Add support for basic charging control"
+  },
+  "0.8.1": {
+    "en": "Additional developer control to get status and capabilities"
+  },
+  "0.8.2": {
+    "en": "Add support for basic charging control (Fix)"
+  },
+  "0.8.3": {
+    "en": "Advanced charging control"
   }
 }

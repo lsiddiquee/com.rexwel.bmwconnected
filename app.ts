@@ -16,7 +16,8 @@ import { ConnectedDriver } from './drivers/ConnectedDriver';
 // Window states capability
 // Hood state capability
 // Trunk state capability
-// Charging control capability
+// Charging current control capability
+// Charging schedule capability
 // Last status update
 
 export class BMWConnectedDrive extends Homey.App {
@@ -50,104 +51,80 @@ export class BMWConnectedDrive extends Homey.App {
         this.registerConditionCards();
     }
 
+    /**
+     * Helper function to handle common flow action logic
+     * @param actionName Name of the action for logging and error messages
+     * @param args Flow action arguments
+     * @param apiAction Function to call on the ConnectedDrive API
+     */
+    private async handleFlowAction(actionName: string, args: any, apiAction: (vin: string, brand: CarBrand) => Promise<void>): Promise<void> {
+        const brand = (args.device?.driver as ConnectedDriver)?.brand ?? CarBrand.Bmw;
+        const vin = (args.device?.deviceData as DeviceData)?.id;
+        if (!vin) {
+            throw new Error(`VIN not found while ${actionName} flow triggered.`);
+        }
+        args.device.log(`Flow triggered ${actionName} for vin ${vin}`);
+
+        try {
+            await apiAction(vin, brand);
+        } catch (err) {
+            this.logger?.LogError(err);
+        }
+    }
+
     private registerActionCards() {
         this.homey.flow.getActionCard('climate_now').registerRunListener(async (args: any) => {
-            const vin = (args.device?.deviceData as DeviceData)?.id;
-            if (!vin) {
-                throw new Error("VIN not found while climate_now flow triggered.");
-            }
-            args.device.log(`Flow triggered climate_now for vin ${vin}`);
-
-            try {
-                await this.connectedDriveApi?.startClimateControl(vin);
-            } catch (err) {
-                this.logger?.LogError(err);
-            }
+            await this.handleFlowAction('climate_now', args, async (vin: string, brand: CarBrand) => {
+                await this.connectedDriveApi?.startClimateControl(vin, brand);
+            });
         });
 
         this.homey.flow.getActionCard('climate_cancel').registerRunListener(async (args: any) => {
-            const vin = (args.device?.deviceData as DeviceData)?.id;
-            if (!vin) {
-                throw new Error("VIN not found while climate_cancel flow triggered.");
-            }
-            args.device.log(`Flow triggered climate_cancel for vin ${vin}`);
-
-            try {
-                await this.connectedDriveApi?.stopClimateControl(vin);
-            } catch (err) {
-                this.logger?.LogError(err);
-            }
+            await this.handleFlowAction('climate_cancel', args, async (vin: string, brand: CarBrand) => {
+                await this.connectedDriveApi?.stopClimateControl(vin, brand);
+            });
         });
 
         this.homey.flow.getActionCard('lock_vehicle').registerRunListener(async (args: any) => {
-            const vin = (args.device?.deviceData as DeviceData)?.id;
-            if (!vin) {
-                throw new Error("VIN not found while lock_vehicle flow triggered.");
-            }
-            args.device.log(`Flow triggered lock_vehicle for vin ${vin}`);
-
-            try {
-                await this.connectedDriveApi?.lockDoors(vin);
-            } catch (err) {
-                this.logger?.LogError(err);
-            }
+            await this.handleFlowAction('lock_vehicle', args, async (vin: string, brand: CarBrand) => {
+                await this.connectedDriveApi?.lockDoors(vin, brand);
+            });
         });
 
         this.homey.flow.getActionCard('unlock_vehicle').registerRunListener(async (args: any) => {
-            const vin = (args.device?.deviceData as DeviceData)?.id;
-            if (!vin) {
-                throw new Error("VIN not found while unlock_vehicle flow triggered.");
-            }
-            args.device.log(`Flow triggered unlock_vehicle for vin ${vin}`);
-
-            try {
-                await this.connectedDriveApi?.unlockDoors(vin);
-            } catch (err) {
-                this.logger?.LogError(err);
-            }
+            await this.handleFlowAction('unlock_vehicle', args, async (vin: string, brand: CarBrand) => {
+                await this.connectedDriveApi?.unlockDoors(vin, brand);
+            });
         });
 
         this.homey.flow.getActionCard('blow_horn').registerRunListener(async (args: any) => {
-            const vin = (args.device?.deviceData as DeviceData)?.id;
-            if (!vin) {
-                throw new Error("VIN not found while blow_horn triggered.");
-            }
-            args.device.log(`Flow triggered blow_horn for vin ${vin}`);
-
-            try {
-                await this.connectedDriveApi?.blowHorn(vin);
-            } catch (err) {
-                this.logger?.LogError(err);
-            }
+            await this.handleFlowAction('blow_horn', args, async (vin: string, brand: CarBrand) => {
+                await this.connectedDriveApi?.blowHorn(vin, brand);
+            });
         });
 
         this.homey.flow.getActionCard('flash_lights').registerRunListener(async (args: any) => {
-            const vin = (args.device?.deviceData as DeviceData)?.id;
-            if (!vin) {
-                throw new Error("VIN not found while flash_lights flow triggered.");
-            }
-            args.device.log(`Flow triggered flash_lights for vin ${vin}`);
-
-            try {
-                await this.connectedDriveApi?.flashLights(vin);
-            } catch (err) {
-                this.logger?.LogError(err);
-            }
+            await this.handleFlowAction('flash_lights', args, async (vin: string, brand: CarBrand) => {
+                await this.connectedDriveApi?.flashLights(vin, brand);
+            });
         });
 
         this.homey.flow.getActionCard('send_message').registerRunListener(async (args: any) => {
-            const brand = (args.device?.driver as ConnectedDriver)?.brand ?? CarBrand.Bmw;
-            const vin = (args.device?.deviceData as DeviceData)?.id;
-            if (!vin) {
-                throw new Error("VIN not found while send_message flow triggered.");
-            }
-            args.device.log(`Flow triggered send_message for vin ${vin}`);
-
-            try {
+            await this.handleFlowAction('send_message', args, async (vin: string, brand: CarBrand) => {
                 await this.connectedDriveApi?.sendMessage(vin, brand, args.subject, args.message);
-            } catch (err) {
-                this.logger?.LogError(err);
-            }
+            });
+        });
+
+        this.homey.flow.getActionCard('start_charging').registerRunListener(async (args: any) => {
+            await this.handleFlowAction('start_charging', args, async (vin: string, brand: CarBrand) => {
+                await this.connectedDriveApi?.startCharging(vin, brand);
+            });
+        });
+
+        this.homey.flow.getActionCard('stop_charging').registerRunListener(async (args: any) => {
+            await this.handleFlowAction('stop_charging', args, async (vin: string, brand: CarBrand) => {
+                await this.connectedDriveApi?.stopCharging(vin, brand);
+            });
         });
     }
 
