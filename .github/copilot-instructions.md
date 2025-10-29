@@ -332,11 +332,6 @@ npm run test:coverage  # Verify 85% coverage threshold
    - Run full test suite to ensure no regressions: `npm test`
    - Verify coverage remains at or above 85%: `npm run test:coverage`
 
-5. **Document the Fix**:
-   - Update breadcrumb with bug fix details
-   - Reference the test case that validates the fix
-   - Include before/after behavior explanation
-
 **Why This Workflow?**:
 
 - **Prevents false positives**: Ensures test actually validates the bug fix
@@ -353,10 +348,10 @@ it('should_preserveApiValue_when_staleMqttInCache', () => {
   // Arrange - Bug: stale MQTT overrides fresh API data
   const apiData = { fuel_level: 80, timestamp: '2025-01-15T10:00:00Z' };
   const mqttData = { fuel_level: 50, timestamp: '2025-01-15T09:00:00Z' }; // 1hr old
-  
+
   // Act
   const result = mergeData(apiData, mqttData);
-  
+
   // Assert - Should use API (newer), not MQTT (stale)
   expect(result.fuel_level).toBe(80); // FAILS before fix
 });
@@ -476,4 +471,4 @@ Refer to:
 
 1. Domain knowledge files in `.github/.copilot/domain_knowledge/`
 2. Specifications in `.github/.copilot/specifications/`
-4. Language specific instructions for coding standards in `.github/instructions/`
+3. Language specific instructions for coding standards in `.github/instructions/`
