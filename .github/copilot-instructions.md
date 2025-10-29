@@ -4,7 +4,7 @@ This document provides context and guidance for GitHub Copilot when working on t
 
 ## Project Overview
 
-This is a Homey smart home application for BMW and Mini vehicles. We are currently migrating from the unofficial BMW Connected Drive mobile app API to the official BMW CarData API.
+This is a Homey smart home application for BMW and Mini vehicles. The app integrates with the official BMW CarData API to provide real-time vehicle monitoring and status updates within the Homey smart home platform.
 
 ## Technology Stack
 
@@ -192,21 +192,39 @@ Use `HomeyTokenStore` for secure credential storage:
 - Stores per device using Homey's settings system
 - Never log or expose tokens
 
-## Authentication
+## Current Architecture
 
-### OAuth 2.0 Device Code Flow
+The application uses the BMW CarData API with the following key characteristics:
 
-The BMW CarData API uses OAuth 2.0 Device Code Flow:
+### Authentication
 
-1. Request device code with PKCE
+OAuth 2.0 Device Code Flow with PKCE:
+
+1. Request device code with PKCE challenge
 2. Display user code and verification URL to user
 3. Poll for authorization completion
-4. Store access and refresh tokens
-5. Automatically refresh before expiration
+4. Store access and refresh tokens securely
+5. Automatically refresh tokens before expiration
 
 See `.github/.copilot/domain_knowledge/bmw-cardata-api.md` for details.
 
-## API Integration
+### API Capabilities
+
+**Read-Only Monitoring** (All Supported):
+
+- Vehicle location and tracking
+- Battery/fuel levels
+- Door/window/lock status
+- Mileage and odometer
+- Charging status (monitoring only)
+- Climate status (monitoring only)
+
+**Not Supported** (API Limitations):
+
+- Remote lock/unlock
+- Climate control
+- Charging control
+- Any vehicle command execution
 
 ### Rate Limiting
 
@@ -231,6 +249,31 @@ The CarData API uses telematic keys (not direct properties):
 - Transform responses to generic models
 - Handle unit conversions (km/miles, L/gal)
 - Map telematic keys to Homey capabilities
+
+## Development Workflow
+
+### Feature Development
+
+1. **Plan**: Read relevant domain knowledge/specifications
+2. **Design**: Consider SOLID principles and existing patterns
+3. **Implement**: Follow TypeScript guidelines and write with tests
+4. **Test**: Propose test cases first, then implement with 85% coverage
+5. **Validate**: Run `npm run fix` and `npm test`
+
+### Bug Fixes
+
+Follow the Test-Driven Development (TDD) workflow documented in the Testing section below.
+
+### Before Committing
+
+Always run these commands:
+
+```bash
+npm run validate  # Format check + lint + markdown lint
+npm run fix       # Auto-fix all issues
+npm test          # Run all tests
+npm run test:coverage  # Verify 85% coverage threshold
+```
 
 ## Testing
 
@@ -260,6 +303,67 @@ The CarData API uses telematic keys (not direct properties):
 - Prevents wasted effort on unnecessary or redundant tests
 - Gives user visibility into test strategy before implementation
 - Results in higher quality, more maintainable test suite
+
+### Bug Fix Workflow (Test-Driven Development)
+
+**CRITICAL**: When fixing bugs, follow this strict TDD workflow to ensure proper validation:
+
+1. **Create Failing Test First**:
+   - Write a unit test that reproduces the bug
+   - The test should **fail** with the current buggy implementation
+   - Test name should describe the expected correct behavior (e.g., `should_preserveApiValue_when_staleMqttInCache`)
+   - Include clear comments explaining what the bug is and what the test validates
+
+2. **Validate Test Failure**:
+   - Run the specific test: `npm test -- <test-file-name> -t "<test-name>"`
+   - Confirm the test **fails** for the right reason (reproduces the bug)
+   - Review the failure message to ensure it accurately reflects the bug
+   - **Do NOT proceed** until you've confirmed the test fails
+
+3. **Apply Bug Fix**:
+   - Implement the minimal code change needed to fix the bug
+   - Follow existing code patterns and TypeScript guidelines
+   - Add comments explaining the fix if the logic is non-obvious
+   - Keep the fix focused - don't introduce unrelated changes
+
+4. **Validate Test Success**:
+   - Run the same test again: `npm test -- <test-file-name> -t "<test-name>"`
+   - Confirm the test **passes** with the fix applied
+   - Run full test suite to ensure no regressions: `npm test`
+   - Verify coverage remains at or above 85%: `npm run test:coverage`
+
+5. **Document the Fix**:
+   - Update breadcrumb with bug fix details
+   - Reference the test case that validates the fix
+   - Include before/after behavior explanation
+
+**Why This Workflow?**:
+
+- **Prevents false positives**: Ensures test actually validates the bug fix
+- **Confirms root cause**: Failing test proves you understand the bug
+- **Guards against regressions**: Passing test prevents bug reintroduction
+- **Documents behavior**: Test serves as executable specification
+- **Builds confidence**: Red-green cycle proves the fix works
+
+**Example**:
+
+```typescript
+// Step 1 & 2: Create failing test (reproduces bug)
+it('should_preserveApiValue_when_staleMqttInCache', () => {
+  // Arrange - Bug: stale MQTT overrides fresh API data
+  const apiData = { fuel_level: 80, timestamp: '2025-01-15T10:00:00Z' };
+  const mqttData = { fuel_level: 50, timestamp: '2025-01-15T09:00:00Z' }; // 1hr old
+  
+  // Act
+  const result = mergeData(apiData, mqttData);
+  
+  // Assert - Should use API (newer), not MQTT (stale)
+  expect(result.fuel_level).toBe(80); // FAILS before fix
+});
+
+// Step 3: Apply fix (add timestamp comparison)
+// Step 4: Rerun test - now PASSES
+```
 
 ### Test Structure
 
@@ -314,36 +418,41 @@ coverageThreshold: {
 }
 ```
 
-## Migration Context
+## Current Architecture
 
-We are currently migrating from BMW Connected Drive API to BMW CarData API:
+The application uses the BMW CarData API with the following key characteristics:
 
-### Breaking Changes
+### Authentication
 
-1. Authentication: Username/password → OAuth Device Code Flow
-2. Capabilities: Remote services removed (lock, climate, charging control)
-3. Rate limiting: Unlimited → 50 requests/24h
-4. Data structure: Direct properties → Telematic keys with containers
+OAuth 2.0 Device Code Flow with PKCE:
 
-### Preserved Functionality
+1. Request device code with PKCE challenge
+2. Display user code and verification URL to user
+3. Poll for authorization completion
+4. Store access and refresh tokens securely
+5. Automatically refresh tokens before expiration
 
-All read-only capabilities remain:
+See `.github/.copilot/domain_knowledge/bmw-cardata-api.md` for details.
 
-- Vehicle location
+### API Capabilities
+
+**Read-Only Monitoring** (All Supported):
+
+- Vehicle location and tracking
 - Battery/fuel levels
 - Door/window/lock status
-- Mileage
+- Mileage and odometer
 - Charging status (monitoring only)
 - Climate status (monitoring only)
 
-## Workflow
+**Not Supported** (API Limitations):
 
-### Code Changes
+- Remote lock/unlock
+- Climate control
+- Charging control
+- Any vehicle command execution
 
-1. Read relevant domain knowledge/specifications
-2. Follow TypeScript instructions
-3. Implement with tests
-4. Run `npm run fix` to auto-fix formatting/linting
+### Rate Limiting
 
 ## Key Principles
 
