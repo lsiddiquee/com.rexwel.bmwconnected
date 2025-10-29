@@ -5,14 +5,13 @@
     ],
     "capabilities": [
         "alarm_generic",
-        "locked",
         "mileage_capability",
         "range_capability",
-        "climate_now_capability",
         "measure_battery",
         "range_capability.battery",
         "range_capability.fuel",
-        "charging_status_capability"
+        "charging_status_capability",
+        "remaining_fuel_capability"
     ],
     "capabilitiesOptions": {
         "alarm_generic": {
@@ -20,6 +19,13 @@
                 "en": "Alarm disarmed",
                 "nl": "Alarm uitgeschakeld"
             }
+        },
+        "range_capability.battery": {
+            "title": {
+                "en": "Electric Range",
+                "nl": "Elektrisch bereik"
+            },
+            "icon": "/assets/battery-range.svg"
         }
     },
     "energy": {
@@ -31,15 +37,13 @@
         "small": "{{driverAssetsPath}}/images/small.png",
         "large": "{{driverAssetsPath}}/images/large.png"
     },
-    "icon": "{{driverAssetsPath}}/icon.svg",	
+    "icon": "{{driverAssetsPath}}/icon.svg",
     "pair": [
         {
-            "id": "loading",
-            "template": "loading"
+            "id": "client_id"
         },
         {
-            "id": "custom_login",
-            "$template": "custom_login"
+            "id": "device_code"
         },
         {
             "id": "list_devices",
@@ -55,12 +59,10 @@
     ],
     "repair": [
         {
-            "id": "loading",
-            "template": "loading"
+            "id": "client_id"
         },
         {
-            "id": "custom_login",
-            "$template": "custom_login"
+            "id": "device_code"
         }
     ]
 }

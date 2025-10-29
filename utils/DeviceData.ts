@@ -1,5 +1,5 @@
 export class DeviceData {
-  id: string;
+  id: string; // VIN
 
   constructor(id: string) {
     this.id = id;

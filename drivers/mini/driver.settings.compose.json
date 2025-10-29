@@ -1,17 +1,23 @@
 [
-    {
-        "$extends": ["distanceUnit"]
-    },
-    {
-        "$extends": ["fuelUnit"]
-    },
-    {
-        "$extends": ["pollingInterval"]
-    },
-    {
-        "$extends": ["refuellingTriggerThreshold"]
-    },
-    {
-        "$extends": ["autoRetry"]
-    }
+  {
+    "$extends": ["distanceUnit"]
+  },
+  {
+    "$extends": ["fuelUnit"]
+  },
+  {
+    "$extends": ["streamingEnabled"]
+  },
+  {
+    "$extends": ["apiPollingEnabled"]
+  },
+  {
+    "$extends": ["apiPollingInterval"]
+  },
+  {
+    "$extends": ["refuellingTriggerThreshold"]
+  },
+  {
+    "$extends": ["autoRetry"]
+  }
 ]

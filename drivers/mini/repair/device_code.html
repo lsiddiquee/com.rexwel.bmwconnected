@@ -1,0 +1,193 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>CarData Authentication</title>
+  </head>
+  <body>
+    <div>
+      <img src="logo.png" class="logo" alt="App Logo" />
+      <header class="homey-header">
+        <h1 class="homey-title" data-i18n="pair.device_code.title"></h1>
+      </header>
+
+      <!-- Initial loading state -->
+      <div id="loadingView" style="display: block">
+        <p class="homey-text" data-i18n="pair.device_code.requesting"></p>
+        <div class="homey-spinner"></div>
+      </div>
+
+      <!-- Device code display -->
+      <div id="codeView" style="display: none">
+        <fieldset class="homey-form-fieldset">
+          <legend class="homey-form-legend" data-i18n="pair.device_code.instructions"></legend>
+
+          <div class="homey-form-group">
+            <p class="homey-text" data-i18n="pair.device_code.step1"></p>
+            <div style="text-align: center; margin: 20px 0">
+              <a
+                id="verificationUrl"
+                href="#"
+                target="_blank"
+                class="homey-button-secondary"
+                style="display: inline-block; padding: 10px 20px"
+              >
+                <span data-i18n="pair.device_code.open_browser"></span>
+              </a>
+            </div>
+          </div>
+
+          <div class="homey-form-group">
+            <p class="homey-text" data-i18n="pair.device_code.step2"></p>
+            <div
+              style="
+                text-align: center;
+                font-size: 32px;
+                font-weight: bold;
+                letter-spacing: 0.2em;
+                margin: 20px 0;
+                padding: 20px;
+                background: #f0f0f0;
+                border-radius: 8px;
+              "
+            >
+              <span id="userCode" style="user-select: text">----</span>
+            </div>
+          </div>
+
+          <div class="homey-form-group">
+            <p class="homey-text" data-i18n="pair.device_code.step3"></p>
+            <div style="text-align: center; margin: 20px 0">
+              <div class="homey-spinner" id="pollingSpinner"></div>
+              <p
+                class="homey-text-small"
+                id="statusMessage"
+                data-i18n="pair.device_code.waiting"
+              ></p>
+            </div>
+          </div>
+
+          <div class="homey-form-group" style="margin-top: 30px">
+            <p class="homey-text-small" style="color: #999; text-align: center">
+              <span data-i18n="pair.device_code.expires_in"></span>:
+              <span id="expiresIn">--</span>
+              <span data-i18n="pair.device_code.minutes"></span>
+            </p>
+          </div>
+        </fieldset>
+
+        <button
+          class="homey-button-secondary-full"
+          id="cancelButton"
+          onclick="cancelPairing()"
+          data-i18n="pair.device_code.cancel"
+        ></button>
+      </div>
+
+      <!-- Error state -->
+      <div id="errorView" style="display: none">
+        <div class="homey-form-group">
+          <p class="homey-text" style="color: #ff3b30">
+            <strong data-i18n="pair.device_code.error.title"></strong>
+          </p>
+          <p id="errorMessage" class="homey-text"></p>
+        </div>
+        <button
+          class="homey-button-primary-full"
+          onclick="retryPairing()"
+          data-i18n="pair.device_code.retry"
+        ></button>
+      </div>
+    </div>
+
+    <script type="application/javascript">
+      let expirationTimeout = null;
+
+      requestDeviceCode();
+
+      function requestDeviceCode() {
+        showView('loading');
+        Homey.emit('request_device_code', null, (err, result) => {
+          if (err || !result) {
+            showError(err || Homey.__('pair.device_code.error.request_failed'));
+            return;
+          }
+
+          displayDeviceCode(result);
+          startPolling();
+        });
+      }
+
+      function displayDeviceCode(data) {
+        document.getElementById('userCode').textContent = data.userCode;
+        document.getElementById('verificationUrl').href = data.verificationUrl;
+
+        // Calculate expiration time in minutes
+        const expiresInMinutes = Math.floor(data.expiresIn / 60);
+        document.getElementById('expiresIn').textContent = expiresInMinutes;
+
+        showView('code');
+
+        // Set expiration timeout
+        expirationTimeout = setTimeout(() => {
+          showError(Homey.__('pair.device_code.error.expired'));
+          stopPolling();
+        }, data.expiresIn * 1000);
+      }
+
+      function startPolling() {
+        // Polling is handled on the backend by pollForAuthorizationAsync()
+        // Frontend just displays the code and waits for success/error events
+        document
+          .getElementById('statusMessage')
+          .setAttribute('data-i18n', 'pair.device_code.waiting');
+      }
+
+      function stopPolling() {
+        if (expirationTimeout) {
+          clearTimeout(expirationTimeout);
+          expirationTimeout = null;
+        }
+      }
+
+      function cancelPairing() {
+        stopPolling();
+        Homey.emit('cancel_pairing', null, () => {});
+      }
+
+      function retryPairing() {
+        requestDeviceCode();
+      }
+
+      function showView(view) {
+        document.getElementById('loadingView').style.display =
+          view === 'loading' ? 'block' : 'none';
+        document.getElementById('codeView').style.display = view === 'code' ? 'block' : 'none';
+        document.getElementById('errorView').style.display = view === 'error' ? 'block' : 'none';
+      }
+
+      function showError(message) {
+        document.getElementById('errorMessage').textContent = message;
+        showView('error');
+        stopPolling();
+      }
+
+      // Listen for authentication success from backend
+      Homey.on('authentication_success', () => {
+        stopPolling();
+        document
+          .getElementById('statusMessage')
+          .setAttribute('data-i18n', 'pair.device_code.success');
+        document.getElementById('pollingSpinner').style.display = 'none';
+        setTimeout(() => {
+          Homey.nextView();
+        }, 1500);
+      });
+
+      // Listen for authentication error from backend
+      Homey.on('authentication_error', (error) => {
+        showError(error || Homey.__('pair.device_code.error.auth_failed'));
+      });
+    </script>
+  </body>
+</html>

@@ -1,8 +1,29 @@
 {
-  "semicolon": "always",
   "extends": "@tsconfig/node12/tsconfig.json",
   "compilerOptions": {
     "outDir": "build/",
-    "sourceMap": true
-  }
+    "sourceMap": true,
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "moduleResolution": "node",
+    "declaration": true,
+    "declarationMap": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["app.ts", "api.ts", "drivers/**/*.ts", "utils/**/*.ts", "lib/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "build",
+    "build-tests",
+    ".homeybuild",
+    "tests",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }
