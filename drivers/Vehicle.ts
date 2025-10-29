@@ -845,6 +845,7 @@ export class Vehicle extends Device {
     }
 
     // Trigger drive session completed flow card
+    // TODO: Fix this now it is triggered on every location change
     const driveSessionCompletedFlowCard =
       this.homey.flow.getDeviceTriggerCard('drive_session_completed');
     await driveSessionCompletedFlowCard.trigger(

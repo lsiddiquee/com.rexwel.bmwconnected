@@ -168,7 +168,7 @@ export class ConnectedDriver extends Driver {
             await session.done();
             return;
           }
-        } catch (error) {
+        } catch {
           this.logger?.info('No valid tokens found - proceeding with device code authentication');
         }
 
@@ -278,16 +278,26 @@ export class ConnectedDriver extends Driver {
         return;
       }
 
+      // Check if error is from closed session (don't report as auth failure)
+      if (error instanceof Error && error.message.includes('Not Found: PairSession')) {
+        this.logger?.info('Session closed before authentication completed - user likely cancelled');
+        return;
+      }
+
+      // Real authentication error - log it
       this.homey.error('Authentication failed:', error);
 
       // Determine error message
-      let errorMessage = 'Authentication failed';
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
+      const errorMessage = error instanceof Error ? error.message : 'Authentication failed';
 
-      // Notify the frontend
-      await session.emit('authentication_error', errorMessage);
+      // Try to notify frontend - will silently fail if session closed
+      await session.emit('authentication_error', errorMessage).catch((emitError) => {
+        if (emitError instanceof Error && emitError.message.includes('Not Found: PairSession')) {
+          this.logger?.info('Session closed - cannot report error to user');
+        } else {
+          this.homey.error('Failed to emit authentication error:', emitError);
+        }
+      });
     }
   }
 
