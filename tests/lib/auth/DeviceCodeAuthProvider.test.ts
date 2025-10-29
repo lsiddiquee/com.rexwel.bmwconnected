@@ -97,6 +97,9 @@ type FetchMock = (url: string, init?: RequestInit) => Promise<Response>;
 let originalFetch: typeof global.fetch;
 let mockFetch: FetchMock | undefined;
 
+// Test constants
+const TEST_CLIENT_ID = 'test-client-id-12345';
+
 function setupFetchMock(mock: FetchMock): void {
   mockFetch = mock;
   originalFetch = global.fetch;
