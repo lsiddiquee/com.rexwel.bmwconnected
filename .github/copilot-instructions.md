@@ -368,6 +368,20 @@ it('should_preserveApiValue_when_staleMqttInCache', () => {
 - Use `beforeEach()` for common setup, `afterEach()` for cleanup
 - Mock external dependencies (API calls, MQTT connections, Homey SDK)
 
+### Mock Patterns
+
+**CRITICAL**: When mocking persistent storage (Homey's `setStoreValue`/`getStoreValue`), **always use deep clone** to simulate serialize/deserialize behavior:
+
+```typescript
+setStoreValue: jest.fn().mockImplementation((key, value) => {
+  // Deep clone simulates Homey's serialization behavior
+  mockStore[key] = JSON.parse(JSON.stringify(value));
+  return Promise.resolve();
+});
+```
+
+**Why**: Without deep clone, code that loads→mutates→saves objects will mutate the stored reference directly, causing "test pollution" within a single test. See `.github/instructions/testing-mock-patterns.instructions.md` for detailed explanation and patterns.
+
 ### Test Categories
 
 **Unit Tests** (Primary Focus):
