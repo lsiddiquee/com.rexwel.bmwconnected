@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'feat/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        # node-version: [16.x, 18.x, 20.x]
+        node-version: [16.x]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate formatting and linting
+        run: npm run validate
+
+      - name: Build project
+        run: npm run build
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        if: matrix.node-version == '20.x'
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+          fail_ci_if_error: false
+
+      - name: Check coverage threshold
+        if: matrix.node-version == '20.x'
+        run: |
+          echo "Checking coverage meets minimum threshold of 68%..."
+          npm run test:coverage -- --coverageThreshold='{"global":{"statements":68,"branches":59,"functions":60,"lines":68}}'
+
+  lint-markdown:
+    name: Lint Markdown
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint markdown files
+        run: npm run lint:markdown
+
+  build-homey-app:
+    name: Build Homey App
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '16.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Homey CLI
+        run: npm install -g homey
+
+      - name: Build Homey app
+        run: homey app build
+
+      - name: Validate app.json
+        run: homey app validate
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homey-app-build
+          path: |
+            build/
+            app.json
+          retention-days: 7
+
+  status-check:
+    name: All Checks Passed
+    runs-on: ubuntu-latest
+    needs: [build-and-test, lint-markdown, build-homey-app]
+    if: always()
+
+    steps:
+      - name: Check build status
+        if: needs.build-and-test.result != 'success'
+        run: exit 1
+
+      - name: Check markdown lint status
+        if: needs.lint-markdown.result != 'success'
+        run: exit 1
+
+      - name: Check Homey build status
+        if: needs.build-homey-app.result != 'success'
+        run: exit 1
+
+      - name: All checks passed
+        run: echo "✅ All CI checks passed successfully!"
