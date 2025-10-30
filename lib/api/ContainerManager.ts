@@ -10,7 +10,7 @@
 import type { IHttpClient } from '../http/IHttpClient';
 import type { ILogger } from '../types/ILogger';
 import { ApiError } from '../types/errors';
-import { ESSENTIAL_KEYS } from './TelematicKeys';
+import { ESSENTIAL_KEYS } from '../types/TelematicKeys';
 
 /**
  * BMW CarData API-specific container creation request

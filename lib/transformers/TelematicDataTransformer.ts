@@ -23,7 +23,7 @@ import type {
   ServiceInfo,
 } from '../models/VehicleStatus';
 import type { TelematicDataPoint } from '../models/TelematicDataPoint';
-import { TelematicKey } from '../api/TelematicKeys';
+import { TelematicKey } from '../types/TelematicKeys';
 
 import type { DriveTrainType } from '../types/DriveTrainType';
 

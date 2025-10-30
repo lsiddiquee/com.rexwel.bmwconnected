@@ -7,7 +7,7 @@
 
 import { TelematicDataTransformer } from '../../../lib/transformers/TelematicDataTransformer';
 import type { TelematicDataPoint } from '../../../lib/models/TelematicDataPoint';
-import { TelematicKey } from '../../../lib/api/TelematicKeys';
+import { TelematicKey } from '../../../lib/types/TelematicKeys';
 import { DriveTrainType } from '../../../lib/types/DriveTrainType';
 
 describe('TelematicDataTransformer', () => {

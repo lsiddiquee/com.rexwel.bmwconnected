@@ -9,6 +9,3 @@ export type { CarDataClientOptions } from './CarDataClient';
 
 export * from './ContainerManager';
 export type { ContainerManagerOptions } from './ContainerManager';
-
-export * from './TelematicKeys';
-export type { TelematicKeyDescriptor, EssentialKey } from './TelematicKeys';
