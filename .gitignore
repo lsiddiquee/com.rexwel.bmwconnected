@@ -49,6 +49,3 @@ build
 access_token
 sample_responses
 data/
-
-.github/chatmodes
-.github/.copilot/breadcrumbs

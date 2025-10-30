@@ -60,6 +60,12 @@ describe('Vehicle Helper Methods Tests', () => {
   });
 
   afterEach(() => {
+    // Clean up any timers
+    if (vehicle['_apiPollingTimer']) {
+      clearTimeout(vehicle['_apiPollingTimer']);
+      vehicle['_apiPollingTimer'] = undefined;
+    }
+    jest.clearAllTimers();
     jest.restoreAllMocks();
   });
 

@@ -63,34 +63,6 @@ interface ApiContainerResponse {
 }
 
 /**
- * Container storage interface
- */
-export interface IContainerStore {
-  /**
-   * Retrieve stored container ID for an identifier
-   *
-   * @param identifier - Unique identifier (VIN, client ID, or custom key)
-   * @returns Container ID or null if not found
-   */
-  getContainerId(identifier: string): Promise<string | null>;
-
-  /**
-   * Store container ID for an identifier
-   *
-   * @param identifier - Unique identifier (VIN, client ID, or custom key)
-   * @param containerId - Container identifier
-   */
-  setContainerId(identifier: string, containerId: string): Promise<void>;
-
-  /**
-   * Remove stored container ID for an identifier
-   *
-   * @param identifier - Unique identifier (VIN, client ID, or custom key)
-   */
-  deleteContainerId(identifier: string): Promise<void>;
-}
-
-/**
  * Configuration options for ContainerManager
  */
 export interface ContainerManagerOptions {
@@ -98,11 +70,6 @@ export interface ContainerManagerOptions {
    * HTTP client for API requests
    */
   httpClient: IHttpClient;
-
-  /**
-   * Container storage implementation
-   */
-  containerStore: IContainerStore;
 
   /**
    * Function to get valid access token
@@ -165,7 +132,6 @@ export interface ContainerManagerOptions {
  */
 export class ContainerManager {
   private readonly httpClient: IHttpClient;
-  private readonly containerStore: IContainerStore;
   private readonly getAccessToken: () => Promise<string>;
   private readonly logger?: ILogger;
   private readonly baseUrl: string;
@@ -173,11 +139,7 @@ export class ContainerManager {
   private readonly containerName: string;
   private readonly containerPurpose: string;
   private readonly telematicKeys: readonly string[];
-
-  /**
-   * In-memory cache of container IDs by identifier
-   */
-  private readonly containerCache: Map<string, string> = new Map();
+  private readonly containerCache = new Map<string, string>();
 
   /**
    * Creates a new ContainerManager instance
@@ -186,7 +148,6 @@ export class ContainerManager {
    */
   constructor(options: ContainerManagerOptions) {
     this.httpClient = options.httpClient;
-    this.containerStore = options.containerStore;
     this.getAccessToken = options.getAccessToken;
     this.logger = options.logger;
     this.baseUrl = options.baseUrl ?? 'https://api-cardata.bmwgroup.com';
@@ -203,13 +164,15 @@ export class ContainerManager {
   }
 
   /**
-   * Gets existing container ID or creates a new container
+   * Gets existing container ID from cache or creates a new container
+   *
+   * Note: Persistent storage is handled by the caller.
+   * This method only manages in-memory cache and API calls.
    *
    * Flow:
    * 1. Check in-memory cache
-   * 2. Check persistent storage
-   * 3. Create new container if not found
-   * 4. Store and cache container ID
+   * 2. Create new container if not found
+   * 3. Cache container ID
    *
    * @param identifier - Unique identifier (VIN, client ID prefix, or custom key)
    * @returns Container ID
@@ -225,23 +188,14 @@ export class ContainerManager {
       return cachedId;
     }
 
-    // Check persistent storage
-    const storedId = await this.containerStore.getContainerId(identifier);
-    if (storedId) {
-      this.logger?.debug('Using stored container ID', { identifier, containerId: storedId });
-      this.containerCache.set(identifier, storedId);
-      return storedId;
-    }
-
     // Create new container
     this.logger?.info('Creating new container', { identifier });
     const containerId = await this.createContainer(identifier);
 
-    // Store and cache
-    await this.containerStore.setContainerId(identifier, containerId);
+    // Cache the new container ID
     this.containerCache.set(identifier, containerId);
 
-    this.logger?.info('Container created and stored', { identifier, containerId });
+    this.logger?.info('Container created and cached', { identifier, containerId });
     return containerId;
   }
 
@@ -326,7 +280,7 @@ export class ContainerManager {
   /**
    * Deletes a container by ID
    *
-   * Also removes from cache and persistent storage for all VINs.
+   * Also removes from cache. Persistent storage cleanup is handled by caller.
    *
    * @param containerId - Container identifier
    * @throws {ApiError} If API request fails
@@ -346,7 +300,6 @@ export class ContainerManager {
       for (const [vin, cachedId] of this.containerCache.entries()) {
         if (cachedId === containerId) {
           this.containerCache.delete(vin);
-          await this.containerStore.deleteContainerId(vin);
         }
       }
 
@@ -371,6 +324,29 @@ export class ContainerManager {
   clearCache(vin: string): void {
     this.containerCache.delete(vin);
     this.logger?.debug('Container cache cleared', { vin });
+  }
+
+  /**
+   * Sets cached container ID for a VIN
+   *
+   * Used by caller after loading container ID from persistent storage.
+   *
+   * @param vin - Vehicle Identification Number
+   * @param containerId - Container identifier
+   */
+  setCachedContainerId(vin: string, containerId: string): void {
+    this.containerCache.set(vin, containerId);
+    this.logger?.debug('Container ID cached', { vin, containerId });
+  }
+
+  /**
+   * Gets cached container ID for a VIN (if any)
+   *
+   * @param vin - Vehicle Identification Number
+   * @returns Container ID if cached, undefined otherwise
+   */
+  getCachedContainerId(vin: string): string | undefined {
+    return this.containerCache.get(vin);
   }
 
   /**

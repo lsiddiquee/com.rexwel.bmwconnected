@@ -322,22 +322,10 @@ export class ConnectedDriver extends Driver {
       });
 
       // TODO: Cleanup this whole code construction is very dubious.
-      const tempContainerStore = {
-        getContainerId: async (): Promise<string | null> => {
-          await Promise.resolve();
-          return null;
-        },
-        setContainerId: async () => {
-          await Promise.resolve();
-        },
-        deleteContainerId: async () => {
-          await Promise.resolve();
-        },
-      };
+      // Now using simplified ContainerManager without storage abstraction
 
       const containerManager = new ContainerManager({
         httpClient,
-        containerStore: tempContainerStore,
         getAccessToken: async () => {
           if (!this.authProvider) {
             throw new Error('Auth provider not initialized');
@@ -375,22 +363,8 @@ export class ConnectedDriver extends Driver {
         },
       });
 
-      const tempContainerStore = {
-        getContainerId: async (): Promise<string | null> => {
-          await Promise.resolve();
-          return null;
-        },
-        setContainerId: async () => {
-          await Promise.resolve();
-        },
-        deleteContainerId: async () => {
-          await Promise.resolve();
-        },
-      };
-
       const containerManager = new ContainerManager({
         httpClient,
-        containerStore: tempContainerStore,
         getAccessToken: async () => {
           if (!this.authProvider) {
             throw new Error('Auth provider not initialized');

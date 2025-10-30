@@ -245,6 +245,79 @@ export class Vehicle extends Device {
   }
 
   /**
+   * Check if API polling can be started
+   *
+   * Validates all prerequisites for starting API polling.
+   *
+   * @returns Validation result with canStart flag and optional reason
+   */
+  private canStartApiPolling(): { canStart: boolean; reason?: string } {
+    if (!this.settings.apiPollingEnabled) {
+      return { canStart: false, reason: 'API polling is disabled in settings' };
+    }
+
+    if (!this.api) {
+      return { canStart: false, reason: 'API client not initialized - cannot start API polling' };
+    }
+
+    if (!this._stateManager) {
+      return {
+        canStart: false,
+        reason: 'State manager not initialized - cannot start API polling',
+      };
+    }
+
+    const containerId = this.getStoreValue('containerId') as string | undefined;
+    if (!containerId) {
+      return {
+        canStart: false,
+        reason: 'No container ID available - API polling requires container',
+      };
+    }
+
+    return { canStart: true };
+  }
+
+  /**
+   * Execute a single API poll
+   *
+   * Fetches raw telematic data from the API and updates the state manager cache.
+   * Handles errors gracefully and logs poll status.
+   *
+   * @private Extracted for testability
+   */
+  private async executePoll(): Promise<void> {
+    try {
+      if (!this.api || !this._stateManager) {
+        this.logger?.warn('API client or state manager unavailable - skipping poll');
+        return;
+      }
+
+      const containerId = this.getStoreValue('containerId') as string | undefined;
+      if (!containerId) {
+        this.logger?.warn('Container ID missing - skipping API poll');
+        return;
+      }
+
+      this.logger?.debug(`Polling API for vehicle ${this.deviceData.id}`);
+
+      // Fetch raw telematic data
+      const rawData = await this.api.getRawTelematicData(this.deviceData.id, containerId);
+
+      // Update state manager cache with API data
+      await this._stateManager.updateFromApi(rawData);
+
+      this.logger?.debug(
+        `API poll completed for vehicle ${this.deviceData.id} (${Object.keys(rawData).length} telematic keys)`
+      );
+    } catch (error) {
+      this.logger?.error(
+        `API polling error for vehicle ${this.deviceData.id}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
    * Start API polling for periodic state updates
    *
    * Polls the BMW CarData API at the configured interval to fetch updated
@@ -257,26 +330,12 @@ export class Vehicle extends Device {
     // Stop existing timer if running
     this.stopApiPolling();
 
-    // Check if API polling is enabled
-    if (!this.settings.apiPollingEnabled) {
-      this.logger?.info('API polling is disabled in settings');
-      return;
-    }
-
-    // Verify prerequisites
-    if (!this.api) {
-      this.logger?.warn('API client not initialized - cannot start API polling');
-      return;
-    }
-
-    if (!this._stateManager) {
-      this.logger?.warn('State manager not initialized - cannot start API polling');
-      return;
-    }
-
-    const containerId = this.getStoreValue('containerId') as string | undefined;
-    if (!containerId) {
-      this.logger?.info('No container ID available - API polling requires container');
+    // Validate prerequisites
+    const validation = this.canStartApiPolling();
+    if (!validation.canStart) {
+      if (validation.reason) {
+        this.logger?.info(validation.reason);
+      }
       return;
     }
 
@@ -285,45 +344,13 @@ export class Vehicle extends Device {
       `Starting API polling for vehicle ${this.deviceData.id} (interval: ${this.settings.apiPollingInterval} minutes)`
     );
 
-    // Polling function
-    const pollApi = async () => {
-      try {
-        if (!this.api || !this._stateManager) {
-          this.logger?.warn('API client or state manager unavailable - skipping poll');
-          return;
-        }
-
-        const containerId = this.getStoreValue('containerId') as string | undefined;
-        if (!containerId) {
-          this.logger?.warn('Container ID missing - skipping API poll');
-          return;
-        }
-
-        this.logger?.debug(`Polling API for vehicle ${this.deviceData.id}`);
-
-        // Fetch raw telematic data
-        const rawData = await this.api.getRawTelematicData(this.deviceData.id, containerId);
-
-        // Update state manager cache with API data
-        await this._stateManager.updateFromApi(rawData);
-
-        this.logger?.debug(
-          `API poll completed for vehicle ${this.deviceData.id} (${Object.keys(rawData).length} telematic keys)`
-        );
-      } catch (error) {
-        this.logger?.error(
-          `API polling error for vehicle ${this.deviceData.id}: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    };
-
     // Set up polling timer
     this._apiPollingTimer = setInterval(() => {
-      void pollApi();
+      void this.executePoll();
     }, intervalMs);
 
-    // Also do an immediate poll
-    void pollApi();
+    // Execute immediate poll
+    void this.executePoll();
   }
 
   /**

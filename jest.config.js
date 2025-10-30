@@ -5,7 +5,6 @@ module.exports = {
   testPathIgnorePatterns: [
     '/node_modules/',
     '/.homeybuild/',
-    '/tests/lib/auth/DeviceCodeAuthProvider.test.ts', // TODO: Update to new constructor signature
   ],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
@@ -20,4 +19,19 @@ module.exports = {
     },
   },
   modulePathIgnorePatterns: ['<rootDir>/.homeybuild'],
+  // Force exit confirmed necessary for Jest worker pool management
+  // All 15 test files verified to exit cleanly individually
+  forceExit: true,
+  // Coverage collection configuration
+  collectCoverageFrom: [
+    '**/*.ts',
+    '!**/*.test.ts',
+    '!**/*.d.ts',
+    '!**/node_modules/**',
+    '!**/build/**',
+    '!**/build-tests/**',
+    '!**/.homeybuild/**',
+    '!**/tests/**',
+    '!**/coverage/**',
+  ],
 };
