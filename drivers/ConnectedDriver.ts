@@ -7,19 +7,86 @@ import { PairSession } from 'homey/lib/Driver';
 import { BMWConnectedDrive } from '../app';
 import { ILogger } from '../lib';
 
+// Import types for factory methods
+type HttpClient = import('../lib/http/HttpClient').HttpClient;
+type CarDataClient = import('../lib/api/CarDataClient').CarDataClient;
+type ContainerManager = import('../lib/api/ContainerManager').ContainerManager;
+
 export class ConnectedDriver extends Driver {
   logger?: ILogger;
-  private currentDeviceCodeResponse?: DeviceCodeResponse;
-  private authProvider?: DeviceCodeAuthProvider;
-  private currentClientId?: string;
-  private currentContainerId?: string;
-  private pollingCancelled: boolean = false;
+  protected currentDeviceCodeResponse?: DeviceCodeResponse;
+  protected authProvider?: DeviceCodeAuthProvider;
+  protected currentClientId?: string;
+  protected currentContainerId?: string;
+  protected pollingCancelled: boolean = false;
 
   async onInit() {
     await Promise.resolve();
 
     const app = this.homey.app as BMWConnectedDrive;
     this.logger = app.logger;
+  }
+
+  /**
+   * Factory method for creating HttpClient with consistent configuration
+   * Protected to allow test overrides
+   */
+  protected async createHttpClient(): Promise<HttpClient> {
+    const { HttpClient } = await import('../lib/http/HttpClient');
+    return new HttpClient(this.getHttpClientConfig());
+  }
+
+  /**
+   * Factory method for creating CarDataClient
+   * Protected to allow test overrides
+   */
+  protected async createCarDataClient(): Promise<CarDataClient> {
+    if (!this.authProvider) {
+      throw new Error('Auth provider not initialized');
+    }
+
+    const { CarDataClient } = await import('../lib/api/CarDataClient');
+    return new CarDataClient({
+      authProvider: this.authProvider,
+      httpClient: await this.createHttpClient(),
+    });
+  }
+
+  /**
+   * Factory method for creating ContainerManager
+   * Protected to allow test overrides
+   */
+  protected async createContainerManager(): Promise<ContainerManager> {
+    if (!this.authProvider) {
+      throw new Error('Auth provider not initialized');
+    }
+
+    const { ContainerManager } = await import('../lib/api/ContainerManager');
+    return new ContainerManager({
+      httpClient: await this.createHttpClient(),
+      getAccessToken: async () => {
+        if (!this.authProvider) {
+          throw new Error('Auth provider not initialized');
+        }
+        return await this.authProvider.getValidAccessToken();
+      },
+      logger: this.logger,
+    });
+  }
+
+  /**
+   * Get HTTP client configuration
+   * Protected to allow test overrides
+   */
+  protected getHttpClientConfig() {
+    return {
+      timeout: 30000,
+      maxRetries: 3,
+      rateLimit: {
+        maxRequests: 50,
+        windowMs: 24 * 60 * 60 * 1000, // 24 hours
+      },
+    };
   }
 
   async onPair(session: PairSession) {
@@ -51,22 +118,7 @@ export class ConnectedDriver extends Driver {
         throw new Error('Authentication not completed - please authenticate first');
       }
 
-      const { CarDataClient } = await import('../lib/api/CarDataClient');
-      const { HttpClient } = await import('../lib/http/HttpClient');
-
-      const httpClient = new HttpClient({
-        timeout: 30000,
-        maxRetries: 3,
-        rateLimit: {
-          maxRequests: 50,
-          windowMs: 24 * 60 * 60 * 1000, // 24 hours
-        },
-      });
-
-      const api = new CarDataClient({
-        authProvider: this.authProvider,
-        httpClient,
-      });
+      const api = await this.createCarDataClient();
 
       // Note: Container management now happens in pollForAuthorizationAsync
       // for both pairing and repair flows
@@ -302,99 +354,71 @@ export class ConnectedDriver extends Driver {
   }
 
   /**
-   * Validate existing container or create new one
+   * Ensure container is ready (validate existing or create new)
    * Called after successful authentication (either via tokens or device code)
    */
-  private async validateOrCreateContainer(): Promise<void> {
+  protected async validateOrCreateContainer(): Promise<void> {
     if (!this.currentContainerId) {
-      this.logger?.info('No container ID - creating new container after authentication');
-
-      const { HttpClient } = await import('../lib/http/HttpClient');
-      const { ContainerManager } = await import('../lib/api/ContainerManager');
-
-      const httpClient = new HttpClient({
-        timeout: 30000,
-        maxRetries: 3,
-        rateLimit: {
-          maxRequests: 50,
-          windowMs: 24 * 60 * 60 * 1000, // 24 hours
-        },
-      });
-
-      // TODO: Cleanup this whole code construction is very dubious.
-      // Now using simplified ContainerManager without storage abstraction
-
-      const containerManager = new ContainerManager({
-        httpClient,
-        getAccessToken: async () => {
-          if (!this.authProvider) {
-            throw new Error('Auth provider not initialized');
-          }
-          return await this.authProvider.getValidAccessToken();
-        },
-        logger: this.logger,
-      });
-
-      try {
-        // Create container - use client ID as identifier (containers are per-GCID, not per-VIN)
-        // Multiple vehicles under same GCID share the same container
-        const containerKey = `HOMEY-${this.currentClientId?.substring(0, 8)}`;
-        this.currentContainerId = await containerManager.getOrCreateContainer(containerKey);
-        this.logger?.info(`Container created: ${this.currentContainerId}`);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        this.logger?.error(`Failed to create container: ${errorMessage}`);
-        throw new Error(`Failed to create container: ${errorMessage}`);
-      }
+      await this.createNewContainer();
     } else {
-      // User provided a container ID - validate it
-      this.logger?.info(`Validating user-provided container ID: ${this.currentContainerId}`);
+      await this.validateExistingContainer();
+    }
+  }
 
-      const { HttpClient } = await import('../lib/http/HttpClient');
-      const { ContainerManager } = await import('../lib/api/ContainerManager');
-      const { ApiError } = await import('../lib/types/errors');
+  /**
+   * Create new container for authentication
+   */
+  protected async createNewContainer(): Promise<void> {
+    this.logger?.info('No container ID - creating new container after authentication');
 
-      const httpClient = new HttpClient({
-        timeout: 30000,
-        maxRetries: 3,
-        rateLimit: {
-          maxRequests: 50,
-          windowMs: 24 * 60 * 60 * 1000,
-        },
-      });
+    const containerManager = await this.createContainerManager();
 
-      const containerManager = new ContainerManager({
-        httpClient,
-        getAccessToken: async () => {
-          if (!this.authProvider) {
-            throw new Error('Auth provider not initialized');
-          }
-          return await this.authProvider.getValidAccessToken();
-        },
-        logger: this.logger,
-      });
+    try {
+      // Create container - use client ID as identifier (containers are per-GCID, not per-VIN)
+      // Multiple vehicles under same GCID share the same container
+      const containerKey = `HOMEY-${this.currentClientId?.substring(0, 8)}`;
+      this.currentContainerId = await containerManager.getOrCreateContainer(containerKey);
+      this.logger?.info(`Container created: ${this.currentContainerId}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      this.logger?.error(`Failed to create container: ${errorMessage}`);
+      throw new Error(`Failed to create container: ${errorMessage}`);
+    }
+  }
 
-      try {
-        const validation = await containerManager.validateContainer(this.currentContainerId);
+  /**
+   * Validate existing user-provided container
+   */
+  protected async validateExistingContainer(): Promise<void> {
+    if (!this.currentContainerId) {
+      throw new Error('Container ID is required for validation');
+    }
 
-        if (!validation.isValid) {
-          this.logger?.warn(
-            `Container ${this.currentContainerId} is missing ${validation.missingKeys?.length} required keys`
-          );
-          throw new Error(
-            `Container is missing ${validation.missingKeys?.length} required keys. Please use a different container or leave empty to create a new one.`
-          );
-        }
+    this.logger?.info(`Validating user-provided container ID: ${this.currentContainerId}`);
 
-        this.logger?.info(`Container ${this.currentContainerId} validated successfully`);
-      } catch (error) {
-        if (error instanceof ApiError && error.statusCode === 404) {
-          throw new Error(
-            'Container ID not found. Please check the ID or leave empty to create a new one.'
-          );
-        }
-        throw error;
+    const containerManager = await this.createContainerManager();
+    const { ApiError } = await import('../lib/types/errors');
+
+    try {
+      const validation = await containerManager.validateContainer(this.currentContainerId);
+
+      if (!validation.isValid) {
+        this.logger?.warn(
+          `Container ${this.currentContainerId} is missing ${validation.missingKeys?.length} required keys`
+        );
+        throw new Error(
+          `Container is missing ${validation.missingKeys?.length} required keys. Please use a different container or leave empty to create a new one.`
+        );
       }
+
+      this.logger?.info(`Container ${this.currentContainerId} validated successfully`);
+    } catch (error) {
+      if (error instanceof ApiError && error.statusCode === 404) {
+        throw new Error(
+          'Container ID not found. Please check the ID or leave empty to create a new one.'
+        );
+      }
+      throw error;
     }
   }
 
@@ -402,7 +426,7 @@ export class ConnectedDriver extends Driver {
    * Update device store with new client ID and container ID
    * Triggers device reinitialization if values changed
    */
-  private async updateDeviceStore(device: Device): Promise<void> {
+  protected async updateDeviceStore(device: Device): Promise<void> {
     if (!this.currentClientId) {
       this.logger?.warn('No client ID to update in device store');
       return;

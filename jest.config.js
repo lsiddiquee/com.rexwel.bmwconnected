@@ -25,6 +25,7 @@ module.exports = {
   // Coverage collection configuration
   collectCoverageFrom: [
     '**/*.ts',
+    '!**/index.ts',
     '!**/*.test.ts',
     '!**/*.d.ts',
     '!**/node_modules/**',
