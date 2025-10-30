@@ -42,6 +42,7 @@ export class LokiLogger extends SimpleClass implements ILogger {
   private extra: ContextExtra = {};
   private user: ContextUser = {};
   private currentLevel: LogLevel = LogLevel.TRACE;
+  private logs: string[] = [];
 
   // Although the reference homey-log package persists the entries for the lifetime of the app,
   // to prevent duplicate logs, this seems like it is a potential memory leak in long-running apps.
@@ -54,11 +55,11 @@ export class LokiLogger extends SimpleClass implements ILogger {
 
     this.setLevel(getLogLevel());
     if (!homey) {
-      LokiLogger._error('Error: missing homey constructor parameter');
+      this._error('Error: missing homey constructor parameter');
       throw new Error('Missing homey instance');
     }
     if (!lokiUrl) {
-      LokiLogger._error('No Loki URL provided');
+      this._error('No Loki URL provided');
       throw new Error('Missing Loki URL');
     }
     // this.homey = homey;
@@ -80,10 +81,10 @@ export class LokiLogger extends SimpleClass implements ILogger {
       this.managerCloud
         .getHomeyId()
         .then((homeyId: string) => this.setTags({ homeyId }))
-        .catch((err: unknown) => LokiLogger._error('Error: could not get `homeyId`', err));
+        .catch((err: unknown) => this._error('Error: could not get `homeyId`', err));
     }
 
-    LokiLogger._log(
+    this._log(
       this.logLevelToString(LogLevel.INFO),
       `App ${this.appId} v${this.appVersion} logging on Homey v${this.homeyVersion}...`
     );
@@ -203,7 +204,7 @@ export class LokiLogger extends SimpleClass implements ILogger {
   public async sendLogToLoki(level: string, message: string) {
     const logEntry = this.buildLogEntry(level, message);
     try {
-      LokiLogger._log(level, message);
+      this._log(level, message);
       const response = await fetch(this.lokiUrl, {
         method: 'POST',
         headers: {
@@ -212,10 +213,10 @@ export class LokiLogger extends SimpleClass implements ILogger {
         body: JSON.stringify({ streams: [logEntry] }),
       });
       if (!response.ok) {
-        LokiLogger._error(`Failed to send log to Loki: ${response.statusText}`);
+        this._error(`Failed to send log to Loki: ${response.statusText}`);
       }
     } catch (error) {
-      LokiLogger._error('Error sending log to Loki:', error);
+      this._error('Error sending log to Loki:', error);
     }
   }
 
@@ -239,7 +240,8 @@ export class LokiLogger extends SimpleClass implements ILogger {
   /**
    * Mimic SDK log method (bound, like homey_logger.js).
    */
-  private static _log(level: string, ...args: unknown[]): void {
+  private _log(level: string, ...args: unknown[]): void {
+    this.persistLogs(level, ...args);
     // eslint-disable-next-line prefer-spread
     (
       console.log.bind(null, LokiLogger._consoleLogTime(), `[${level}]`) as typeof console.log
@@ -249,10 +251,22 @@ export class LokiLogger extends SimpleClass implements ILogger {
   /**
    * Mimic SDK error method (bound, like homey_logger.js).
    */
-  private static _error(...args: unknown[]): void {
+  private _error(...args: unknown[]): void {
+    this.persistLogs('error', ...args);
     // eslint-disable-next-line prefer-spread
     (
       console.error.bind(null, LokiLogger._consoleLogTime(), '[loki-log]') as typeof console.error
     ).apply(null, args);
+  }
+
+  private persistLogs(level: string, ...args: unknown[]): void {
+    if (this.logs.length >= 100) {
+      this.logs.shift();
+    }
+    this.logs.push(`[${new Date().toISOString()}] ${level}: ${args.join(' ')}`);
+  }
+
+  public getRecentLogs(): string[] {
+    return this.logs;
   }
 }

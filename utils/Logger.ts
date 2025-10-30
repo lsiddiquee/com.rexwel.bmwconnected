@@ -41,6 +41,9 @@ export class Logger implements ILogger {
   getLevel(): LogLevel {
     throw new Error('Method not implemented.');
   }
+  getRecentLogs(): string[] {
+    return this.logs;
+  }
 
   private logInternal(level: LogLevel, message: string): void {
     const logLevel = this.getLogLevel();
@@ -48,7 +51,7 @@ export class Logger implements ILogger {
     if (level === LogLevel.ERROR) this.logger.error(message);
     else this.logger.log(`${LogLevel[level]}: ${message}`);
     if (logLevel || level >= LogLevel.ERROR) {
-      if (this.logs.length === 50) {
+      if (this.logs.length >= 100) {
         this.logs.shift();
       }
       this.logs.push(`[${new Date().toISOString()}] ${LogLevel[level]}: ${message}`);

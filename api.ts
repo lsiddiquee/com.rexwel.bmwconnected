@@ -31,8 +31,10 @@ export async function getLogs({ homey }: { homey: Homey }): Promise<string[]> {
   const app = homey.app as BMWConnectedDrive;
   app.logger?.info('getLogs invoked.');
 
-  // TODO: Fix this
-  // return app.logger?.logs ?? [];
+  const loggerWithRecentLogs = app.logger as unknown as { getRecentLogs: () => string[] }; // Type assertion
+  if (loggerWithRecentLogs) {
+    return loggerWithRecentLogs.getRecentLogs();
+  }
   return [];
 }
 
