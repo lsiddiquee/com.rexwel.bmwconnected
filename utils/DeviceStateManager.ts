@@ -19,6 +19,7 @@ import type { ILogger } from '../lib/types/ILogger';
 import { DriveTrainType } from '../lib/types/DriveTrainType';
 import type { IVehicleClient } from '../lib/client/IVehicleClient';
 import { DeviceSettings } from './DeviceSettings';
+import type { LocationType } from './LocationType';
 
 /**
  * Device store data structure
@@ -519,5 +520,79 @@ export class DeviceStateManager {
       });
       throw error;
     }
+  }
+
+  /**
+   * Get last trip complete location (persisted)
+   *
+   * @returns Last trip complete location or default empty location if not set
+   */
+  getLastTripCompleteLocation(): LocationType {
+    const stored = this.device.getStoreValue('lastTripCompleteLocation') as
+      | LocationType
+      | undefined;
+    return (
+      stored ?? {
+        label: '',
+        latitude: 0,
+        longitude: 0,
+        address: '',
+      }
+    );
+  }
+
+  /**
+   * Set last trip complete location (persists to store)
+   *
+   * @param location - Location to persist
+   */
+  async setLastTripCompleteLocation(location: LocationType): Promise<void> {
+    await this.device.setStoreValue('lastTripCompleteLocation', location);
+    this.logger?.debug('Persisted last trip complete location', { location });
+  }
+
+  /**
+   * Get last trip complete mileage (persisted)
+   *
+   * @returns Last trip complete mileage or 0 if not set
+   */
+  getLastTripCompleteMileage(): number {
+    const stored = this.device.getStoreValue('lastTripCompleteMileage') as number | undefined;
+    return stored ?? 0;
+  }
+
+  /**
+   * Set last trip complete mileage (persists to store)
+   *
+   * @param mileage - Mileage to persist
+   */
+  async setLastTripCompleteMileage(mileage: number): Promise<void> {
+    await this.device.setStoreValue('lastTripCompleteMileage', mileage);
+    this.logger?.debug('Persisted last trip complete mileage', { mileage });
+  }
+
+  /**
+   * Get last known location (persisted, Homey LocationType format)
+   *
+   * Returns the last known location in Homey's LocationType format with label, address, etc.
+   * This is updated whenever the location changes and includes geofence information.
+   *
+   * @returns Last known location or undefined if not set
+   */
+  getLastLocation(): LocationType | undefined {
+    const stored = this.device.getStoreValue('lastLocation') as LocationType | undefined;
+    return stored;
+  }
+
+  /**
+   * Set last known location (persists to store, Homey LocationType format)
+   *
+   * Stores the location with label, address, and other Homey-specific fields.
+   *
+   * @param location - Location to persist
+   */
+  async setLastLocation(location: LocationType): Promise<void> {
+    await this.device.setStoreValue('lastLocation', location);
+    this.logger?.debug('Persisted last location', { location });
   }
 }
