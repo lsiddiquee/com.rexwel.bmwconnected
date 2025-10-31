@@ -286,7 +286,7 @@ Common error codes:
 
 The BMW CarData Streaming API provides real-time vehicle data via MQTT protocol, offering an alternative to the REST API that **does not count against the 50 requests per 24-hour quota**. This makes it ideal for applications requiring frequent updates.
 
-**Reference Documentation**: https://bmw-cardata.bmwgroup.com/customer/public/api-documentation/Id-Streaming
+**Reference Documentation**: <https://bmw-cardata.bmwgroup.com/customer/public/api-documentation/Id-Streaming>
 
 ### Key Characteristics
 

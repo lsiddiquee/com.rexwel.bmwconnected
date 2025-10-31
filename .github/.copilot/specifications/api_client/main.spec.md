@@ -340,7 +340,7 @@ const accessToken = await authProvider.getValidAccessToken();
 class RateLimiter {
 private requests: Array<{ timestamp: Date; endpoint: string }> = [];
 private readonly maxRequests = 50;
-private readonly windowMs = 24 _ 60 _ 60 \* 1000; // 24 hours
+private readonly windowMs = 24 _60_ 60 \* 1000; // 24 hours
 
     async checkAndWait(endpoint: string): Promise<void> {
         this.cleanOldRequests();

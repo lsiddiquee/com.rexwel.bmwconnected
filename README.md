@@ -33,7 +33,7 @@ Before adding a car you need to go to app settings and fill in your username and
 ## Acknowledgements
 
 - Use at your own risk. I accept no responsibility for any damages caused by using this app.
-- Reverse geo coding data is provided under ODbL and © OpenStreetMap contributors. Further details https://www.openstreetmap.org/copyright.
+- Reverse geo coding data is provided under ODbL and © OpenStreetMap contributors. Further details <https://www.openstreetmap.org/copyright>.
 
 ## Useful links
 

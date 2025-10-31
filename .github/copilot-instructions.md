@@ -161,8 +161,8 @@ const containerId = this.getStoreValue('containerId') as string | undefined;
 
 See:
 
-- https://apps.developer.homey.app/the-basics/devices/pairing
-- https://apps.developer.homey.app/the-basics/devices/settings
+- <https://apps.developer.homey.app/the-basics/devices/pairing>
+- <https://apps.developer.homey.app/the-basics/devices/settings>
 
 ### Logging
 
