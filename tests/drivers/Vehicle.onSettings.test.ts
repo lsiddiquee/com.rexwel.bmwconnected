@@ -37,6 +37,19 @@ describe('Vehicle.onSettings', () => {
     // Create mock state manager
     mockStateManager = {
       getVehicleStatus: jest.fn(),
+      updateFromApi: jest.fn().mockResolvedValue(undefined),
+      getLastLocation: jest.fn().mockReturnValue(null),
+      setLastLocation: jest.fn().mockResolvedValue(undefined),
+      getClientId: jest.fn().mockReturnValue('test-client-id'),
+      getContainerId: jest.fn().mockReturnValue('test-container-id'),
+      getDriveTrain: jest.fn().mockReturnValue('PLUGIN_HYBRID'),
+      setDriveTrain: jest.fn().mockResolvedValue(undefined),
+      getLastTripCompleteLocation: jest.fn().mockReturnValue(null),
+      setLastTripCompleteLocation: jest.fn().mockResolvedValue(undefined),
+      getLastTripCompleteMileage: jest.fn().mockReturnValue(null),
+      setLastTripCompleteMileage: jest.fn().mockResolvedValue(undefined),
+      updateFromMqttMessage: jest.fn().mockResolvedValue(undefined),
+      clearCache: jest.fn(),
     };
 
     // Create Vehicle instance bypassing constructor
@@ -45,7 +58,7 @@ describe('Vehicle.onSettings', () => {
     vehicle.logger = mockLogger;
     vehicle.homey = { app: mockApp } as any;
     vehicle.settings = new DeviceSettings();
-    vehicle['_stateManager'] = mockStateManager;
+    vehicle['stateManager'] = mockStateManager;
 
     // Mock private methods
     vehicle['startApiPolling'] = jest.fn();
@@ -223,7 +236,7 @@ describe('Vehicle.onSettings', () => {
 
       // Assert
       expect(vehicle['setDistanceUnits']).toHaveBeenCalledWith('imperial');
-      expect(vehicle['updateCapabilitiesFromStatus']).not.toHaveBeenCalled();
+      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(null);
     });
   });
 
@@ -284,7 +297,7 @@ describe('Vehicle.onSettings', () => {
 
       // Assert
       expect(vehicle['setFuelUnits']).toHaveBeenCalledWith('gallonUK');
-      expect(vehicle['updateCapabilitiesFromStatus']).not.toHaveBeenCalled();
+      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(null);
     });
   });
 

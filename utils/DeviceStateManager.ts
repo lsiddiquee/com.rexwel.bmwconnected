@@ -17,14 +17,14 @@ import type { StreamMessage } from '../lib/streaming';
 import { TelematicDataTransformer } from '../lib/transformers/TelematicDataTransformer';
 import type { ILogger } from '../lib/types/ILogger';
 import { DriveTrainType } from '../lib/types/DriveTrainType';
-import type { IVehicleClient } from '../lib/client/IVehicleClient';
-import { DeviceSettings } from './DeviceSettings';
 import type { LocationType } from './LocationType';
+import { STORE_KEY_DEVICE_STATE, STORE_KEY_CLIENT_ID, STORE_KEY_CONTAINER_ID } from './StoreKeys';
 
 /**
  * Device store data structure
  *
  * Persisted in Homey device store for each vehicle device.
+ * Includes all data managed by DeviceStateManager except auth credentials (clientId/containerId).
  */
 export interface DeviceStoreData {
   /**
@@ -50,24 +50,28 @@ export interface DeviceStoreData {
   /**
    * Timestamp of last API update (ISO 8601)
    */
-  lastApiUpdate: string | null;
+  lastApiUpdate?: string;
 
   /**
    * Timestamp of last MQTT message (ISO 8601)
    */
-  lastMqttUpdate: string | null;
-}
+  lastMqttUpdate?: string;
 
-/**
- * Default empty device store data
- */
-const DEFAULT_STORE_DATA: DeviceStoreData = {
-  telematicCache: {},
-  vin: '',
-  driveTrain: 'UNKNOWN' as DriveTrainType,
-  lastApiUpdate: null,
-  lastMqttUpdate: null,
-};
+  /**
+   * Last trip completion location (where previous trip ended)
+   */
+  lastTripCompleteLocation?: LocationType;
+
+  /**
+   * Last trip completion mileage (where previous trip ended)
+   */
+  lastTripCompleteMileage?: number;
+
+  /**
+   * Last known location with geofence info (Homey LocationType format)
+   */
+  lastLocation?: LocationType;
+}
 
 /**
  * Device State Manager
@@ -96,117 +100,42 @@ export type StateUpdateDelegate = (status: VehicleStatus) => void | Promise<void
 export class DeviceStateManager {
   private readonly device: Homey.Device;
   private readonly logger?: ILogger;
-  private readonly storeKey = 'deviceState';
 
   // MQTT batching state
   private mqttBatchQueue: StreamMessage[] = [];
   private mqttBatchTimer: NodeJS.Timeout | null = null;
 
   // Delegate to notify on MQTT batch update
-  private stateUpdateDelegate?: StateUpdateDelegate;
+  private stateUpdateDelegate: StateUpdateDelegate;
+
+  private static readonly MQTT_BATCH_WINDOWS_MS = 1000; // 1 second
 
   /**
    * Creates a new DeviceStateManager instance
    *
    * @param device - Homey device instance for store access
+   * @param vin - Vehicle Identification Number (device ID)
    * @param logger - Optional logger for debugging
    */
-  constructor(device: Homey.Device, logger?: ILogger, stateUpdateDelegate?: StateUpdateDelegate) {
+  constructor(
+    device: Homey.Device,
+    vin: string,
+    stateUpdateDelegate: StateUpdateDelegate,
+    logger?: ILogger
+  ) {
     this.device = device;
     this.logger = logger;
-    if (stateUpdateDelegate) {
-      this.stateUpdateDelegate = stateUpdateDelegate;
-    }
-  }
-
-  /**
-   * Initializes the device store and optionally seeds cache from API
-   *
-   * Call this during device onInit() to ensure store exists.
-   * If not already initialized:
-   * 1. Fetches VehicleStatus to get VIN and drive train
-   * 2. Initializes store with VIN and drive train
-   * 3. If container ID provided, seeds cache with raw telematic data from API
-   *
-   * @param carDataClient - CarData API client for fetching data
-   * @param vin - Vehicle Identification Number (device ID)
-   * @param containerId - Optional container ID for telematic data (enables cache seeding)
-   * @returns Promise resolving to VehicleStatus if cache was seeded, null otherwise
-   */
-  async initialize(
-    carDataClient: IVehicleClient,
-    vin: string,
-    containerId?: string
-  ): Promise<VehicleStatus | null> {
-    const existing = this.loadStoreData();
-
-    // Initialize store if not already initialized
-    if (!existing.vin) {
-      this.logger?.debug('Initializing device store - fetching VIN and drive train from API');
-
-      const status = await carDataClient.getVehicleStatus(vin);
-
-      await this.saveStoreData({
-        ...DEFAULT_STORE_DATA,
-        vin: status.vin,
-        driveTrain: status.driveTrain,
-      });
-
-      this.logger?.info('Device store initialized', {
-        vin: status.vin,
-        driveTrain: status.driveTrain,
-      });
-    } else {
-      this.logger?.debug('Device store already initialized', {
-        vin: existing.vin,
-        driveTrain: existing.driveTrain,
-      });
-    }
-
-    // Seed cache if container ID provided (common path for both initialized and new stores)
-    if (containerId) {
-      await this.seedCacheFromApi(carDataClient, vin, containerId);
-    }
-
-    return this.getVehicleStatus();
-  }
-
-  /**
-   * Seeds cache with raw telematic data from API
-   *
-   * Internal helper for cache initialization.
-   * Only called if container ID exists and client supports raw telematic data.
-   *
-   * @param carDataClient - CarData API client
-   * @param vin - Vehicle Identification Number
-   * @param containerId - Container ID for telematic data
-   * @returns Promise resolving to VehicleStatus
-   * @private
-   */
-  private async seedCacheFromApi(
-    carDataClient: IVehicleClient,
-    vin: string,
-    containerId: string
-  ): Promise<void> {
-    try {
-      this.logger?.info(`Seeding cache from API for vehicle ${vin}`);
-
-      // Get raw telematic data from API
-      const rawData = await carDataClient.getRawTelematicData(vin, containerId);
-
-      this.logger?.debug('Cache seed data from API', {
-        keysCount: Object.keys(rawData).length,
-        data: rawData,
-      });
-
-      // Update cache from raw telematic data
-      await this.updateCacheFromTelematicData(rawData, 'api');
-
-      this.logger?.info(
-        `Cache seeded successfully with ${Object.keys(rawData).length} telematic keys`
-      );
-    } catch (error) {
-      this.logger?.error(`Failed to seed cache from API for vehicle ${vin}`, error as Error);
+    this.stateUpdateDelegate = stateUpdateDelegate;
+    let deviceState = this.device.getStoreValue(STORE_KEY_DEVICE_STATE) as
+      | DeviceStoreData
+      | undefined;
+    if (!deviceState) {
+      deviceState = {
+        telematicCache: {},
+        vin: vin,
+        driveTrain: DriveTrainType.UNKNOWN,
+      };
+      void this.saveStoreData(deviceState);
     }
   }
 
@@ -226,7 +155,7 @@ export class DeviceStateManager {
    * Batches MQTT messages for 1 second before updating state.
    * All messages received within 1s are merged and processed together.
    */
-  updateFromMqttMessage(message: StreamMessage): VehicleStatus {
+  updateFromMqttMessage(message: StreamMessage): void {
     // Add message to batch queue
     this.mqttBatchQueue.push(message);
 
@@ -259,11 +188,8 @@ export class DeviceStateManager {
           // Update cache using shared method
           await this.updateCacheFromTelematicData(mergedData, 'mqtt');
 
-          // Load updated state for transformation
-          const storeData = this.loadStoreData();
-
           // Transform unified cache to VehicleStatus (always computed from cache)
-          const updatedStatus = this.transformCacheToStatus(storeData);
+          const updatedStatus = this.transformCacheToStatus();
 
           this.logger?.debug('State updated from MQTT (batched)', {
             lastUpdated: updatedStatus.lastUpdatedAt,
@@ -271,19 +197,14 @@ export class DeviceStateManager {
           });
 
           // Invoke delegate if set
-          if (this.stateUpdateDelegate) {
-            try {
-              await this.stateUpdateDelegate(updatedStatus);
-            } catch (err) {
-              this.logger?.warn('State update delegate threw error', { error: err });
-            }
+          try {
+            await this.stateUpdateDelegate(updatedStatus);
+          } catch (err) {
+            this.logger?.warn('State update delegate threw error', { error: err });
           }
         })();
-      }, 1000);
+      }, DeviceStateManager.MQTT_BATCH_WINDOWS_MS);
     }
-
-    // Return last known status immediately (may not include this message yet)
-    return this.getVehicleStatus() ?? ({} as VehicleStatus);
   }
 
   /**
@@ -305,23 +226,18 @@ export class DeviceStateManager {
     // Update cache using shared method
     await this.updateCacheFromTelematicData(telematicData, 'api');
 
-    // Load updated state for transformation
-    const storeData = this.loadStoreData();
-
     // Transform unified cache to VehicleStatus
-    const updatedStatus = this.transformCacheToStatus(storeData);
+    const updatedStatus = this.transformCacheToStatus();
 
     this.logger?.debug('State updated from API', {
       lastUpdated: updatedStatus.lastUpdatedAt,
     });
 
     // Invoke delegate if set
-    if (this.stateUpdateDelegate) {
-      try {
-        await this.stateUpdateDelegate(updatedStatus);
-      } catch (err) {
-        this.logger?.warn('State update delegate threw error', { error: err });
-      }
+    try {
+      await this.stateUpdateDelegate(updatedStatus);
+    } catch (err) {
+      this.logger?.warn('State update delegate threw error', { error: err });
     }
 
     return updatedStatus;
@@ -383,65 +299,11 @@ export class DeviceStateManager {
    * Computed from unified cache (single source of truth).
    * Used for capability registration on app restart.
    *
-   * @returns Cached VehicleStatus or null
+   * @returns Cached VehicleStatus
+   * @throws Error if state manager not initialized (call initialize() first)
    */
-  getVehicleStatus(): VehicleStatus | null {
-    const storeData = this.loadStoreData();
-    if (!storeData.vin) {
-      return null; // Not initialized yet
-    }
-    return this.transformCacheToStatus(storeData);
-  }
-
-  /**
-   * Retrieves a specific telematic value by key
-   *
-   * @param key - Telematic key path (e.g., "vehicleStatus.mileage")
-   * @returns Data point or undefined if not found
-   */
-  getTelematicValue(key: string): TelematicDataPoint | undefined {
-    const storeData = this.loadStoreData();
-    return storeData.telematicCache[key];
-  }
-
-  /**
-   * Retrieves all telematic cache data
-   *
-   * Useful for debugging or bulk operations.
-   *
-   * @returns Complete telematic cache
-   */
-  getTelematicCache(): Record<string, TelematicDataPoint> {
-    const storeData = this.loadStoreData();
-    return storeData.telematicCache;
-  }
-
-  /**
-   * Gets metadata about last updates
-   *
-   * @returns Object with last API and MQTT update timestamps
-   */
-  getUpdateMetadata(): {
-    lastApiUpdate: string | null;
-    lastMqttUpdate: string | null;
-  } {
-    const storeData = this.loadStoreData();
-    return {
-      lastApiUpdate: storeData.lastApiUpdate,
-      lastMqttUpdate: storeData.lastMqttUpdate,
-    };
-  }
-
-  /**
-   * Checks if streaming is enabled
-   *
-   * Reads from device settings (user preference in UI).
-   *
-   * @returns True if streaming enabled
-   */
-  isStreamingEnabled(): boolean {
-    const settings = this.device.getSettings() as DeviceSettings;
-    return settings.streamingEnabled ?? true; // Default to true if not set
+  getVehicleStatus(): VehicleStatus {
+    return this.transformCacheToStatus();
   }
 
   /**
@@ -454,7 +316,7 @@ export class DeviceStateManager {
     this.logger?.info('Clearing device state cache');
     const storeData = this.loadStoreData();
     await this.saveStoreData({
-      ...DEFAULT_STORE_DATA,
+      telematicCache: {},
       vin: storeData.vin,
       driveTrain: storeData.driveTrain,
     });
@@ -470,7 +332,9 @@ export class DeviceStateManager {
    * @returns Transformed VehicleStatus
    * @private
    */
-  private transformCacheToStatus(storeData: DeviceStoreData): VehicleStatus {
+  private transformCacheToStatus(): VehicleStatus {
+    const storeData = this.loadStoreData();
+
     // Transform telematic data to VehicleStatus
     const transformed = TelematicDataTransformer.transform(
       storeData.vin,
@@ -491,18 +355,13 @@ export class DeviceStateManager {
    * @private
    */
   private loadStoreData(): DeviceStoreData {
-    try {
-      const data = this.device.getStoreValue(this.storeKey) as DeviceStoreData | undefined;
+    const data = this.device.getStoreValue(STORE_KEY_DEVICE_STATE) as DeviceStoreData | undefined;
 
-      if (!data) {
-        return { ...DEFAULT_STORE_DATA };
-      }
-
-      return data;
-    } catch (error) {
-      this.logger?.warn('Failed to load device store data, using defaults', { error });
-      return { ...DEFAULT_STORE_DATA };
+    if (!data) {
+      throw new Error('Device store data not found - DeviceStateManager not initialized');
     }
+
+    return data;
   }
 
   /**
@@ -513,7 +372,7 @@ export class DeviceStateManager {
    */
   private async saveStoreData(data: DeviceStoreData): Promise<void> {
     try {
-      await this.device.setStoreValue(this.storeKey, data);
+      await this.device.setStoreValue(STORE_KEY_DEVICE_STATE, data);
     } catch (error) {
       this.logger?.error('Failed to save device store data', error as Error, {
         vin: data.vin,
@@ -525,20 +384,11 @@ export class DeviceStateManager {
   /**
    * Get last trip complete location (persisted)
    *
-   * @returns Last trip complete location or default empty location if not set
+   * @returns Last trip complete location or undefined if not set
    */
-  getLastTripCompleteLocation(): LocationType {
-    const stored = this.device.getStoreValue('lastTripCompleteLocation') as
-      | LocationType
-      | undefined;
-    return (
-      stored ?? {
-        label: '',
-        latitude: 0,
-        longitude: 0,
-        address: '',
-      }
-    );
+  getLastTripCompleteLocation(): LocationType | undefined {
+    const storeData = this.loadStoreData();
+    return storeData.lastTripCompleteLocation;
   }
 
   /**
@@ -547,18 +397,20 @@ export class DeviceStateManager {
    * @param location - Location to persist
    */
   async setLastTripCompleteLocation(location: LocationType): Promise<void> {
-    await this.device.setStoreValue('lastTripCompleteLocation', location);
+    const storeData = this.loadStoreData();
+    storeData.lastTripCompleteLocation = location;
+    await this.saveStoreData(storeData);
     this.logger?.debug('Persisted last trip complete location', { location });
   }
 
   /**
    * Get last trip complete mileage (persisted)
    *
-   * @returns Last trip complete mileage or 0 if not set
+   * @returns Last trip complete mileage or undefined if not set
    */
-  getLastTripCompleteMileage(): number {
-    const stored = this.device.getStoreValue('lastTripCompleteMileage') as number | undefined;
-    return stored ?? 0;
+  getLastTripCompleteMileage(): number | undefined {
+    const storeData = this.loadStoreData();
+    return storeData.lastTripCompleteMileage;
   }
 
   /**
@@ -567,7 +419,9 @@ export class DeviceStateManager {
    * @param mileage - Mileage to persist
    */
   async setLastTripCompleteMileage(mileage: number): Promise<void> {
-    await this.device.setStoreValue('lastTripCompleteMileage', mileage);
+    const storeData = this.loadStoreData();
+    storeData.lastTripCompleteMileage = mileage;
+    await this.saveStoreData(storeData);
     this.logger?.debug('Persisted last trip complete mileage', { mileage });
   }
 
@@ -580,8 +434,8 @@ export class DeviceStateManager {
    * @returns Last known location or undefined if not set
    */
   getLastLocation(): LocationType | undefined {
-    const stored = this.device.getStoreValue('lastLocation') as LocationType | undefined;
-    return stored;
+    const storeData = this.loadStoreData();
+    return storeData.lastLocation;
   }
 
   /**
@@ -592,7 +446,71 @@ export class DeviceStateManager {
    * @param location - Location to persist
    */
   async setLastLocation(location: LocationType): Promise<void> {
-    await this.device.setStoreValue('lastLocation', location);
+    const storeData = this.loadStoreData();
+    storeData.lastLocation = location;
+    await this.saveStoreData(storeData);
     this.logger?.debug('Persisted last location', { location });
+  }
+
+  /**
+   * Get client ID for BMW CarData API authentication (persisted)
+   *
+   * @returns Client ID or undefined if not set
+   */
+  getClientId(): string | undefined {
+    const stored = this.device.getStoreValue(STORE_KEY_CLIENT_ID) as string | undefined;
+    return stored;
+  }
+
+  /**
+   * Set client ID for BMW CarData API authentication (persists to store)
+   *
+   * @param clientId - Client ID to persist
+   */
+  async setClientId(clientId: string): Promise<void> {
+    await this.device.setStoreValue(STORE_KEY_CLIENT_ID, clientId);
+    this.logger?.debug('Persisted client ID', { clientId: clientId.substring(0, 8) + '...' });
+  }
+
+  /**
+   * Get container ID for BMW CarData API telematic data access (persisted)
+   *
+   * @returns Container ID or undefined if not set
+   */
+  getContainerId(): string | undefined {
+    const stored = this.device.getStoreValue(STORE_KEY_CONTAINER_ID) as string | undefined;
+    return stored;
+  }
+
+  /**
+   * Set container ID for BMW CarData API telematic data access (persists to store)
+   *
+   * @param containerId - Container ID to persist
+   */
+  async setContainerId(containerId: string): Promise<void> {
+    await this.device.setStoreValue(STORE_KEY_CONTAINER_ID, containerId);
+    this.logger?.debug('Persisted container ID', { containerId });
+  }
+
+  /**
+   * Get vehicle drive train type for capability migration (persisted)
+   *
+   * @returns Drive train type or undefined if not set
+   */
+  getDriveTrain(): DriveTrainType {
+    const storeData = this.loadStoreData();
+    return storeData.driveTrain;
+  }
+
+  /**
+   * Set vehicle drive train type for capability migration (persists to store)
+   *
+   * @param driveTrain - Drive train type to persist
+   */
+  async setDriveTrain(driveTrain: DriveTrainType): Promise<void> {
+    const storeData = this.loadStoreData();
+    storeData.driveTrain = driveTrain;
+    await this.saveStoreData(storeData);
+    this.logger?.debug('Persisted drive train', { driveTrain });
   }
 }

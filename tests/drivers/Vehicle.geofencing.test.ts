@@ -8,7 +8,6 @@
 import { Vehicle } from '../../drivers/Vehicle';
 import { DeviceSettings } from '../../utils/DeviceSettings';
 import { LocationType } from '../../utils/LocationType';
-import { Capabilities } from '../../utils/Capabilities';
 import { ConfigurationManager } from '../../utils/ConfigurationManager';
 import { Configuration } from '../../utils/Configuration';
 import * as geo from 'geolocation-utils';
@@ -23,6 +22,7 @@ describe('Vehicle Geofencing and Location', () => {
   let mockHomey: any;
   let mockFlowCards: any;
   let mockConfiguration: Configuration;
+  let mockStateManager: any;
 
   beforeEach(() => {
     // Create mock logger
@@ -89,6 +89,28 @@ describe('Vehicle Geofencing and Location', () => {
     // Mock ConfigurationManager
     jest.spyOn(ConfigurationManager, 'getConfiguration').mockReturnValue(mockConfiguration);
 
+    // Create mock state manager
+    mockStateManager = {
+      getLastLocation: jest.fn().mockReturnValue(undefined),
+      setLastLocation: jest.fn().mockResolvedValue(undefined),
+      getVehicleStatus: jest.fn().mockReturnValue({
+        vin: 'TEST_VIN_123',
+        driveTrain: 'ELECTRIC',
+        lastUpdatedAt: new Date(),
+      }),
+      updateFromApi: jest.fn().mockResolvedValue(undefined),
+      getClientId: jest.fn().mockReturnValue('test-client-id'),
+      getContainerId: jest.fn().mockReturnValue('test-container-id'),
+      getDriveTrain: jest.fn().mockReturnValue('ELECTRIC'),
+      setDriveTrain: jest.fn().mockResolvedValue(undefined),
+      getLastTripCompleteLocation: jest.fn().mockReturnValue(null),
+      setLastTripCompleteLocation: jest.fn().mockResolvedValue(undefined),
+      getLastTripCompleteMileage: jest.fn().mockReturnValue(null),
+      setLastTripCompleteMileage: jest.fn().mockResolvedValue(undefined),
+      updateFromMqttMessage: jest.fn().mockResolvedValue(undefined),
+      clearCache: jest.fn(),
+    } as any;
+
     // Create Vehicle instance bypassing constructor
     vehicle = Object.create(Vehicle.prototype);
     vehicle.app = mockApp;
@@ -97,6 +119,7 @@ describe('Vehicle Geofencing and Location', () => {
     vehicle.deviceData = { id: 'TEST_VIN_123' };
     vehicle.settings = new DeviceSettings();
     vehicle.currentVehicleState = null;
+    vehicle['stateManager'] = mockStateManager;
 
     // Mock capability methods
     vehicle['getCapabilityValueSafe'] = jest.fn();
@@ -254,7 +277,7 @@ describe('Vehicle Geofencing and Location', () => {
       expect(mockLogger.info).toHaveBeenCalledWith('Location changed.');
     });
 
-    it('should_updateAppCurrentLocation_when_locationChanges', async () => {
+    it('should_updateStateManagerLastLocation_when_locationChanges', async () => {
       // Arrange
       const newLocation: LocationType = {
         label: '',
@@ -267,20 +290,18 @@ describe('Vehicle Geofencing and Location', () => {
       await vehicle['onLocationChanged'](newLocation);
 
       // Assert
-      expect(vehicle.app.currentLocation).toEqual(newLocation);
+      expect(mockStateManager.setLastLocation).toHaveBeenCalledWith(newLocation);
     });
 
     it('should_triggerGeofenceEnter_when_enteringGeofence', async () => {
       // Arrange
-      vehicle.currentVehicleState = {
-        vin: 'TEST123',
-        driveTrain: 'ELECTRIC',
-        currentMileage: 10000,
-        location: {
-          coordinates: { latitude: 52.0, longitude: 0.0 }, // Outside
-          address: { formatted: 'Old Address' },
-        },
-      } as any;
+      const previousLocation: LocationType = {
+        label: '',
+        latitude: 52.0,
+        longitude: 0.0,
+        address: 'Old Address',
+      };
+      mockStateManager.getLastLocation.mockReturnValue(previousLocation);
 
       const newLocation: LocationType = {
         label: '',
@@ -313,15 +334,13 @@ describe('Vehicle Geofencing and Location', () => {
 
     it('should_triggerGeofenceExit_when_leavingGeofence', async () => {
       // Arrange
-      vehicle.currentVehicleState = {
-        vin: 'TEST123',
-        driveTrain: 'ELECTRIC',
-        currentMileage: 10000,
-        location: {
-          coordinates: { latitude: 51.5074, longitude: -0.1278 }, // Inside Home
-          address: { formatted: '123 Home St' },
-        },
-      } as any;
+      const previousLocation: LocationType = {
+        label: 'Home',
+        latitude: 51.5074,
+        longitude: -0.1278,
+        address: '123 Home St',
+      };
+      mockStateManager.getLastLocation.mockReturnValue(previousLocation);
 
       const newLocation: LocationType = {
         label: '',
@@ -357,15 +376,13 @@ describe('Vehicle Geofencing and Location', () => {
 
     it('should_triggerBothEnterAndExit_when_movingBetweenGeofences', async () => {
       // Arrange
-      vehicle.currentVehicleState = {
-        vin: 'TEST123',
-        driveTrain: 'ELECTRIC',
-        currentMileage: 10000,
-        location: {
-          coordinates: { latitude: 51.5074, longitude: -0.1278 }, // Home
-          address: { formatted: '123 Home St' },
-        },
-      } as any;
+      const previousLocation: LocationType = {
+        label: 'Home',
+        latitude: 51.5074,
+        longitude: -0.1278,
+        address: '123 Home St',
+      };
+      mockStateManager.getLastLocation.mockReturnValue(previousLocation);
 
       const newLocation: LocationType = {
         label: '',
@@ -413,15 +430,13 @@ describe('Vehicle Geofencing and Location', () => {
 
     it('should_notTriggerGeofenceCards_when_noGeofenceChange', async () => {
       // Arrange
-      vehicle.currentVehicleState = {
-        vin: 'TEST123',
-        driveTrain: 'ELECTRIC',
-        currentMileage: 10000,
-        location: {
-          coordinates: { latitude: 52.0, longitude: 0.0 }, // Outside
-          address: { formatted: 'Somewhere' },
-        },
-      } as any;
+      const previousLocation: LocationType = {
+        label: '',
+        latitude: 52.0,
+        longitude: 0.0,
+        address: 'Somewhere',
+      };
+      mockStateManager.getLastLocation.mockReturnValue(previousLocation);
 
       const newLocation: LocationType = {
         label: '',
@@ -440,28 +455,24 @@ describe('Vehicle Geofencing and Location', () => {
       expect(mockFlowCards.geo_fence_exit.trigger).not.toHaveBeenCalled();
     });
 
-    it('should_triggerDriveSessionCompleted_when_locationChanges', async () => {
+    it('should_notTriggerDriveSessionCompleted_when_locationChanges', async () => {
       // Arrange
-      vehicle.currentVehicleState = {
-        vin: 'TEST123',
-        driveTrain: 'ELECTRIC',
-        currentMileage: 10000,
-        location: {
-          coordinates: { latitude: 51.5074, longitude: -0.1278 },
-          address: { formatted: 'Start Address' },
-        },
-      } as any;
+      const previousLocation: LocationType = {
+        label: 'Home',
+        latitude: 51.5074,
+        longitude: -0.1278,
+        address: '123 Home St',
+      };
+      mockStateManager.getLastLocation.mockReturnValue(previousLocation);
 
       const newLocation: LocationType = {
         label: '',
         latitude: 51.5134,
         longitude: -0.0896,
-        address: 'End Address',
+        address: '456 Work Ave',
       };
 
-      // Mock insideCircle based on location and fence
       (geo.insideCircle as jest.Mock).mockImplementation((location: LocationType, fence: any) => {
-        // New location (51.5134, -0.0896) inside Work fence only
         if (
           location.latitude === 51.5134 &&
           location.longitude === -0.0896 &&
@@ -469,7 +480,6 @@ describe('Vehicle Geofencing and Location', () => {
         ) {
           return true;
         }
-        // Old location (51.5074, -0.1278) inside Home fence only
         if (
           location.latitude === 51.5074 &&
           location.longitude === -0.1278 &&
@@ -480,33 +490,26 @@ describe('Vehicle Geofencing and Location', () => {
         return false;
       });
 
-      vehicle['getCapabilityValueSafe'] = jest.fn().mockResolvedValue(10050);
-
       // Act
       await vehicle['onLocationChanged'](newLocation);
 
       // Assert
-      expect(mockFlowCards.drive_session_completed.trigger).toHaveBeenCalledWith(
+      expect(mockFlowCards.geo_fence_exit.trigger).toHaveBeenCalledWith(
         vehicle,
-        {
-          StartLabel: 'Home',
-          StartLatitude: 51.5074,
-          StartLongitude: -0.1278,
-          StartAddress: 'Start Address',
-          StartMileage: 10000,
-          EndLabel: 'Work',
-          EndLatitude: 51.5134,
-          EndLongitude: -0.0896,
-          EndAddress: 'End Address',
-          EndMileage: 10050,
-        },
+        expect.objectContaining({ label: 'Home' }),
         {}
       );
+      expect(mockFlowCards.geo_fence_enter.trigger).toHaveBeenCalledWith(
+        vehicle,
+        expect.objectContaining({ label: 'Work' }),
+        {}
+      );
+      expect(mockFlowCards.drive_session_completed.trigger).not.toHaveBeenCalled();
     });
 
     it('should_handleNoPreviousLocation_when_firstLocationUpdate', async () => {
       // Arrange
-      vehicle.currentVehicleState = null;
+      mockStateManager.getLastLocation.mockReturnValue(undefined);
 
       const newLocation: LocationType = {
         label: '',
@@ -515,81 +518,50 @@ describe('Vehicle Geofencing and Location', () => {
         address: 'First Location',
       };
 
-      (geo.insideCircle as jest.Mock).mockReturnValue(true);
-      vehicle['getCapabilityValueSafe'] = jest.fn().mockResolvedValue(5000);
+      (geo.insideCircle as jest.Mock).mockReturnValue(false);
 
       // Act
       await vehicle['onLocationChanged'](newLocation);
 
       // Assert
-      expect(mockFlowCards.location_changed.trigger).toHaveBeenCalled();
-      expect(mockFlowCards.drive_session_completed.trigger).toHaveBeenCalledWith(
-        vehicle,
-        expect.objectContaining({
-          StartLabel: '',
-          StartLatitude: 0,
-          StartLongitude: 0,
-          StartAddress: '',
-          StartMileage: 0,
-        }),
-        {}
-      );
+      expect(mockFlowCards.location_changed.trigger).toHaveBeenCalledWith(vehicle, newLocation, {});
+      expect(mockFlowCards.geo_fence_enter.trigger).not.toHaveBeenCalled();
+      expect(mockFlowCards.geo_fence_exit.trigger).not.toHaveBeenCalled();
+      expect(mockFlowCards.drive_session_completed.trigger).not.toHaveBeenCalled();
     });
 
-    it('should_useEmptyDefaults_when_oldLocationMissing', async () => {
+    it('should_notTriggerGeofenceFlows_when_stayingWithinSameGeofence', async () => {
       // Arrange
-      vehicle.currentVehicleState = {
-        vin: 'TEST123',
-        driveTrain: 'ELECTRIC',
-        currentMileage: undefined, // No mileage
-      } as any;
+      const previousLocation: LocationType = {
+        label: 'Home',
+        latitude: 51.5074,
+        longitude: -0.1278,
+        address: '123 Home St',
+      };
+      mockStateManager.getLastLocation.mockReturnValue(previousLocation);
 
       const newLocation: LocationType = {
         label: '',
-        latitude: 51.5074,
-        longitude: -0.1278,
-        address: 'New Location',
+        latitude: 51.5075,
+        longitude: -0.1279,
+        address: 'Nearby Home St',
       };
 
-      vehicle['getCapabilityValueSafe'] = jest.fn().mockResolvedValue(null);
+      (geo.insideCircle as jest.Mock).mockImplementation((_location: LocationType, fence: any) => {
+        if (fence.label === 'Home') {
+          return true;
+        }
+        return false;
+      });
 
       // Act
       await vehicle['onLocationChanged'](newLocation);
 
       // Assert
-      expect(mockFlowCards.drive_session_completed.trigger).toHaveBeenCalledWith(
-        vehicle,
-        expect.objectContaining({
-          StartMileage: 0,
-          EndMileage: 0,
-        }),
-        {}
-      );
-    });
-
-    it('should_getMileageFromCapability_when_locationChanges', async () => {
-      // Arrange
-      const newLocation: LocationType = {
-        label: '',
-        latitude: 51.5074,
-        longitude: -0.1278,
-        address: 'Test',
-      };
-
-      vehicle['getCapabilityValueSafe'] = jest.fn().mockResolvedValue(15000);
-
-      // Act
-      await vehicle['onLocationChanged'](newLocation);
-
-      // Assert
-      expect(vehicle['getCapabilityValueSafe']).toHaveBeenCalledWith(Capabilities.MILEAGE);
-      expect(mockFlowCards.drive_session_completed.trigger).toHaveBeenCalledWith(
-        vehicle,
-        expect.objectContaining({
-          EndMileage: 15000,
-        }),
-        {}
-      );
+      expect(newLocation.label).toBe('Home');
+      expect(mockFlowCards.geo_fence_enter.trigger).not.toHaveBeenCalled();
+      expect(mockFlowCards.geo_fence_exit.trigger).not.toHaveBeenCalled();
+      expect(mockFlowCards.drive_session_completed.trigger).not.toHaveBeenCalled();
     });
   });
 });

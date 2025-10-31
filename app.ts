@@ -5,7 +5,6 @@ import Homey from 'homey';
 import { ConfigurationManager } from './utils/ConfigurationManager';
 import { ILogger, LogLevel } from './lib';
 import { Configuration } from './utils/Configuration';
-import { LocationType } from './utils/LocationType';
 import * as semver from 'semver';
 import { ArgumentAutocompleteResults } from 'homey/lib/FlowCard';
 import { Capabilities } from './utils/Capabilities';
@@ -15,6 +14,7 @@ import { DeviceCodeAuthProvider } from './lib/auth/DeviceCodeAuthProvider';
 import { CarDataClient } from './lib/api/CarDataClient';
 import { HttpClient } from './lib/http/HttpClient';
 import { HomeyTokenStore } from './utils/HomeyTokenStore';
+import { Vehicle } from './drivers/Vehicle';
 
 // TODO:
 // Window states capability
@@ -30,7 +30,6 @@ import { HomeyTokenStore } from './utils/HomeyTokenStore';
  */
 export class BMWConnectedDrive extends Homey.App {
   logger?: ILogger;
-  currentLocation?: LocationType;
 
   // Client managers for shared authentication and API clients
   private authProviders: Map<string, DeviceCodeAuthProvider> = new Map();
@@ -64,6 +63,24 @@ export class BMWConnectedDrive extends Homey.App {
   }
 
   /**
+   * Create HTTP client with standard configuration
+   * Used by both API client and container manager
+   *
+   * @returns HttpClient instance
+   */
+  createHttpClient(): HttpClient {
+    return new HttpClient({
+      timeout: 30000,
+      maxRetries: 3,
+      rateLimit: {
+        maxRequests: 50,
+        windowMs: 24 * 60 * 60 * 1000, // 24 hours
+      },
+      logger: this.logger,
+    });
+  }
+
+  /**
    * Get or create API client for a client ID
    *
    * @param clientId - BMW CarData API client ID (UUID)
@@ -80,15 +97,7 @@ export class BMWConnectedDrive extends Homey.App {
     const authProvider = this.getAuthProvider(clientId);
 
     // Create HTTP client with rate limiting (50 requests per 24 hours)
-    const httpClient = new HttpClient({
-      timeout: 30000,
-      maxRetries: 3,
-      rateLimit: {
-        maxRequests: 50,
-        windowMs: 24 * 60 * 60 * 1000, // 24 hours
-      },
-      logger: this.logger,
-    });
+    const httpClient = this.createHttpClient();
 
     const apiClient = new CarDataClient({
       authProvider,
@@ -122,13 +131,15 @@ export class BMWConnectedDrive extends Homey.App {
    * onInit is called when the app is initialized.
    */
   async onInit(): Promise<void> {
+    await Promise.resolve();
+
     // Load configuration first to determine logger type
     let configuration = ConfigurationManager.getConfiguration(this.homey);
     if (!configuration) {
       configuration = new Configuration();
       ConfigurationManager.setConfiguration(this.homey, configuration);
     } else {
-      await this.migrate_configuration();
+      this.migrate_configuration();
     }
 
     // Initialize logger based on configuration
@@ -177,12 +188,12 @@ export class BMWConnectedDrive extends Homey.App {
         return [];
       }
     );
-    // TODO: This is currently app level, need to improve this, either the currentLocation needs to be multi device or we need to move this to device level
     geofenceCard.registerRunListener(async (args: any, _state: any) => {
-      const app = this.homey.app as BMWConnectedDrive;
-      return (
-        app.currentLocation && args.geo_fence.id && app.currentLocation.label === args.geo_fence.id
-      );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const device = args.device as Vehicle;
+      const currentLocation = device.stateManager.getLastLocation();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
+      return currentLocation && args.geo_fence.id && currentLocation.label === args.geo_fence.id;
     });
 
     this.homey.flow
@@ -190,17 +201,18 @@ export class BMWConnectedDrive extends Homey.App {
       .registerRunListener(async (args: any, _: any) => {
         const battery_percentage = await Capabilities.GetCapabilityValueSafe<number>(
           args.device,
-          'measure_battery'
+          Capabilities.MEASURE_BATTERY
         );
         return battery_percentage && battery_percentage < args.battery_charge_test;
       });
 
+    // TODO: Fix conditions
     this.homey.flow
       .getConditionCard('charging_status')
       .registerRunListener(async (args: any, _: any) => {
         const charging_state = await Capabilities.GetCapabilityValueSafe<string>(
           args.device,
-          'charging_status_capability'
+          Capabilities.EV_CHARGING_STATE
         );
         return charging_state === args.charging_state;
       });
@@ -209,7 +221,7 @@ export class BMWConnectedDrive extends Homey.App {
   /**
    * Perform migrations to ensure proper functionality after upgrading
    */
-  private async migrate_configuration() {
+  private migrate_configuration() {
     const configuration = ConfigurationManager.getConfiguration(this.homey);
     this.logger?.info(`Configuration version is ${configuration.currentVersion}.`);
 
@@ -217,9 +229,9 @@ export class BMWConnectedDrive extends Homey.App {
       configuration.currentVersion = '0.0.0';
     }
 
-    await this.migrate_0_6_5(configuration);
-    await this.migrate_0_7_0(configuration);
-    await this.migrate_1_0_0(configuration);
+    this.migrate_0_6_5(configuration);
+    this.migrate_0_7_0(configuration);
+    this.migrate_1_0_0(configuration);
 
     configuration.currentVersion = this.homey.app.manifest.version;
     ConfigurationManager.setConfiguration(this.homey, configuration);
@@ -228,7 +240,7 @@ export class BMWConnectedDrive extends Homey.App {
   /**
    * Migrate configuration from earlier version to 0.6.5
    */
-  private async migrate_0_6_5(configuration: Configuration) {
+  private migrate_0_6_5(configuration: Configuration) {
     if (semver.lt(configuration.currentVersion, '0.6.5')) {
       this.logger?.info('Migrating to version 0.6.5');
 
@@ -250,7 +262,7 @@ export class BMWConnectedDrive extends Homey.App {
   /**
    * Migrate configuration from earlier version to 0.7.0
    */
-  private async migrate_0_7_0(configuration: Configuration) {
+  private migrate_0_7_0(configuration: Configuration) {
     if (semver.lt(configuration.currentVersion, '0.7.0')) {
       this.logger?.info('Migrating to version 0.7.0');
 
@@ -265,7 +277,7 @@ export class BMWConnectedDrive extends Homey.App {
   /**
    * Migrate configuration from earlier version to 1.0.0 (BMW CarData API migration)
    */
-  private async migrate_1_0_0(configuration: Configuration) {
+  private migrate_1_0_0(configuration: Configuration) {
     if (semver.lt(configuration.currentVersion, '1.0.0')) {
       this.logger?.info('Migrating to version 1.0.0 (BMW CarData API)');
 

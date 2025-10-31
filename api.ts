@@ -6,6 +6,7 @@ import { ConfigurationManager } from './utils/ConfigurationManager';
 import { OpenStreetMap } from './utils/OpenStreetMap';
 import { LocationType } from './utils/LocationType';
 import { DeviceData } from './utils/DeviceData';
+import { Vehicle } from './drivers/Vehicle';
 
 export async function saveSettings({
   homey,
@@ -67,15 +68,23 @@ export async function getCurrentLocation({
 }: {
   homey: Homey;
 }): Promise<LocationType | undefined> {
+  await Promise.resolve();
+
+  // TODO: Improve to be able to select vehicle if multiple are registered
   const app = homey.app as BMWConnectedDrive;
   app.logger?.info('getCurrentLocation invoked.');
 
-  try {
-    return app.currentLocation;
-  } catch (err) {
-    app.logger?.error('Failed to get current location', err instanceof Error ? err : undefined);
-    return undefined;
+  for (const driver of Object.values(homey.drivers.getDrivers())) {
+    const devices = driver.getDevices();
+    for (const device of devices) {
+      const vehicle = device as Vehicle;
+      const location = vehicle.stateManager.getLastLocation();
+      if (location) {
+        return location;
+      }
+    }
   }
+  return undefined;
 }
 
 export async function clearTokenStore({ homey }: { homey: Homey }): Promise<boolean> {

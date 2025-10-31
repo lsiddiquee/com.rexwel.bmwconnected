@@ -260,7 +260,7 @@ describe('CarDataClient - Comprehensive Tests', () => {
       expect(vehicles[0].vin).toBe('VIN123');
       expect(vehicles[0].brand).toBe('BMW');
       expect(vehicles[0].model).toBe('X5');
-      expect(vehicles[0].driveTrain).toBe('electric');
+      expect(vehicles[0].driveTrain).toBe('ELECTRIC');
 
       expect(mockHttpClient.get).toHaveBeenCalledWith(
         'https://api-cardata.bmwgroup.com/customers/vehicles/mappings',
@@ -345,9 +345,9 @@ describe('CarDataClient - Comprehensive Tests', () => {
 
       // Assert
       expect(vehicles).toHaveLength(3);
-      expect(vehicles[0].driveTrain).toBe('electric');
-      expect(vehicles[1].driveTrain).toBe('plug-in-hybrid');
-      expect(vehicles[2].driveTrain).toBe('combustion');
+      expect(vehicles[0].driveTrain).toBe('ELECTRIC');
+      expect(vehicles[1].driveTrain).toBe('PLUGIN_HYBRID');
+      expect(vehicles[2].driveTrain).toBe('COMBUSTION');
     });
   });
 

@@ -215,7 +215,7 @@ describe('Vehicle Helper Methods Tests', () => {
 
     it('should_setRangeBatteryUnits_when_electricVehicle', async () => {
       // Arrange
-      vehicle.hasCapability = jest.fn((cap) => cap === Capabilities.MEASURE_BATTERY);
+      vehicle.hasCapability = jest.fn((cap) => cap === Capabilities.RANGE_BATTERY);
 
       // Act
       await vehicle['setDistanceUnits']('metric');

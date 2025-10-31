@@ -15,7 +15,9 @@
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },
-  "eslint.validate": ["typescript"],
+  "eslint.validate": [
+    "typescript"
+  ],
   "typescript.tsdk": "node_modules/typescript/lib",
   "files.exclude": {
     "**/.git": true,
@@ -30,5 +32,10 @@
     "**/.homeybuild": true,
     "**/package-lock.json": true
   },
-  "cSpell.words": ["gcid", "Geofence", "telematic"]
+  "cSpell.words": [
+    "gcid",
+    "Geofence",
+    "geofences",
+    "telematic"
+  ]
 }

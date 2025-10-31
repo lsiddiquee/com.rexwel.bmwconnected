@@ -1,29 +1,62 @@
 /**
  * Comprehensive tests for ConnectedDriver
  *
- * Tests the driver's pairing/authentication flows, container management,
- * and device management capabilities using inheritance-based dependency injection.
+ * Validates pairing/repair flows, container management, and device store updates
+ * using a subclass that exposes protected members for assertions and uses
+ * the same StoreKey constants as production code.
  */
 
 import { ConnectedDriver } from '../../drivers/ConnectedDriver';
-import { DeviceCodeAuthProvider } from '../../lib/auth/DeviceCodeAuthProvider';
+import type { Vehicle } from '../../drivers/Vehicle';
+import type { CarDataClient } from '../../lib/api/CarDataClient';
+import type { ContainerManager } from '../../lib/api/ContainerManager';
+import type { DeviceCodeAuthProvider } from '../../lib/auth/DeviceCodeAuthProvider';
+import { DriveTrainType } from '../../lib/types/DriveTrainType';
+import {
+  STORE_KEY_CLIENT_ID,
+  STORE_KEY_CONTAINER_ID,
+  STORE_KEY_DEVICE_STATE,
+} from '../../utils/StoreKeys';
+import type { DeviceStoreData } from '../../utils/DeviceStateManager';
 
-// Mock Homey SDK
 jest.mock('homey');
 
-// TestableConnectedDriver that overrides factory methods for testing
+type MockAuthProvider = {
+  getValidAccessToken: jest.Mock<Promise<string | undefined>, []>;
+  requestDeviceCode: jest.Mock<Promise<unknown>, []>;
+  pollForTokens: jest.Mock<Promise<void>, [string]>;
+};
+
+type MockCarDataClient = {
+  getVehicles: jest.Mock<
+    Promise<Array<{ vin: string; model?: string; brand?: string; driveTrain: DriveTrainType }>>,
+    []
+  >;
+};
+
+type MockContainerManager = {
+  getOrCreateContainer: jest.Mock<Promise<string>, [string]>;
+  validateContainer: jest.Mock<Promise<{ isValid: boolean; missingKeys?: string[] }>, [string]>;
+};
+
+type MockSession = {
+  setHandler: jest.Mock<void, [string, (...args: unknown[]) => unknown]>;
+  emit: jest.Mock<Promise<void>, [string, unknown]>;
+  done: jest.Mock<Promise<void>, []>;
+  nextView: jest.Mock<Promise<void>, []>;
+};
+
 class TestableConnectedDriver extends ConnectedDriver {
-  // Test doubles for dependencies
-  private mockHttpClient: any;
-  private mockCarDataClient: any;
-  private mockContainerManager: any;
+  public readonly mockAuthProvider: MockAuthProvider;
+  public readonly mockCarDataClient: MockCarDataClient;
+  public readonly mockContainerManager: MockContainerManager;
 
   constructor() {
     super();
-
-    // Initialize test doubles
-    this.mockHttpClient = {
-      request: jest.fn(),
+    this.mockAuthProvider = {
+      getValidAccessToken: jest.fn().mockResolvedValue(undefined),
+      requestDeviceCode: jest.fn(),
+      pollForTokens: jest.fn(),
     };
 
     this.mockCarDataClient = {
@@ -36,28 +69,47 @@ class TestableConnectedDriver extends ConnectedDriver {
     };
   }
 
-  // Override factory methods to return test doubles
-  protected async createHttpClient(): Promise<any> {
-    return this.mockHttpClient;
+  public setCurrentClientIdForTest(clientId?: string): void {
+    this.currentClientId = clientId;
   }
 
-  protected async createCarDataClient(): Promise<any> {
-    // Keep original validation logic
-    if (!this.authProvider) {
-      throw new Error('Auth provider not initialized');
+  public setCurrentContainerIdForTest(containerId?: string): void {
+    this.currentContainerId = containerId;
+  }
+
+  public getCurrentClientIdForTest(): string | undefined {
+    return this.currentClientId;
+  }
+
+  public getCurrentContainerIdForTest(): string | undefined {
+    return this.currentContainerId;
+  }
+
+  public setPollingCancelledForTest(cancelled: boolean): void {
+    this.pollingCancelled = cancelled;
+  }
+
+  protected getAuthProvider(): DeviceCodeAuthProvider {
+    if (!this.currentClientId) {
+      throw new Error('Client ID not initialized');
     }
-    return this.mockCarDataClient;
+    return this.mockAuthProvider as unknown as DeviceCodeAuthProvider;
   }
 
-  protected async createContainerManager(): Promise<any> {
-    // Keep original validation logic
-    if (!this.authProvider) {
-      throw new Error('Auth provider not initialized');
+  protected getCarDataClient(): CarDataClient {
+    if (!this.currentClientId) {
+      throw new Error('Client ID not initialized');
     }
-    return this.mockContainerManager;
+    return this.mockCarDataClient as unknown as CarDataClient;
   }
 
-  // Expose protected methods for testing
+  protected async createContainerManager(): Promise<ContainerManager> {
+    if (!this.currentClientId) {
+      throw new Error('Client ID not initialized');
+    }
+    return this.mockContainerManager as unknown as ContainerManager;
+  }
+
   public async testValidateOrCreateContainer(): Promise<void> {
     return this.validateOrCreateContainer();
   }
@@ -70,93 +122,42 @@ class TestableConnectedDriver extends ConnectedDriver {
     return this.validateExistingContainer();
   }
 
-  public async testUpdateDeviceStore(device: any): Promise<void> {
+  public async testUpdateDeviceStore(device: Vehicle): Promise<void> {
     return this.updateDeviceStore(device);
-  }
-
-  // Getters for test doubles
-  public get testHttpClient() {
-    return this.mockHttpClient;
-  }
-  public get testCarDataClient() {
-    return this.mockCarDataClient;
-  }
-  public get testContainerManager() {
-    return this.mockContainerManager;
-  }
-
-  // Expose protected properties for testing
-  public setCurrentClientId(clientId: string) {
-    this.currentClientId = clientId;
-  }
-  public setCurrentContainerId(containerId: string) {
-    this.currentContainerId = containerId;
-  }
-  public setAuthProvider(authProvider: DeviceCodeAuthProvider) {
-    this.authProvider = authProvider;
-  }
-  public setPollingCancelled(cancelled: boolean) {
-    this.pollingCancelled = cancelled;
-  }
-  public getCurrentClientId() {
-    return this.currentClientId;
-  }
-  public getCurrentContainerId() {
-    return this.currentContainerId;
-  }
-  public getAuthProvider() {
-    return this.authProvider;
-  }
-  public getPollingCancelled() {
-    return this.pollingCancelled;
-  }
-
-  // Expose protected factory methods for testing
-  public async testCreateHttpClient(): Promise<any> {
-    return this.createHttpClient();
-  }
-
-  public async testCreateCarDataClient(): Promise<any> {
-    return this.createCarDataClient();
-  }
-
-  public async testCreateContainerManager(): Promise<any> {
-    return this.createContainerManager();
-  }
-
-  public testGetHttpClientConfig() {
-    return this.getHttpClientConfig();
   }
 }
 
-describe('ConnectedDriver - Comprehensive Tests', () => {
+describe('ConnectedDriver - Comprehensive', () => {
   let driver: TestableConnectedDriver;
   let mockHomey: any;
   let mockApp: any;
   let mockLogger: any;
-  let mockSession: any;
-  let mockDevice: any;
-  let mockAuthProvider: jest.Mocked<DeviceCodeAuthProvider>;
+  let mockSession: MockSession;
 
   beforeEach(() => {
-    // Reset all mocks
     jest.clearAllMocks();
 
-    // Create mock logger
     mockLogger = {
       info: jest.fn(),
-      error: jest.fn(),
       warn: jest.fn(),
+      error: jest.fn(),
       debug: jest.fn(),
     };
 
-    // Create mock app
     mockApp = {
       logger: mockLogger,
       getAuthProvider: jest.fn(),
+      getApiClient: jest.fn(),
+      createHttpClient: jest.fn(),
     };
 
-    // Create mock Homey instance
+    mockSession = {
+      setHandler: jest.fn(),
+      emit: jest.fn().mockResolvedValue(undefined),
+      done: jest.fn().mockResolvedValue(undefined),
+      nextView: jest.fn().mockResolvedValue(undefined),
+    };
+
     mockHomey = {
       app: mockApp,
       log: jest.fn(),
@@ -166,483 +167,257 @@ describe('ConnectedDriver - Comprehensive Tests', () => {
       },
     };
 
-    // Create mock session
-    mockSession = {
-      setHandler: jest.fn(),
-      emit: jest.fn().mockResolvedValue(undefined),
-      done: jest.fn().mockResolvedValue(undefined),
-      nextView: jest.fn().mockResolvedValue(undefined),
-    };
-
-    // Create mock device
-    mockDevice = {
-      getStoreValue: jest.fn(),
-      setStoreValue: jest.fn().mockResolvedValue(undefined),
-      setAvailable: jest.fn().mockResolvedValue(undefined),
-      reinitializeAfterAuth: jest.fn().mockResolvedValue(undefined),
-    };
-
-    // Create mock auth provider
-    mockAuthProvider = {
-      requestDeviceCode: jest.fn(),
-      pollForTokens: jest.fn(),
-      getValidAccessToken: jest.fn(),
-      storeTokens: jest.fn(),
-      clearTokens: jest.fn(),
-      refreshTokens: jest.fn(),
-    } as any;
-
-    // Create driver instance
     driver = new TestableConnectedDriver();
-    driver.homey = mockHomey;
+    (driver as unknown as { homey: typeof mockHomey }).homey = mockHomey;
   });
 
   describe('Initialization', () => {
-    it('should_initializeLogger_when_onInitCalled', async () => {
-      // Arrange - Act
+    it('should initialize logger during onInit', async () => {
       await driver.onInit();
 
-      // Assert
       expect(driver.logger).toBe(mockLogger);
     });
+  });
 
-    it('should_provideHttpClientConfig_when_getHttpClientConfigCalled', () => {
-      // Arrange - Act
-      const config = driver.testGetHttpClientConfig();
+  describe('Pairing credential reuse', () => {
+    it('should reuse credentials from existing devices', async () => {
+      const mockStateManager = {
+        getClientId: jest.fn().mockReturnValue('existing-client-id'),
+        getContainerId: jest.fn().mockReturnValue('existing-container-id'),
+      };
+      const mockDevice = { stateManager: mockStateManager };
+      const mockDriver = { getDevices: jest.fn().mockReturnValue([mockDevice]) };
+      mockHomey.drivers.getDrivers.mockReturnValue({ other: mockDriver });
 
-      // Assert
-      expect(config).toEqual({
-        timeout: 30000,
-        maxRetries: 3,
-        rateLimit: {
-          maxRequests: 50,
-          windowMs: 24 * 60 * 60 * 1000,
-        },
-      });
+      await driver.onPair(mockSession as unknown as any);
+
+      expect(driver.getCurrentClientIdForTest()).toBe('existing-client-id');
+      expect(driver.getCurrentContainerIdForTest()).toBe('existing-container-id');
     });
   });
 
-  describe('Factory Methods', () => {
+  describe('Container management', () => {
     beforeEach(async () => {
       await driver.onInit();
-      driver.setAuthProvider(mockAuthProvider);
+      driver.setCurrentClientIdForTest('test-client-id');
     });
 
-    it('should_createHttpClient_when_factoryMethodCalled', async () => {
-      // Arrange - Act
-      const httpClient = await driver.testCreateHttpClient();
+    it('should create container when none provided', async () => {
+      driver.setCurrentContainerIdForTest(undefined);
+      driver.mockContainerManager.getOrCreateContainer.mockResolvedValue('new-container-id');
 
-      // Assert
-      expect(httpClient).toBe(driver.testHttpClient);
+      await driver.testValidateOrCreateContainer();
+
+      expect(driver.mockContainerManager.getOrCreateContainer).toHaveBeenCalledWith(
+        'HOMEY-test-cli'
+      );
+      expect(driver.getCurrentContainerIdForTest()).toBe('new-container-id');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'No container ID - creating new container after authentication'
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith('Container created: new-container-id');
     });
 
-    it('should_createCarDataClient_when_authProviderInitialized', async () => {
-      // Arrange - Act
-      const carDataClient = await driver.testCreateCarDataClient();
+    it('should propagate container creation error', async () => {
+      driver.setCurrentContainerIdForTest(undefined);
+      const failure = new Error('Container creation failed');
+      driver.mockContainerManager.getOrCreateContainer.mockRejectedValue(failure);
 
-      // Assert
-      expect(carDataClient).toBe(driver.testCarDataClient);
-    });
-
-    it('should_throwError_when_createCarDataClientWithoutAuthProvider', async () => {
-      // Arrange
-      driver.setAuthProvider(undefined as any);
-
-      // Act & Assert
-      await expect(driver.testCreateCarDataClient()).rejects.toThrow(
-        'Auth provider not initialized'
+      await expect(driver.testCreateNewContainer()).rejects.toThrow(
+        'Failed to create container: Container creation failed'
+      );
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Failed to create container: Container creation failed'
       );
     });
 
-    it('should_createContainerManager_when_authProviderInitialized', async () => {
-      // Arrange - Act
-      const containerManager = await driver.testCreateContainerManager();
+    it('should validate existing container', async () => {
+      driver.setCurrentContainerIdForTest('existing-container-id');
+      driver.mockContainerManager.validateContainer.mockResolvedValue({
+        isValid: true,
+        missingKeys: [],
+      });
 
-      // Assert
-      expect(containerManager).toBe(driver.testContainerManager);
+      await driver.testValidateExistingContainer();
+
+      expect(driver.mockContainerManager.validateContainer).toHaveBeenCalledWith(
+        'existing-container-id'
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Validating user-provided container ID: existing-container-id'
+      );
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Container existing-container-id validated successfully'
+      );
     });
 
-    it('should_throwError_when_createContainerManagerWithoutAuthProvider', async () => {
-      // Arrange
-      driver.setAuthProvider(undefined as any);
+    it('should throw when validation reports missing keys', async () => {
+      driver.setCurrentContainerIdForTest('invalid-container');
+      driver.mockContainerManager.validateContainer.mockResolvedValue({
+        isValid: false,
+        missingKeys: ['key1'],
+      });
 
-      // Act & Assert
-      await expect(driver.testCreateContainerManager()).rejects.toThrow(
-        'Auth provider not initialized'
+      await expect(driver.testValidateExistingContainer()).rejects.toThrow(
+        'Container is missing 1 required keys. Please use a different container or leave empty to create a new one.'
+      );
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Container invalid-container is missing 1 required keys'
+      );
+    });
+
+    it('should throw friendly error when container not found', async () => {
+      const { ApiError } = await import('../../lib/types/errors');
+      driver.setCurrentContainerIdForTest('missing-container');
+      driver.mockContainerManager.validateContainer.mockRejectedValue(
+        new ApiError('Not found', 404)
+      );
+
+      await expect(driver.testValidateExistingContainer()).rejects.toThrow(
+        'Container ID not found. Please check the ID or leave empty to create a new one.'
       );
     });
   });
 
-  describe('Container Management', () => {
-    beforeEach(async () => {
-      await driver.onInit();
-      driver.setAuthProvider(mockAuthProvider);
-    });
-
-    describe('Create New Container', () => {
-      it('should_createNewContainer_when_noContainerIdProvided', async () => {
-        // Arrange
-        driver.setCurrentClientId('test-client-id');
-        driver.setCurrentContainerId(undefined as any);
-        driver.testContainerManager.getOrCreateContainer.mockResolvedValue('new-container-id');
-
-        // Act
-        await driver.testCreateNewContainer();
-
-        // Assert
-        expect(driver.testContainerManager.getOrCreateContainer).toHaveBeenCalledWith(
-          'HOMEY-test-cli'
-        );
-        expect(driver.getCurrentContainerId()).toBe('new-container-id');
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          'No container ID - creating new container after authentication'
-        );
-        expect(mockLogger.info).toHaveBeenCalledWith('Container created: new-container-id');
-      });
-
-      it('should_throwError_when_containerCreationFails', async () => {
-        // Arrange
-        driver.setCurrentClientId('test-client-id');
-        const creationError = new Error('Container creation failed');
-        driver.testContainerManager.getOrCreateContainer.mockRejectedValue(creationError);
-
-        // Act & Assert
-        await expect(driver.testCreateNewContainer()).rejects.toThrow(
-          'Failed to create container: Container creation failed'
-        );
-        expect(mockLogger.error).toHaveBeenCalledWith(
-          'Failed to create container: Container creation failed'
-        );
-      });
-    });
-
-    describe('Validate Existing Container', () => {
-      it('should_validateContainer_when_containerIdProvided', async () => {
-        // Arrange
-        driver.setCurrentContainerId('existing-container-id');
-        driver.testContainerManager.validateContainer.mockResolvedValue({
-          isValid: true,
-          missingKeys: [],
-        });
-
-        // Act
-        await driver.testValidateExistingContainer();
-
-        // Assert
-        expect(driver.testContainerManager.validateContainer).toHaveBeenCalledWith(
-          'existing-container-id'
-        );
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          'Validating user-provided container ID: existing-container-id'
-        );
-        expect(mockLogger.info).toHaveBeenCalledWith(
-          'Container existing-container-id validated successfully'
-        );
-      });
-
-      it('should_throwError_when_containerValidationReturnsInvalid', async () => {
-        // Arrange
-        driver.setCurrentContainerId('invalid-container-id');
-        driver.testContainerManager.validateContainer.mockResolvedValue({
-          isValid: false,
-          missingKeys: ['key1', 'key2'],
-        });
-
-        // Act & Assert
-        await expect(driver.testValidateExistingContainer()).rejects.toThrow(
-          'Container is missing 2 required keys. Please use a different container or leave empty to create a new one.'
-        );
-        expect(mockLogger.warn).toHaveBeenCalledWith(
-          'Container invalid-container-id is missing 2 required keys'
-        );
-      });
-
-      it('should_throwError_when_containerNotFound', async () => {
-        // Arrange
-        driver.setCurrentContainerId('missing-container-id');
-        const { ApiError } = require('../../lib/types/errors');
-        const notFoundError = new ApiError('Not found', 404);
-        driver.testContainerManager.validateContainer.mockRejectedValue(notFoundError);
-
-        // Act & Assert
-        await expect(driver.testValidateExistingContainer()).rejects.toThrow(
-          'Container ID not found. Please check the ID or leave empty to create a new one.'
-        );
-      });
-
-      it('should_throwError_when_noContainerIdForValidation', async () => {
-        // Arrange
-        driver.setCurrentContainerId(undefined as any);
-
-        // Act & Assert
-        await expect(driver.testValidateExistingContainer()).rejects.toThrow(
-          'Container ID is required for validation'
-        );
-      });
-    });
-
-    describe('Validate or Create Container', () => {
-      it('should_createContainer_when_noContainerIdProvided', async () => {
-        // Arrange
-        driver.setCurrentClientId('test-client-id');
-        driver.setCurrentContainerId(undefined as any);
-        driver.testContainerManager.getOrCreateContainer.mockResolvedValue('new-container-id');
-
-        // Act
-        await driver.testValidateOrCreateContainer();
-
-        // Assert
-        expect(driver.testContainerManager.getOrCreateContainer).toHaveBeenCalledWith(
-          'HOMEY-test-cli'
-        );
-        expect(driver.getCurrentContainerId()).toBe('new-container-id');
-      });
-
-      it('should_validateContainer_when_containerIdProvided', async () => {
-        // Arrange
-        driver.setCurrentContainerId('existing-container-id');
-        driver.testContainerManager.validateContainer.mockResolvedValue({
-          isValid: true,
-          missingKeys: [],
-        });
-
-        // Act
-        await driver.testValidateOrCreateContainer();
-
-        // Assert
-        expect(driver.testContainerManager.validateContainer).toHaveBeenCalledWith(
-          'existing-container-id'
-        );
-        expect(driver.testContainerManager.getOrCreateContainer).not.toHaveBeenCalled();
-      });
-    });
-  });
-
-  describe('Device Store Management', () => {
+  describe('Device store updates', () => {
     beforeEach(async () => {
       await driver.onInit();
     });
 
-    it('should_updateDeviceStore_when_credentialsChanged', async () => {
-      // Arrange
-      driver.setCurrentClientId('new-client-id');
-      driver.setCurrentContainerId('new-container-id');
-      mockDevice.getStoreValue
-        .mockReturnValueOnce('old-client-id') // Current clientId
-        .mockReturnValueOnce('old-container-id'); // Current containerId
+    it('should update device store when credentials change', async () => {
+      driver.setCurrentClientIdForTest('new-client-id');
+      driver.setCurrentContainerIdForTest('new-container-id');
 
-      // Act
-      await driver.testUpdateDeviceStore(mockDevice);
+      const mockStateManager = {
+        getClientId: jest.fn().mockReturnValue('old-client-id'),
+        getContainerId: jest.fn().mockReturnValue('old-container-id'),
+        setClientId: jest.fn().mockResolvedValue(undefined),
+        setContainerId: jest.fn().mockResolvedValue(undefined),
+      };
+      const mockVehicle = {
+        stateManager: mockStateManager,
+        initializeVehicleDataAndServices: jest.fn().mockResolvedValue(undefined),
+        setAvailable: jest.fn().mockResolvedValue(undefined),
+      } as unknown as Vehicle;
 
-      // Assert
-      expect(mockDevice.setStoreValue).toHaveBeenCalledWith('clientId', 'new-client-id');
-      expect(mockDevice.setStoreValue).toHaveBeenCalledWith('containerId', 'new-container-id');
-      expect(mockDevice.setAvailable).toHaveBeenCalled();
-      expect(mockDevice.reinitializeAfterAuth).toHaveBeenCalled();
+      await driver.testUpdateDeviceStore(mockVehicle);
+
+      expect(mockStateManager.setClientId).toHaveBeenCalledWith('new-client-id');
+      expect(mockStateManager.setContainerId).toHaveBeenCalledWith('new-container-id');
+      expect(mockVehicle.initializeVehicleDataAndServices).toHaveBeenCalled();
+      expect(mockVehicle.setAvailable).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith('Device store changed - updating...');
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'Triggering device reinitialization after authentication change'
+        'Reinitializing device after authentication change'
       );
     });
 
-    it('should_skipUpdate_when_credentialsUnchanged', async () => {
-      // Arrange
-      driver.setCurrentClientId('same-client-id');
-      driver.setCurrentContainerId('same-container-id');
-      mockDevice.getStoreValue
-        .mockReturnValueOnce('same-client-id') // Current clientId
-        .mockReturnValueOnce('same-container-id'); // Current containerId
+    it('should skip update when credentials unchanged', async () => {
+      driver.setCurrentClientIdForTest('same-client-id');
+      driver.setCurrentContainerIdForTest('same-container');
 
-      // Act
-      await driver.testUpdateDeviceStore(mockDevice);
+      const mockStateManager = {
+        getClientId: jest.fn().mockReturnValue('same-client-id'),
+        getContainerId: jest.fn().mockReturnValue('same-container'),
+        setClientId: jest.fn(),
+        setContainerId: jest.fn(),
+      };
+      const mockVehicle = {
+        stateManager: mockStateManager,
+        initializeVehicleDataAndServices: jest.fn().mockResolvedValue(undefined),
+        setAvailable: jest.fn().mockResolvedValue(undefined),
+      } as unknown as Vehicle;
 
-      // Assert
-      expect(mockDevice.setStoreValue).not.toHaveBeenCalled();
-      expect(mockDevice.setAvailable).toHaveBeenCalled();
-      expect(mockDevice.reinitializeAfterAuth).toHaveBeenCalled();
+      await driver.testUpdateDeviceStore(mockVehicle);
+
+      expect(mockStateManager.setClientId).not.toHaveBeenCalled();
+      expect(mockStateManager.setContainerId).not.toHaveBeenCalled();
+      expect(mockVehicle.initializeVehicleDataAndServices).toHaveBeenCalled();
       expect(mockLogger.info).toHaveBeenCalledWith(
         'Device store already up to date - no changes needed'
       );
     });
 
-    it('should_warnAndReturn_when_noClientIdToUpdate', async () => {
-      // Arrange
-      driver.setCurrentClientId(undefined as any);
+    it('should warn when client id missing', async () => {
+      driver.setCurrentClientIdForTest(undefined);
 
-      // Act
-      await driver.testUpdateDeviceStore(mockDevice);
+      const mockVehicle = {
+        stateManager: {
+          getClientId: jest.fn(),
+          getContainerId: jest.fn(),
+          setClientId: jest.fn(),
+          setContainerId: jest.fn(),
+        },
+        initializeVehicleDataAndServices: jest.fn(),
+        setAvailable: jest.fn(),
+      } as unknown as Vehicle;
 
-      // Assert
-      expect(mockDevice.setStoreValue).not.toHaveBeenCalled();
-      expect(mockDevice.setAvailable).not.toHaveBeenCalled();
+      await driver.testUpdateDeviceStore(mockVehicle);
+
       expect(mockLogger.warn).toHaveBeenCalledWith('No client ID to update in device store');
+      expect(mockVehicle.initializeVehicleDataAndServices).not.toHaveBeenCalled();
     });
   });
 
-  describe('Pairing Flow', () => {
+  describe('Pairing list handler', () => {
     beforeEach(async () => {
       await driver.onInit();
-      mockApp.getAuthProvider.mockReturnValue(mockAuthProvider);
-    });
-
-    it('should_setupSessionHandlers_when_onPairCalled', async () => {
-      // Arrange
+      driver.setCurrentClientIdForTest('pair-client-id');
+      driver.setCurrentContainerIdForTest('pair-container-id');
+      driver.mockCarDataClient.getVehicles.mockResolvedValue([
+        {
+          vin: 'VIN123',
+          model: 'BMW X5',
+          brand: 'BMW',
+          driveTrain: DriveTrainType.COMBUSTION,
+        },
+      ]);
       mockHomey.drivers.getDrivers.mockReturnValue({});
+    });
 
-      // Act
-      await driver.onPair(mockSession);
+    it('should list vehicles with initialized store structure', async () => {
+      await driver.onPair(mockSession as unknown as any);
 
-      // Assert
-      expect(mockSession.setHandler).toHaveBeenCalledWith('list_devices', expect.any(Function));
-      expect(mockSession.setHandler).toHaveBeenCalledWith(
-        'client_id_entered',
-        expect.any(Function)
+      const listHandlerCall = mockSession.setHandler.mock.calls.find(
+        (call) => call[0] === 'list_devices'
       );
-      expect(mockSession.setHandler).toHaveBeenCalledWith(
-        'request_device_code',
-        expect.any(Function)
+      expect(listHandlerCall).toBeDefined();
+      const listHandler = listHandlerCall?.[1];
+      expect(typeof listHandler).toBe('function');
+      const devices = await (
+        listHandler as () => Promise<
+          Array<{ store: Record<string, unknown>; data: { id: string }; name: string }>
+        >
+      )();
+
+      expect(devices).toHaveLength(1);
+      expect(devices[0].name).toBe('BMW X5 (VIN123)');
+      expect(devices[0].data.id).toBe('VIN123');
+
+      const store = devices[0].store as Record<string, unknown>;
+      expect(store[STORE_KEY_CLIENT_ID]).toBe('pair-client-id');
+      expect(store[STORE_KEY_CONTAINER_ID]).toBe('pair-container-id');
+
+      const deviceState = store[STORE_KEY_DEVICE_STATE] as DeviceStoreData;
+      expect(deviceState.vin).toBe('VIN123');
+      expect(deviceState.driveTrain).toBe(DriveTrainType.COMBUSTION);
+      expect(deviceState.telematicCache).toEqual({});
+
+      expect(mockLogger.info).toHaveBeenCalledWith('Vehicle found: BMW: VIN123, BMW X5');
+    });
+
+    it('should error when authentication not completed', async () => {
+      driver.setCurrentClientIdForTest(undefined);
+      await driver.onPair(mockSession as unknown as any);
+      const listHandlerCall = mockSession.setHandler.mock.calls.find(
+        (call) => call[0] === 'list_devices'
       );
-      expect(mockSession.setHandler).toHaveBeenCalledWith('cancel_pairing', expect.any(Function));
-      expect(mockSession.setHandler).toHaveBeenCalledWith('showView', expect.any(Function));
-      expect(mockLogger.info).toHaveBeenCalledWith('Pairing started');
-    });
+      expect(listHandlerCall).toBeDefined();
+      const listHandler = listHandlerCall?.[1];
 
-    it('should_retrieveExistingCredentials_when_devicesExist', async () => {
-      // Arrange
-      const existingDevice = {
-        getStoreValue: jest
-          .fn()
-          .mockReturnValueOnce('existing-client-id')
-          .mockReturnValueOnce('existing-container-id'),
-      };
-      const mockDriver = {
-        getDevices: jest.fn().mockReturnValue([existingDevice]),
-      };
-      mockHomey.drivers.getDrivers.mockReturnValue({ 'test-driver': mockDriver });
-
-      // Act
-      await driver.onPair(mockSession);
-
-      // Assert
-      expect(driver.getCurrentClientId()).toBe('existing-client-id');
-      expect(driver.getCurrentContainerId()).toBe('existing-container-id');
-    });
-
-    describe('List Devices Handler', () => {
-      let listDevicesHandler: Function;
-
-      beforeEach(async () => {
-        mockHomey.drivers.getDrivers.mockReturnValue({});
-        await driver.onPair(mockSession);
-
-        // Extract the list_devices handler
-        const setHandlerCalls = mockSession.setHandler.mock.calls;
-        const listDevicesCall = setHandlerCalls.find((call: any) => call[0] === 'list_devices');
-        listDevicesHandler = listDevicesCall[1];
-      });
-
-      it('should_returnVehicleList_when_authenticationCompleted', async () => {
-        // Arrange
-        driver.setAuthProvider(mockAuthProvider);
-        const mockVehicles = [
-          { vin: 'TEST123', model: 'BMW X5', brand: 'BMW' },
-          { vin: 'TEST456', model: 'Mini Cooper', brand: 'MINI' },
-        ];
-        driver.testCarDataClient.getVehicles.mockResolvedValue(mockVehicles);
-        driver.setCurrentClientId('test-client-id');
-        driver.setCurrentContainerId('test-container-id');
-
-        // Act
-        const result = await listDevicesHandler();
-
-        // Assert
-        expect(result).toHaveLength(2);
-        expect(result[0].name).toBe('BMW X5 (TEST123)');
-        expect(result[0].data.id).toBe('TEST123');
-        expect(result[0].store).toEqual({
-          clientId: 'test-client-id',
-          containerId: 'test-container-id',
-        });
-        expect(result[0].icon).toBe('icon.svg');
-        expect(result[0].settings).toBeDefined();
-        expect(mockLogger.info).toHaveBeenCalledWith('Vehicle found: BMW: TEST123, BMW X5');
-      });
-
-      it('should_throwError_when_authenticationNotCompleted', async () => {
-        // Arrange
-        driver.setAuthProvider(undefined as any);
-
-        // Act & Assert
-        await expect(listDevicesHandler()).rejects.toThrow(
-          'Authentication not completed - please authenticate first'
-        );
-      });
-
-      it('should_throwError_when_vehicleHasNoVin', async () => {
-        // Arrange
-        driver.setAuthProvider(mockAuthProvider);
-        const mockVehicles = [{ vin: null, model: 'BMW X5', brand: 'BMW' }];
-        driver.testCarDataClient.getVehicles.mockResolvedValue(mockVehicles);
-
-        // Act & Assert
-        await expect(listDevicesHandler()).rejects.toThrow('Cannot list vehicle as VIN is empty.');
-      });
-    });
-  });
-
-  describe('Repair Flow', () => {
-    beforeEach(async () => {
-      await driver.onInit();
-    });
-
-    it('should_prepopulateCredentials_when_onRepairCalled', async () => {
-      // Arrange
-      mockDevice.getStoreValue
-        .mockReturnValueOnce('existing-client-id')
-        .mockReturnValueOnce('existing-container-id');
-
-      // Act
-      await driver.onRepair(mockSession, mockDevice);
-
-      // Assert
-      expect(driver.getCurrentClientId()).toBe('existing-client-id');
-      expect(driver.getCurrentContainerId()).toBe('existing-container-id');
-      expect(mockSession.setHandler).toHaveBeenCalledWith(
-        'client_id_entered',
-        expect.any(Function)
+      await expect((listHandler as () => Promise<unknown>)()).rejects.toThrow(
+        'Authentication not completed - please authenticate first'
       );
-    });
-
-    it('should_handleMissingCredentials_when_deviceStoreEmpty', async () => {
-      // Arrange
-      mockDevice.getStoreValue.mockReturnValue(undefined);
-
-      // Act
-      await driver.onRepair(mockSession, mockDevice);
-
-      // Assert
-      expect(driver.getCurrentClientId()).toBeUndefined();
-      expect(driver.getCurrentContainerId()).toBeUndefined();
-    });
-  });
-
-  describe('Error Handling', () => {
-    beforeEach(async () => {
-      await driver.onInit();
-    });
-
-    it('should_handleContainerManagerErrors_gracefully', async () => {
-      // Arrange
-      driver.setAuthProvider(mockAuthProvider);
-      driver.setCurrentClientId('test-client-id');
-      const networkError = new Error('Network timeout');
-      driver.testContainerManager.getOrCreateContainer.mockRejectedValue(networkError);
-
-      // Act & Assert
-      await expect(driver.testCreateNewContainer()).rejects.toThrow(
-        'Failed to create container: Network timeout'
-      );
-      expect(mockLogger.error).toHaveBeenCalledWith('Failed to create container: Network timeout');
     });
   });
 });

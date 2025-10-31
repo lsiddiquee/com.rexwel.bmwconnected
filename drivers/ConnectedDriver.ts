@@ -1,21 +1,27 @@
 import { Device, Driver } from 'homey';
 import { DeviceData } from '../utils/DeviceData';
 import { DeviceSettings } from '../utils/DeviceSettings';
-import { DeviceCodeAuthProvider } from '../lib/auth/DeviceCodeAuthProvider';
 import { DeviceCodeResponse } from '../lib/models';
 import { PairSession } from 'homey/lib/Driver';
 import { BMWConnectedDrive } from '../app';
 import { ILogger } from '../lib';
+import {
+  STORE_KEY_CLIENT_ID,
+  STORE_KEY_CONTAINER_ID,
+  STORE_KEY_DEVICE_STATE,
+} from '../utils/StoreKeys';
+import { DeviceStoreData } from '../utils/DeviceStateManager';
 
-// Import types for factory methods
-type HttpClient = import('../lib/http/HttpClient').HttpClient;
+// Import types for factory methods and casting
+type DeviceCodeAuthProvider = import('../lib/auth/DeviceCodeAuthProvider').DeviceCodeAuthProvider;
 type CarDataClient = import('../lib/api/CarDataClient').CarDataClient;
 type ContainerManager = import('../lib/api/ContainerManager').ContainerManager;
+type Vehicle = import('./Vehicle').Vehicle;
 
 export class ConnectedDriver extends Driver {
+  private app!: BMWConnectedDrive;
   logger?: ILogger;
   protected currentDeviceCodeResponse?: DeviceCodeResponse;
-  protected authProvider?: DeviceCodeAuthProvider;
   protected currentClientId?: string;
   protected currentContainerId?: string;
   protected pollingCancelled: boolean = false;
@@ -23,33 +29,32 @@ export class ConnectedDriver extends Driver {
   async onInit() {
     await Promise.resolve();
 
-    const app = this.homey.app as BMWConnectedDrive;
-    this.logger = app.logger;
+    this.app = this.homey.app as BMWConnectedDrive;
+    this.logger = this.app.logger;
   }
 
   /**
-   * Factory method for creating HttpClient with consistent configuration
+   * Get shared auth provider from app
    * Protected to allow test overrides
    */
-  protected async createHttpClient(): Promise<HttpClient> {
-    const { HttpClient } = await import('../lib/http/HttpClient');
-    return new HttpClient(this.getHttpClientConfig());
-  }
-
-  /**
-   * Factory method for creating CarDataClient
-   * Protected to allow test overrides
-   */
-  protected async createCarDataClient(): Promise<CarDataClient> {
-    if (!this.authProvider) {
-      throw new Error('Auth provider not initialized');
+  protected getAuthProvider(): DeviceCodeAuthProvider {
+    if (!this.currentClientId) {
+      throw new Error('Client ID not initialized');
     }
 
-    const { CarDataClient } = await import('../lib/api/CarDataClient');
-    return new CarDataClient({
-      authProvider: this.authProvider,
-      httpClient: await this.createHttpClient(),
-    });
+    return this.app.getAuthProvider(this.currentClientId);
+  }
+
+  /**
+   * Get shared CarDataClient from app
+   * Protected to allow test overrides
+   */
+  protected getCarDataClient(): CarDataClient {
+    if (!this.currentClientId) {
+      throw new Error('Client ID not initialized');
+    }
+
+    return this.app.getApiClient(this.currentClientId);
   }
 
   /**
@@ -57,36 +62,24 @@ export class ConnectedDriver extends Driver {
    * Protected to allow test overrides
    */
   protected async createContainerManager(): Promise<ContainerManager> {
-    if (!this.authProvider) {
-      throw new Error('Auth provider not initialized');
+    if (!this.currentClientId) {
+      throw new Error('Client ID not initialized');
     }
+
+    // Use app's factory method to create HttpClient with consistent configuration
+    const httpClient = this.app.createHttpClient();
+
+    // Get shared auth provider from app
+    const authProvider = this.getAuthProvider();
 
     const { ContainerManager } = await import('../lib/api/ContainerManager');
     return new ContainerManager({
-      httpClient: await this.createHttpClient(),
+      httpClient,
       getAccessToken: async () => {
-        if (!this.authProvider) {
-          throw new Error('Auth provider not initialized');
-        }
-        return await this.authProvider.getValidAccessToken();
+        return await authProvider.getValidAccessToken();
       },
       logger: this.logger,
     });
-  }
-
-  /**
-   * Get HTTP client configuration
-   * Protected to allow test overrides
-   */
-  protected getHttpClientConfig() {
-    return {
-      timeout: 30000,
-      maxRetries: 3,
-      rateLimit: {
-        maxRequests: 50,
-        windowMs: 24 * 60 * 60 * 1000, // 24 hours
-      },
-    };
   }
 
   async onPair(session: PairSession) {
@@ -94,12 +87,14 @@ export class ConnectedDriver extends Driver {
 
     this.logger?.info('Pairing started');
 
-    // Attempt to retrieve the client id and container id from the devices.
+    // Attempt to retrieve the client id and container id from existing devices.
     const drivers = this.homey.drivers.getDrivers() as { [key: string]: Driver };
     for (const driver of Object.values(drivers)) {
       for (const device of driver.getDevices()) {
-        const clientId = device.getStoreValue('clientId') as string | undefined;
-        const containerId = device.getStoreValue('containerId') as string | undefined;
+        // Cast to Vehicle to access state manager
+        const vehicleDevice = device as Vehicle;
+        const clientId = vehicleDevice.stateManager.getClientId();
+        const containerId = vehicleDevice.stateManager.getContainerId();
         if (!this.currentClientId && clientId) {
           this.currentClientId = clientId;
         }
@@ -112,13 +107,13 @@ export class ConnectedDriver extends Driver {
     this.setSessionPairRepairHandlers(session);
 
     session.setHandler('list_devices', async () => {
-      // Create a temporary CarDataClient to list vehicles during pairing
+      // Get shared CarDataClient from app to list vehicles during pairing
       // This client uses the freshly authenticated tokens from the pairing flow
-      if (!this.authProvider) {
+      if (!this.currentClientId) {
         throw new Error('Authentication not completed - please authenticate first');
       }
 
-      const api = await this.createCarDataClient();
+      const api = this.getCarDataClient();
 
       // Note: Container management now happens in pollForAuthorizationAsync
       // for both pairing and repair flows
@@ -139,17 +134,24 @@ export class ConnectedDriver extends Driver {
         // Store VIN as immutable device data
         const deviceData = new DeviceData(vehicle.vin);
 
-        // Store authentication credentials in device store (dynamic, persistent)
+        // Store authentication credentials and default device state in device store (dynamic, persistent)
+        // Initialize all store keys with defaults to ensure consistent structure
+        const deviceState: DeviceStoreData = {
+          telematicCache: {},
+          vin: vehicle.vin,
+          driveTrain: vehicle.driveTrain,
+        };
         const store = {
-          clientId: this.currentClientId,
-          containerId: this.currentContainerId,
+          [STORE_KEY_DEVICE_STATE]: deviceState,
+          [STORE_KEY_CLIENT_ID]: this.currentClientId,
+          [STORE_KEY_CONTAINER_ID]: this.currentContainerId,
         };
 
         // Device settings are for user preferences only
         const settings = new DeviceSettings();
 
         return {
-          name: `${vehicle.model ?? 'BMW Vehicle'} (${vehicle.vin})`,
+          name: `${vehicle.model} (${vehicle.vin})`,
           data: deviceData,
           store,
           settings,
@@ -163,8 +165,9 @@ export class ConnectedDriver extends Driver {
     await Promise.resolve();
 
     // Pre-populate client ID and container ID from device store if available
-    const clientId = device.getStoreValue('clientId') as string | undefined;
-    const containerId = device.getStoreValue('containerId') as string | undefined;
+    const vehicleDevice = device as Vehicle;
+    const clientId = vehicleDevice.stateManager.getClientId();
+    const containerId = vehicleDevice.stateManager.getContainerId();
 
     if (clientId && typeof clientId === 'string') {
       this.currentClientId = clientId;
@@ -197,13 +200,10 @@ export class ConnectedDriver extends Driver {
           this.currentContainerId = undefined;
         }
 
-        // Get shared auth provider from app
-        const app = this.homey.app as BMWConnectedDrive;
-        this.authProvider = app.getAuthProvider(this.currentClientId);
-
         // Check if we already have valid tokens for this client ID
         try {
-          const accessToken = await this.authProvider.getValidAccessToken();
+          const authProvider = this.getAuthProvider();
+          const accessToken = await authProvider.getValidAccessToken();
           if (accessToken) {
             this.logger?.info('Valid tokens found - skipping device code authentication');
 
@@ -242,10 +242,9 @@ export class ConnectedDriver extends Driver {
         }
 
         // Get shared auth provider from app (creates if doesn't exist)
-        const app = this.homey.app as BMWConnectedDrive;
-        this.authProvider = app.getAuthProvider(this.currentClientId);
+        const authProvider = this.getAuthProvider();
 
-        this.currentDeviceCodeResponse = await this.authProvider.requestDeviceCode();
+        this.currentDeviceCodeResponse = await authProvider.requestDeviceCode();
 
         // Start polling in the background
         void this.pollForAuthorizationAsync(session, device);
@@ -266,7 +265,6 @@ export class ConnectedDriver extends Driver {
       this.logger?.info('Pairing cancelled by user');
       this.pollingCancelled = true;
       this.currentDeviceCodeResponse = undefined;
-      this.authProvider = undefined;
       await session.done();
     });
 
@@ -286,15 +284,16 @@ export class ConnectedDriver extends Driver {
    * Emits events to the pairing session when authorization completes or fails
    */
   private async pollForAuthorizationAsync(session: PairSession, device?: Device): Promise<void> {
-    if (!this.authProvider || !this.currentDeviceCodeResponse) {
+    if (!this.currentClientId || !this.currentDeviceCodeResponse) {
       return;
     }
 
     try {
+      // Get shared auth provider from app
+      const authProvider = this.getAuthProvider();
+
       // Start the polling process
-      const pollingPromise = this.authProvider.pollForTokens(
-        this.currentDeviceCodeResponse.deviceCode
-      );
+      const pollingPromise = authProvider.pollForTokens(this.currentDeviceCodeResponse.deviceCode);
 
       // Check cancellation status periodically
       const checkCancellation = async (): Promise<void> => {
@@ -432,9 +431,12 @@ export class ConnectedDriver extends Driver {
       return;
     }
 
+    // Cast to Vehicle to access state manager and reinitialize method
+    const vehicleDevice = device as Vehicle;
+
     // Update device store with client ID and container ID (if changed)
-    const currentClientId = device.getStoreValue('clientId') as string | undefined;
-    const currentContainerId = device.getStoreValue('containerId') as string | undefined;
+    const currentClientId = vehicleDevice.stateManager.getClientId();
+    const currentContainerId = vehicleDevice.stateManager.getContainerId();
 
     if (
       currentClientId === this.currentClientId &&
@@ -444,17 +446,26 @@ export class ConnectedDriver extends Driver {
     } else {
       this.logger?.info('Device store changed - updating...');
 
-      // Update device store
-      await device.setStoreValue('clientId', this.currentClientId);
-      await device.setStoreValue('containerId', this.currentContainerId);
+      // Update device store via state manager
+      await vehicleDevice.stateManager.setClientId(this.currentClientId);
+      if (this.currentContainerId) {
+        await vehicleDevice.stateManager.setContainerId(this.currentContainerId);
+      }
     }
 
-    await device.setAvailable();
-
     // IMPORTANT: Store changes don't trigger lifecycle methods - must explicitly reinitialize
-    this.logger?.info('Triggering device reinitialization after authentication change');
-    // Type assertion since we know this is a Vehicle device
-    const vehicleDevice = device as unknown as { reinitializeAfterAuth: () => Promise<void> };
-    await vehicleDevice.reinitializeAfterAuth();
+    this.logger?.info('Reinitializing device after authentication change');
+    try {
+      await vehicleDevice.initializeVehicleDataAndServices();
+
+      await device.setAvailable();
+
+      this.logger?.info('Device reinitialized successfully after authentication change');
+    } catch (error) {
+      this.logger?.error(
+        'Failed to reinitialize device after authentication change',
+        error instanceof Error ? error : undefined
+      );
+    }
   }
 }

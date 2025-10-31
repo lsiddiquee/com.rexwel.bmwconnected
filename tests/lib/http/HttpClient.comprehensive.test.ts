@@ -527,25 +527,24 @@ describe('HttpClient - Comprehensive Tests', () => {
       expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
-    it.skip('should_failAfterMaxRetries_when_allRetriesFail', async () => {
-      // TODO: Fix timing issue with fake timers in retry logic
-      // This test is temporarily skipped to prevent test suite failures
-      // The retry logic works correctly in practice
-
+    it('should_failAfterMaxRetries_when_allRetriesFail', async () => {
       // Arrange
       const networkError = new TypeError('Persistent network error');
       mockFetch.mockRejectedValue(networkError); // All attempts fail with same error
 
       // Act
       const responsePromise = httpClient.get('/test');
+      const handledPromise = responsePromise.catch((error) => error);
 
-      // Fast-forward through all retry delays (initial + 2 retries)
-      // Use runAllTimers to ensure all pending timers are processed
-      jest.runAllTimers();
+      // Fast-forward through exponential backoff delays (1s, 2s)
+      await jest.advanceTimersByTimeAsync(1000);
+      await jest.advanceTimersByTimeAsync(2000);
 
       // Assert
-      await expect(responsePromise).rejects.toThrow('Network error: Persistent network error');
-      expect(mockFetch).toHaveBeenCalledTimes(3); // 3 total attempts
+      const error = await handledPromise;
+      expect(error).toBeInstanceOf(NetworkError);
+      expect((error as Error).message).toBe('Network error: Persistent network error');
+      expect(mockFetch).toHaveBeenCalledTimes(3); // Initial attempt + 2 retries
     });
   });
 

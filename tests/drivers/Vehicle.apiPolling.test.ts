@@ -37,7 +37,21 @@ describe('Vehicle API Polling', () => {
 
     // Create mock state manager
     mockStateManager = {
-      updateFromApi: jest.fn().mockResolvedValue(undefined),
+      updateFromApi: jest.fn().mockResolvedValue({
+        vin: 'TEST_VIN_123',
+        driveTrain: 'ELECTRIC',
+        lastUpdatedAt: new Date(),
+      }),
+      getVehicleStatus: jest.fn().mockReturnValue({
+        vin: 'TEST_VIN_123',
+        driveTrain: 'ELECTRIC',
+        lastUpdatedAt: new Date(),
+      }),
+      getLastLocation: jest.fn().mockReturnValue(null),
+      setLastLocation: jest.fn().mockResolvedValue(undefined),
+      getClientId: jest.fn().mockReturnValue('test-client-id'),
+      getContainerId: jest.fn().mockReturnValue('test-container-123'),
+      getDriveTrain: jest.fn().mockReturnValue('ELECTRIC'),
     };
 
     // Create mock store
@@ -52,7 +66,7 @@ describe('Vehicle API Polling', () => {
     vehicle.settings = new DeviceSettings();
     vehicle.settings.apiPollingEnabled = true;
     vehicle.settings.apiPollingInterval = 60;
-    vehicle['_stateManager'] = mockStateManager;
+    vehicle['stateManager'] = mockStateManager;
     vehicle['_carDataClient'] = mockApiClient;
     vehicle['_apiPollingTimer'] = undefined;
 
@@ -114,21 +128,9 @@ describe('Vehicle API Polling', () => {
       expect(result.reason).toBe('API client not initialized - cannot start API polling');
     });
 
-    it('should_returnFalse_when_noStateManager', () => {
-      // Arrange
-      vehicle['_stateManager'] = undefined;
-
-      // Act
-      const result = vehicle['canStartApiPolling']();
-
-      // Assert
-      expect(result.canStart).toBe(false);
-      expect(result.reason).toBe('State manager not initialized - cannot start API polling');
-    });
-
     it('should_returnFalse_when_noContainerId', () => {
       // Arrange
-      mockStore['containerId'] = undefined;
+      mockStateManager.getContainerId.mockReturnValue(undefined);
 
       // Act
       const result = vehicle['canStartApiPolling']();
@@ -172,29 +174,13 @@ describe('Vehicle API Polling', () => {
       await vehicle['executePoll']();
 
       // Assert
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'API client or state manager unavailable - skipping poll'
-      );
-      expect(mockApiClient.getRawTelematicData).not.toHaveBeenCalled();
-    });
-
-    it('should_skipPoll_when_noStateManager', async () => {
-      // Arrange
-      vehicle['_stateManager'] = undefined;
-
-      // Act
-      await vehicle['executePoll']();
-
-      // Assert
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'API client or state manager unavailable - skipping poll'
-      );
+      expect(mockLogger.warn).toHaveBeenCalledWith('API client unavailable - skipping poll');
       expect(mockApiClient.getRawTelematicData).not.toHaveBeenCalled();
     });
 
     it('should_skipPoll_when_noContainerId', async () => {
       // Arrange
-      mockStore['containerId'] = undefined;
+      mockStateManager.getContainerId.mockReturnValue(undefined);
 
       // Act
       await vehicle['executePoll']();
@@ -336,23 +322,9 @@ describe('Vehicle API Polling', () => {
       expect(vehicle['executePoll']).not.toHaveBeenCalled();
     });
 
-    it('should_notStartPolling_when_noStateManager', () => {
-      // Arrange
-      vehicle['_stateManager'] = undefined;
-
-      // Act
-      vehicle['startApiPolling']();
-
-      // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'State manager not initialized - cannot start API polling'
-      );
-      expect(vehicle['executePoll']).not.toHaveBeenCalled();
-    });
-
     it('should_notStartPolling_when_noContainerId', () => {
       // Arrange
-      mockStore['containerId'] = undefined;
+      mockStateManager.getContainerId.mockReturnValue(undefined);
 
       // Act
       vehicle['startApiPolling']();

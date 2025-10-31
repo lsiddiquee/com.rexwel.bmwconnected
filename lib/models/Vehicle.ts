@@ -5,6 +5,8 @@
  * This model can be used with any vehicle API implementation.
  */
 
+import { DriveTrainType } from '../types/DriveTrainType';
+
 /**
  * Basic vehicle information
  */
@@ -30,9 +32,9 @@ export interface Vehicle {
   year: number;
 
   /**
-   * Drive train type (e.g., "ELECTRIC", "PHEV", "COMBUSTION")
+   * Drive train type
    */
-  driveTrain: string;
+  driveTrain: DriveTrainType;
 
   /**
    * Vehicle color code

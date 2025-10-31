@@ -419,7 +419,7 @@ export class CarDataClient implements IVehicleClient {
         brand: data.brand ?? 'BMW',
         model: data.modelName ?? data.series ?? 'Unknown',
         year: this.extractYear(data.constructionDate) ?? 0,
-        driveTrain: this.mapDriveTrain(data.driveTrain) ?? 'unknown',
+        driveTrain: mapDriveTrain(data.driveTrain),
         lastFetched: new Date(),
         attributes: {
           bodyType: data.bodyType,
@@ -556,22 +556,5 @@ export class CarDataClient implements IVehicleClient {
 
     const match = /^(\d{4})/.exec(constructionDate);
     return match ? parseInt(match[1], 10) : undefined;
-  }
-
-  /**
-   * Maps BMW drive train codes to generic values
-   *
-   * @param driveTrain - BMW drive train code
-   * @returns Generic drive train value
-   * @private
-   */
-  private mapDriveTrain(driveTrain?: string): string | undefined {
-    const mapping: Record<string, string> = {
-      BEV: 'electric',
-      PHEV: 'plug-in-hybrid',
-      ICE: 'combustion',
-    };
-
-    return driveTrain ? (mapping[driveTrain] ?? driveTrain) : undefined;
   }
 }

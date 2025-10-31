@@ -58,10 +58,25 @@ describe('Vehicle MQTT and Initialization', () => {
 
     // Create mock state manager
     mockStateManager = {
-      isStreamingEnabled: jest.fn().mockReturnValue(true),
       updateFromMqttMessage: jest.fn(),
-      getLatestStatus: jest.fn(),
+      getVehicleStatus: jest.fn().mockReturnValue({
+        vin: 'TEST_VIN_123',
+        driveTrain: 'ELECTRIC',
+        lastUpdatedAt: new Date(),
+      }),
       clearCache: jest.fn(),
+      getLastLocation: jest.fn().mockReturnValue(null),
+      getLastTripCompleteLocation: jest.fn().mockReturnValue(null),
+      getLastTripCompleteMileage: jest.fn().mockReturnValue(0),
+      setLastLocation: jest.fn().mockResolvedValue(undefined),
+      setLastTripCompleteLocation: jest.fn().mockResolvedValue(undefined),
+      setLastTripCompleteMileage: jest.fn().mockResolvedValue(undefined),
+      getClientId: jest.fn().mockReturnValue('test-client-id'),
+      getContainerId: jest.fn().mockReturnValue('test-container-id'),
+      setClientId: jest.fn().mockResolvedValue(undefined),
+      setContainerId: jest.fn().mockResolvedValue(undefined),
+      getDriveTrain: jest.fn().mockReturnValue('ELECTRIC'),
+      setDriveTrain: jest.fn().mockResolvedValue(undefined),
     } as any;
 
     // Create mock auth provider
@@ -104,7 +119,7 @@ describe('Vehicle MQTT and Initialization', () => {
     vehicle.homey = mockHomey;
     vehicle.deviceData = { id: 'TEST_VIN_123' };
     vehicle.settings = new DeviceSettings();
-    vehicle['_stateManager'] = mockStateManager;
+    vehicle['stateManager'] = mockStateManager;
     vehicle['_authProvider'] = undefined;
     vehicle['_carDataClient'] = undefined;
     vehicle['_mqttClient'] = undefined;
@@ -130,24 +145,6 @@ describe('Vehicle MQTT and Initialization', () => {
       // Assert
       expect(mockStateManager.updateFromMqttMessage).toHaveBeenCalledWith(mockMessage);
       expect(mockLogger.error).not.toHaveBeenCalled();
-    });
-
-    it('should_logWarning_when_stateManagerNotInitialized', async () => {
-      // Arrange
-      vehicle['_stateManager'] = undefined;
-      const mockMessage: StreamMessage = {
-        timestamp: '2025-01-15T10:00:00Z',
-        data: {},
-      } as any;
-
-      // Act
-      await vehicle['handleMqttMessage']('gcid/TEST_VIN_123', mockMessage);
-
-      // Assert
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'State manager not initialized - cannot process MQTT message'
-      );
-      expect(mockStateManager.updateFromMqttMessage).not.toHaveBeenCalled();
     });
 
     it('should_handleError_when_updateFromMqttMessageThrows', async () => {
@@ -193,13 +190,13 @@ describe('Vehicle MQTT and Initialization', () => {
   describe('initializeCarDataClient', () => {
     it('should_initializeClient_when_clientIdExists', async () => {
       // Arrange
-      vehicle.getStoreValue = jest.fn().mockReturnValue('test-client-id');
+      mockStateManager.getClientId.mockReturnValue('test-client-id');
 
       // Act
       await vehicle['initializeCarDataClient']();
 
       // Assert
-      expect(vehicle.getStoreValue).toHaveBeenCalledWith('clientId');
+      expect(mockStateManager.getClientId).toHaveBeenCalled();
       expect(mockApp.getAuthProvider).toHaveBeenCalledWith('test-client-id');
       expect(mockApp.getApiClient).toHaveBeenCalledWith('test-client-id');
       expect(vehicle['_authProvider']).toBe(mockAuthProvider);
@@ -214,7 +211,7 @@ describe('Vehicle MQTT and Initialization', () => {
 
     it('should_logWarning_when_clientIdMissing', async () => {
       // Arrange
-      vehicle.getStoreValue = jest.fn().mockReturnValue(undefined);
+      mockStateManager.getClientId.mockReturnValue(undefined);
 
       // Act
       await vehicle['initializeCarDataClient']();
@@ -230,7 +227,7 @@ describe('Vehicle MQTT and Initialization', () => {
 
     it('should_logWarning_when_clientIdNull', async () => {
       // Arrange
-      vehicle.getStoreValue = jest.fn().mockReturnValue(null);
+      mockStateManager.getClientId.mockReturnValue(undefined);
 
       // Act
       await vehicle['initializeCarDataClient']();
@@ -410,24 +407,9 @@ describe('Vehicle MQTT and Initialization', () => {
       handleMqttMessageSpy.mockRestore();
     });
 
-    it('should_logWarning_when_stateManagerNotInitialized', async () => {
-      // Arrange
-      vehicle['_stateManager'] = undefined;
-
-      // Act
-      await vehicle['initializeMqttStreaming']();
-
-      // Assert
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'State manager not initialized - cannot start MQTT streaming'
-      );
-      expect(MqttStreamClient).not.toHaveBeenCalled();
-      expect(vehicle['_mqttClient']).toBeUndefined();
-    });
-
     it('should_logInfo_when_streamingDisabled', async () => {
       // Arrange
-      mockStateManager.isStreamingEnabled.mockReturnValue(false);
+      vehicle.settings.streamingEnabled = false;
 
       // Act
       await vehicle['initializeMqttStreaming']();

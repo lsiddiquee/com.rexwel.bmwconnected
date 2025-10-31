@@ -52,6 +52,21 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
     vehicle.logger = mockLogger;
     vehicle.homey = { app: mockApp } as any;
 
+    // Create mock state manager
+    const mockStateManager = {
+      getLastLocation: jest.fn().mockReturnValue(null),
+      setLastLocation: jest.fn().mockResolvedValue(undefined),
+      getVehicleStatus: jest.fn().mockReturnValue({
+        vin: 'TEST_VIN',
+        driveTrain: DriveTrainType.ELECTRIC,
+        lastUpdatedAt: new Date(),
+      }),
+      getClientId: jest.fn().mockReturnValue('test-client-id'),
+      getContainerId: jest.fn().mockReturnValue('test-container-id'),
+      getDriveTrain: jest.fn().mockReturnValue(DriveTrainType.ELECTRIC),
+    } as any;
+    vehicle['stateManager'] = mockStateManager;
+
     // Mock setCapabilityValueSafe to track capability updates
     setCapabilityValueSafeSpy = jest
       .spyOn(vehicle as any, 'setCapabilityValueSafe')

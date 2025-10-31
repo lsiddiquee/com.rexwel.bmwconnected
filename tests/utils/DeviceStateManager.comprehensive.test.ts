@@ -1,74 +1,66 @@
 /**
- * Comprehensive Unit Tests for DeviceStateManager
+ * DeviceStateManager comprehensive behaviour tests.
  *
- * Tests uncovered functionality to improve coverage from 57.42% to 85%+:
- * - MQTT batching logic and delegate callbacks
- * - Initialization methods and error handling
- * - Metadata and settings access
- * - Cache management operations
- * - Error scenarios and edge cases
+ * Focus on:
+ * 1. Store seeding during construction.
+ * 2. MQTT batching behaviour.
+ * 3. API cache updates.
+ * 4. Cache clearing.
+ * 5. Persistence helpers for trip/location, client/container ids, drive train.
+ * 6. Delegate error handling.
  */
 
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import type Homey from 'homey';
 import { DeviceStateManager, type StateUpdateDelegate } from '../../utils/DeviceStateManager';
-import type { TelematicDataPoint, VehicleStatus } from '../../lib/models';
-import type { IVehicleClient } from '../../lib/client/IVehicleClient';
 import type { ILogger } from '../../lib/types/ILogger';
 import type { StreamMessage } from '../../lib/streaming';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
-import type Homey from 'homey';
+import {
+  STORE_KEY_CLIENT_ID,
+  STORE_KEY_CONTAINER_ID,
+  STORE_KEY_DEVICE_STATE,
+} from '../../utils/StoreKeys';
 
-describe('DeviceStateManager - Comprehensive Tests', () => {
+describe('DeviceStateManager - comprehensive behaviour', () => {
   let mockDevice: jest.Mocked<Homey.Device>;
   let mockLogger: jest.Mocked<ILogger>;
-  let mockCarDataClient: jest.Mocked<IVehicleClient>;
-  let stateManager: DeviceStateManager;
   let mockStore: Record<string, unknown>;
   let stateUpdateDelegate: jest.MockedFunction<StateUpdateDelegate>;
+  let manager: DeviceStateManager;
 
   beforeEach(() => {
-    // Fresh mock store for each test
     mockStore = {};
 
-    // Mock device with store access
     mockDevice = {
       getStoreValue: jest
         .fn<(key: string) => unknown>()
-        .mockImplementation((key: string) => mockStore[key]),
+        .mockImplementation((key) => mockStore[key]),
       setStoreValue: jest
         .fn<(key: string, value: unknown) => Promise<void>>()
-        .mockImplementation((key: string, value: unknown) => {
-          // Deep clone to simulate Homey's serialization
+        .mockImplementation(async (key, value) => {
           mockStore[key] = JSON.parse(JSON.stringify(value));
-          return Promise.resolve();
         }),
-      getSettings: jest.fn(),
-    } as any;
+      getSettings: jest.fn().mockReturnValue({ streamingEnabled: true }),
+    } as unknown as jest.Mocked<Homey.Device>;
 
-    // Mock logger
     mockLogger = {
       info: jest.fn(),
-      debug: jest.fn(),
       warn: jest.fn(),
       error: jest.fn(),
+      debug: jest.fn(),
       log: jest.fn(),
       trace: jest.fn(),
       fatal: jest.fn(),
       setLevel: jest.fn(),
       getLevel: jest.fn(),
-    } as any;
+    } as unknown as jest.Mocked<ILogger>;
 
-    // Mock CarData client
-    mockCarDataClient = {
-      getVehicleStatus: jest.fn(),
-      getRawTelematicData: jest.fn(),
-    } as any;
+    stateUpdateDelegate = jest.fn<StateUpdateDelegate>().mockImplementation(async () => {
+      // Default delegate is async to mirror production usage
+    });
 
-    // Mock state update delegate
-    stateUpdateDelegate = jest.fn<StateUpdateDelegate>();
-
-    // Create state manager with delegate
-    stateManager = new DeviceStateManager(mockDevice, mockLogger, stateUpdateDelegate);
+    manager = new DeviceStateManager(mockDevice, 'VIN123', stateUpdateDelegate, mockLogger);
   });
 
   afterEach(() => {
@@ -76,498 +68,175 @@ describe('DeviceStateManager - Comprehensive Tests', () => {
     jest.useRealTimers();
   });
 
-  describe('Initialization', () => {
-    it('should_initializeStore_when_notAlreadyInitialized', async () => {
-      // Arrange
-      const mockStatus: VehicleStatus = {
-        vin: 'TEST_VIN_123',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-01-01T12:00:00Z'),
-        currentMileage: 10000,
-      };
-      mockCarDataClient.getVehicleStatus.mockResolvedValue(mockStatus);
+  it('seeds store snapshot during construction', () => {
+    const seeded = mockStore[STORE_KEY_DEVICE_STATE] as {
+      vin: string;
+      driveTrain: DriveTrainType;
+      telematicCache: Record<string, unknown>;
+    };
 
-      // Act
-      const result = await stateManager.initialize(mockCarDataClient, 'TEST_VIN_123');
-
-      // Assert
-      expect(mockCarDataClient.getVehicleStatus).toHaveBeenCalledWith('TEST_VIN_123');
-      expect(mockDevice.setStoreValue).toHaveBeenCalledWith(
-        'deviceState',
-        expect.objectContaining({
-          vin: 'TEST_VIN_123',
-          driveTrain: DriveTrainType.ELECTRIC,
-          telematicCache: {},
-          lastApiUpdate: null,
-          lastMqttUpdate: null,
-        })
-      );
-      expect(result).toEqual(
-        expect.objectContaining({
-          vin: 'TEST_VIN_123',
-          driveTrain: DriveTrainType.ELECTRIC,
-        })
-      ); // Returns getVehicleStatus() result
-      expect(mockLogger.debug).toHaveBeenCalledWith(
-        'Initializing device store - fetching VIN and drive train from API'
-      );
-    });
-
-    it('should_seedCache_when_containerIdProvided', async () => {
-      // Arrange
-      const mockStatus: VehicleStatus = {
-        vin: 'TEST_VIN_123',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-01-01T12:00:00Z'),
-        currentMileage: 10000,
-      };
-      const mockTelematicData: Record<string, TelematicDataPoint> = {
-        'vehicle.fuel_level': {
-          timestamp: '2025-01-01T12:00:00Z',
-          value: 75,
-          unit: '%',
-        },
-      };
-
-      mockCarDataClient.getVehicleStatus.mockResolvedValue(mockStatus);
-      mockCarDataClient.getRawTelematicData.mockResolvedValue(mockTelematicData);
-
-      // Act
-      const result = await stateManager.initialize(
-        mockCarDataClient,
-        'TEST_VIN_123',
-        'container123'
-      );
-
-      // Assert
-      expect(mockCarDataClient.getRawTelematicData).toHaveBeenCalledWith(
-        'TEST_VIN_123',
-        'container123'
-      );
-      expect(result).toEqual(
-        expect.objectContaining({
-          vin: 'TEST_VIN_123',
-          driveTrain: DriveTrainType.ELECTRIC,
-        })
-      );
-    });
-
-    it('should_skipInitialization_when_alreadyInitialized', async () => {
-      // Arrange - Pre-populate store
-      mockStore.deviceState = {
-        vin: 'EXISTING_VIN',
-        driveTrain: DriveTrainType.COMBUSTION,
-        telematicCache: {},
-        lastApiUpdate: null,
-        lastMqttUpdate: null,
-      };
-
-      // Act
-      const result = await stateManager.initialize(mockCarDataClient, 'TEST_VIN_123');
-
-      // Assert
-      expect(mockCarDataClient.getVehicleStatus).not.toHaveBeenCalled();
-      expect(result).toEqual(
-        expect.objectContaining({
-          vin: 'EXISTING_VIN',
-          driveTrain: DriveTrainType.COMBUSTION,
-        })
-      ); // Returns getVehicleStatus() result
-    });
-
-    it('should_handleError_when_initializationFails', async () => {
-      // Arrange
-      const error = new Error('API failure');
-      mockCarDataClient.getVehicleStatus.mockRejectedValue(error);
-
-      // Act & Assert
-      await expect(stateManager.initialize(mockCarDataClient, 'TEST_VIN_123')).rejects.toThrow(
-        'API failure'
-      );
-      // Note: No logger.error call expected as getVehicleStatus fails before error handling
-    });
+    expect(seeded).toBeDefined();
+    expect(seeded.vin).toBe('VIN123');
+    expect(seeded.driveTrain).toBe(DriveTrainType.UNKNOWN);
+    expect(seeded.telematicCache).toEqual({});
   });
 
-  describe('MQTT Batching', () => {
-    beforeEach(() => {
-      jest.useFakeTimers();
-      // Pre-initialize store
-      mockStore.deviceState = {
-        vin: 'TEST_VIN_123',
-        driveTrain: DriveTrainType.ELECTRIC,
-        telematicCache: {},
-        lastApiUpdate: null,
-        lastMqttUpdate: null,
-      };
-    });
+  it('batches mqtt messages within one second and calls delegate once', async () => {
+    jest.useFakeTimers();
 
-    afterEach(() => {
-      jest.useRealTimers();
-    });
-
-    it('should_batchMqttMessages_when_receivedWithin1Second', async () => {
-      // Arrange
-      const message1: StreamMessage = {
-        vin: 'TEST_VIN_123',
-        entityId: 'entity1',
-        topic: 'TEST_VIN_123',
-        timestamp: '2025-01-01T12:00:00Z',
-        data: {
-          'vehicle.fuel_level': {
-            timestamp: '2025-01-01T12:00:00Z',
-            value: 75,
-            unit: '%',
-          },
+    const firstMessage: StreamMessage = {
+      vin: 'VIN123',
+      entityId: 'entity-1',
+      topic: 'VIN123',
+      timestamp: '2025-01-01T10:00:00Z',
+      data: {
+        'vehicleStatus.mileage': {
+          timestamp: '2025-01-01T10:00:00Z',
+          value: 12345,
+          unit: 'KILOMETERS',
+          source: 'mqtt',
         },
-      };
+      },
+    };
 
-      const message2: StreamMessage = {
-        vin: 'TEST_VIN_123',
-        entityId: 'entity2',
-        topic: 'TEST_VIN_123',
-        timestamp: '2025-01-01T12:00:01Z',
-        data: {
-          'vehicle.battery_level': {
-            timestamp: '2025-01-01T12:00:01Z',
-            value: 80,
-            unit: '%',
-          },
+    const secondMessage: StreamMessage = {
+      vin: 'VIN123',
+      entityId: 'entity-2',
+      topic: 'VIN123',
+      timestamp: '2025-01-01T10:00:01Z',
+      data: {
+        'vehicleStatus.chargingStatus': {
+          timestamp: '2025-01-01T10:00:01Z',
+          value: 'CHARGING',
+          source: 'mqtt',
         },
-      };
+      },
+    };
 
-      // Act
-      const result1 = stateManager.updateFromMqttMessage(message1);
-      const result2 = stateManager.updateFromMqttMessage(message2);
+    manager.updateFromMqttMessage(firstMessage);
+    manager.updateFromMqttMessage(secondMessage);
 
-      // Assert - Should return existing status before batch processing
-      expect(result1).toEqual(
-        expect.objectContaining({
-          vin: 'TEST_VIN_123',
-        })
-      );
-      expect(result2).toEqual(
-        expect.objectContaining({
-          vin: 'TEST_VIN_123',
-        })
-      );
+    jest.advanceTimersByTime(1000);
+    await jest.runAllTimersAsync();
 
-      // Advance timer to trigger batch processing
-      jest.advanceTimersByTime(1000);
+    const storeData = mockStore[STORE_KEY_DEVICE_STATE] as {
+      telematicCache: Record<string, unknown>;
+      lastMqttUpdate?: string;
+    };
 
-      // Run all timers and promises
-      await jest.runAllTimersAsync();
-
-      // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith('Batch updating state from MQTT messages', {
-        vin: 'TEST_VIN_123',
-        batchCount: 2,
-        keysCount: 2,
-      });
-      expect(stateUpdateDelegate).toHaveBeenCalledWith(
-        expect.objectContaining({
-          vin: 'TEST_VIN_123',
-        })
-      );
-    });
-
-    it('should_handleDelegateError_when_delegateThrows', async () => {
-      // Arrange
-      stateUpdateDelegate.mockImplementation(() => Promise.reject(new Error('Delegate error')));
-
-      const message: StreamMessage = {
-        vin: 'TEST_VIN_123',
-        entityId: 'entity1',
-        topic: 'TEST_VIN_123',
-        timestamp: '2025-01-01T12:00:00Z',
-        data: {
-          'vehicle.fuel_level': {
-            timestamp: '2025-01-01T12:00:00Z',
-            value: 75,
-            unit: '%',
-          },
-        },
-      };
-
-      // Act
-      stateManager.updateFromMqttMessage(message);
-      jest.advanceTimersByTime(1000);
-      await jest.runAllTimersAsync();
-
-      // Assert
-      expect(mockLogger.warn).toHaveBeenCalledWith('State update delegate threw error', {
-        error: expect.any(Error),
-      });
-    });
-
-    it('should_mergeDataPoints_when_sameKeyInBatch', async () => {
-      // Arrange
-      const message1: StreamMessage = {
-        vin: 'TEST_VIN_123',
-        entityId: 'entity1',
-        topic: 'TEST_VIN_123',
-        timestamp: '2025-01-01T12:00:00Z',
-        data: {
-          'vehicle.fuel_level': {
-            timestamp: '2025-01-01T12:00:00Z',
-            value: 75,
-            unit: '%',
-          },
-        },
-      };
-
-      const message2: StreamMessage = {
-        vin: 'TEST_VIN_123',
-        entityId: 'entity2',
-        topic: 'TEST_VIN_123',
-        timestamp: '2025-01-01T12:00:01Z',
-        data: {
-          'vehicle.fuel_level': {
-            timestamp: '2025-01-01T12:00:01Z',
-            value: 80, // Later value should win
-            unit: '%',
-          },
-        },
-      };
-
-      // Act
-      stateManager.updateFromMqttMessage(message1);
-      stateManager.updateFromMqttMessage(message2);
-      jest.advanceTimersByTime(1000);
-      await jest.runAllTimersAsync();
-
-      // Assert - The merged data should have the later value (80)
-      expect(mockDevice.setStoreValue).toHaveBeenCalledWith(
-        'deviceState',
-        expect.objectContaining({
-          telematicCache: expect.objectContaining({
-            'vehicle.fuel_level': expect.objectContaining({
-              value: 80,
-            }),
-          }),
-        })
-      );
-    });
-
-    it('should_returnCurrentStatus_immediately', () => {
-      // Arrange
-      const message: StreamMessage = {
-        vin: 'TEST_VIN_123',
-        entityId: 'entity1',
-        topic: 'TEST_VIN_123',
-        timestamp: '2025-01-01T12:00:00Z',
-        data: {
-          'vehicle.fuel_level': {
-            timestamp: '2025-01-01T12:00:00Z',
-            value: 75,
-            unit: '%',
-          },
-        },
-      };
-
-      // Act
-      const result = stateManager.updateFromMqttMessage(message);
-
-      // Assert - Should return immediately, not wait for batch
-      expect(result).toBeDefined();
-      expect(typeof result).toBe('object');
-    });
+    expect(storeData.telematicCache['vehicleStatus.mileage']).toBeDefined();
+    expect(storeData.telematicCache['vehicleStatus.chargingStatus']).toBeDefined();
+    expect(storeData.lastMqttUpdate).toBeDefined();
+    expect(stateUpdateDelegate).toHaveBeenCalledTimes(1);
   });
 
-  describe('Metadata and Settings', () => {
-    beforeEach(() => {
-      // Pre-populate store with metadata
-      mockStore.deviceState = {
-        vin: 'TEST_VIN_123',
-        driveTrain: DriveTrainType.ELECTRIC,
-        telematicCache: {},
-        lastApiUpdate: '2025-01-01T10:00:00Z',
-        lastMqttUpdate: '2025-01-01T11:00:00Z',
-      };
+  it('updates cache when api telematic data provided', async () => {
+    const apiData = {
+      'vehicleStatus.fuelLevel': {
+        timestamp: '2025-01-01T11:00:00Z',
+        value: 80,
+        unit: 'PERCENT',
+        source: 'api' as const,
+      },
+    };
+
+    await manager.updateFromApi(apiData);
+
+    const storeData = mockStore[STORE_KEY_DEVICE_STATE] as {
+      telematicCache: Record<string, unknown>;
+      lastApiUpdate?: string;
+    };
+
+    expect(storeData.telematicCache['vehicleStatus.fuelLevel']).toBeDefined();
+    expect(storeData.lastApiUpdate).toBeDefined();
+    expect(stateUpdateDelegate).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears cache but preserves vin and drive train', async () => {
+    const storeData = mockStore[STORE_KEY_DEVICE_STATE] as {
+      telematicCache: Record<string, unknown>;
+      vin: string;
+      driveTrain: DriveTrainType;
+    };
+    storeData.telematicCache = {
+      'vehicleStatus.range': {
+        timestamp: '2025-01-01T11:00:00Z',
+        value: 200,
+        unit: 'KILOMETERS',
+        source: 'api',
+      },
+    };
+    storeData.driveTrain = DriveTrainType.PLUGIN_HYBRID;
+
+    await manager.clearCache();
+
+    const cleared = mockStore[STORE_KEY_DEVICE_STATE] as typeof storeData;
+    expect(cleared.vin).toBe('VIN123');
+    expect(cleared.driveTrain).toBe(DriveTrainType.PLUGIN_HYBRID);
+    expect(cleared.telematicCache).toEqual({});
+  });
+
+  it('persists and retrieves trip completion location and mileage', async () => {
+    const location = { label: 'Home', latitude: 52.0, longitude: 4.0, address: '' };
+    await manager.setLastTripCompleteLocation(location);
+    await manager.setLastTripCompleteMileage(12345);
+
+    expect(manager.getLastTripCompleteLocation()).toEqual(location);
+    expect(manager.getLastTripCompleteMileage()).toBe(12345);
+  });
+
+  it('persists and retrieves last known location', async () => {
+    const location = { label: 'Work', latitude: 51.5, longitude: 5.0, address: '' };
+    await manager.setLastLocation(location);
+
+    expect(manager.getLastLocation()).toEqual(location);
+  });
+
+  it('persists client and container identifiers', async () => {
+    await manager.setClientId('client-123');
+    await manager.setContainerId('container-456');
+
+    expect(manager.getClientId()).toBe('client-123');
+    expect(manager.getContainerId()).toBe('container-456');
+    expect(mockDevice.setStoreValue).toHaveBeenCalledWith(STORE_KEY_CLIENT_ID, 'client-123');
+    expect(mockDevice.setStoreValue).toHaveBeenCalledWith(STORE_KEY_CONTAINER_ID, 'container-456');
+  });
+
+  it('updates drive train value in store', async () => {
+    await manager.setDriveTrain(DriveTrainType.ELECTRIC);
+
+    expect(manager.getDriveTrain()).toBe(DriveTrainType.ELECTRIC);
+    const storeData = mockStore[STORE_KEY_DEVICE_STATE] as { driveTrain: DriveTrainType };
+    expect(storeData.driveTrain).toBe(DriveTrainType.ELECTRIC);
+  });
+
+  it('logs warning when delegate rejects during mqtt flush', async () => {
+    jest.useFakeTimers();
+    stateUpdateDelegate.mockImplementationOnce(async () => {
+      throw new Error('delegate failed');
     });
 
-    it('should_returnUpdateMetadata_when_called', () => {
-      // Act
-      const metadata = stateManager.getUpdateMetadata();
-
-      // Assert
-      expect(metadata).toEqual({
-        lastApiUpdate: '2025-01-01T10:00:00Z',
-        lastMqttUpdate: '2025-01-01T11:00:00Z',
-      });
-    });
-
-    it('should_returnStreamingEnabled_when_settingTrue', () => {
-      // Arrange
-      mockDevice.getSettings.mockReturnValue({ streamingEnabled: true });
-
-      // Act
-      const result = stateManager.isStreamingEnabled();
-
-      // Assert
-      expect(result).toBe(true);
-      expect(mockDevice.getSettings).toHaveBeenCalled();
-    });
-
-    it('should_returnStreamingDisabled_when_settingFalse', () => {
-      // Arrange
-      mockDevice.getSettings.mockReturnValue({ streamingEnabled: false });
-
-      // Act
-      const result = stateManager.isStreamingEnabled();
-
-      // Assert
-      expect(result).toBe(false);
-    });
-
-    it('should_defaultToTrue_when_streamingSettingUndefined', () => {
-      // Arrange
-      mockDevice.getSettings.mockReturnValue({});
-
-      // Act
-      const result = stateManager.isStreamingEnabled();
-
-      // Assert
-      expect(result).toBe(true); // Default value
-    });
-
-    it('should_returnTelematicCache_when_called', () => {
-      // Arrange
-      const mockCache = {
-        'vehicle.fuel_level': {
-          timestamp: '2025-01-01T12:00:00Z',
-          value: 75,
-          unit: '%',
+    const message: StreamMessage = {
+      vin: 'VIN123',
+      entityId: 'entity-1',
+      topic: 'VIN123',
+      timestamp: '2025-01-01T10:00:00Z',
+      data: {
+        'vehicleStatus.mileage': {
+          timestamp: '2025-01-01T10:00:00Z',
+          value: 12345,
+          unit: 'KILOMETERS',
+          source: 'mqtt' as const,
         },
-      };
-      mockStore.deviceState = {
-        vin: 'TEST_VIN_123',
-        driveTrain: DriveTrainType.ELECTRIC,
-        telematicCache: mockCache,
-        lastApiUpdate: null,
-        lastMqttUpdate: null,
-      };
+      },
+    };
 
-      // Act
-      const result = stateManager.getTelematicCache();
+    manager.updateFromMqttMessage(message);
+    jest.advanceTimersByTime(1000);
+    await jest.runAllTimersAsync();
 
-      // Assert
-      expect(result).toEqual(mockCache);
-    });
-  });
-
-  describe('Cache Management', () => {
-    beforeEach(() => {
-      // Pre-populate store with data
-      mockStore.deviceState = {
-        vin: 'TEST_VIN_123',
-        driveTrain: DriveTrainType.ELECTRIC,
-        telematicCache: {
-          'vehicle.fuel_level': {
-            timestamp: '2025-01-01T12:00:00Z',
-            value: 75,
-            unit: '%',
-          },
-        },
-        lastApiUpdate: '2025-01-01T10:00:00Z',
-        lastMqttUpdate: '2025-01-01T11:00:00Z',
-      };
-    });
-
-    it('should_clearCache_when_called', async () => {
-      // Act
-      await stateManager.clearCache();
-
-      // Assert
-      expect(mockDevice.setStoreValue).toHaveBeenCalledWith(
-        'deviceState',
-        expect.objectContaining({
-          vin: 'TEST_VIN_123', // Preserved
-          driveTrain: DriveTrainType.ELECTRIC, // Preserved
-          telematicCache: {}, // Cleared
-          lastApiUpdate: null, // Cleared
-          lastMqttUpdate: null, // Cleared
-        })
-      );
-      expect(mockLogger.info).toHaveBeenCalledWith('Clearing device state cache');
-    });
-
-    it('should_returnVehicleStatus_when_cacheExists', () => {
-      // Act
-      const result = stateManager.getVehicleStatus();
-
-      // Assert
-      expect(result).toBeDefined();
-      expect(result?.vin).toBe('TEST_VIN_123');
-      expect(result?.driveTrain).toBe(DriveTrainType.ELECTRIC);
-    });
-
-    it('should_returnNull_when_noCacheExists', () => {
-      // Arrange - Clear store
-      mockStore = {};
-
-      // Act
-      const result = stateManager.getVehicleStatus();
-
-      // Assert
-      expect(result).toBeNull();
-    });
-  });
-
-  describe('Error Handling', () => {
-    it('should_handleMissingStore_gracefully', () => {
-      // Arrange - No store data
-      mockStore = {};
-
-      // Act & Assert - Should not throw
-      expect(() => stateManager.getUpdateMetadata()).not.toThrow();
-      expect(() => stateManager.getTelematicCache()).not.toThrow();
-      expect(() => stateManager.getVehicleStatus()).not.toThrow();
-    });
-
-    it('should_handleCorruptedStore_gracefully', () => {
-      // Arrange - Corrupted store data
-      mockStore.deviceState = null;
-
-      // Act & Assert - Should not throw
-      expect(() => stateManager.getUpdateMetadata()).not.toThrow();
-      expect(() => stateManager.getTelematicCache()).not.toThrow();
-      expect(() => stateManager.getVehicleStatus()).not.toThrow();
-    });
-
-    it('should_handleStoreReadError_gracefully', () => {
-      // Arrange
-      mockDevice.getStoreValue.mockImplementation(() => {
-        throw new Error('Store read error');
-      });
-
-      // Act & Assert - Should not throw but log error
-      expect(() => stateManager.getVehicleStatus()).not.toThrow();
-    });
-  });
-
-  describe('Constructor Variations', () => {
-    it('should_createWithoutLogger', () => {
-      // Act
-      const manager = new DeviceStateManager(mockDevice);
-
-      // Assert
-      expect(manager).toBeDefined();
-    });
-
-    it('should_createWithoutDelegate', () => {
-      // Act
-      const manager = new DeviceStateManager(mockDevice, mockLogger);
-
-      // Assert
-      expect(manager).toBeDefined();
-    });
-
-    it('should_createWithAllParameters', () => {
-      // Act
-      const manager = new DeviceStateManager(mockDevice, mockLogger, stateUpdateDelegate);
-
-      // Assert
-      expect(manager).toBeDefined();
+    expect(mockLogger.warn).toHaveBeenCalledWith('State update delegate threw error', {
+      error: expect.any(Error),
     });
   });
 });

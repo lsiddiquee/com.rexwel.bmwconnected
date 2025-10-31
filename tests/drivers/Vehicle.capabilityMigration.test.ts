@@ -77,8 +77,21 @@ describe('Vehicle Capability Migration Tests', () => {
     // Mock state manager with helper to avoid repetitive type assertions
     const mockStateManager = {
       getVehicleStatus: jest.fn(),
+      updateFromApi: jest.fn().mockResolvedValue(undefined),
+      getLastLocation: jest.fn().mockReturnValue(null),
+      setLastLocation: jest.fn().mockResolvedValue(undefined),
+      getClientId: jest.fn().mockReturnValue('test-client-id'),
+      getContainerId: jest.fn().mockReturnValue('test-container-id'),
+      getDriveTrain: jest.fn().mockReturnValue('ELECTRIC'),
+      setDriveTrain: jest.fn().mockResolvedValue(undefined),
+      getLastTripCompleteLocation: jest.fn().mockReturnValue(null),
+      setLastTripCompleteLocation: jest.fn().mockResolvedValue(undefined),
+      getLastTripCompleteMileage: jest.fn().mockReturnValue(null),
+      setLastTripCompleteMileage: jest.fn().mockResolvedValue(undefined),
+      updateFromMqttMessage: jest.fn().mockResolvedValue(undefined),
+      clearCache: jest.fn(),
     };
-    vehicle['_stateManager'] = mockStateManager as any;
+    vehicle['stateManager'] = mockStateManager as any;
   });
 
   afterEach(() => {
@@ -89,8 +102,9 @@ describe('Vehicle Capability Migration Tests', () => {
     it('should_addElectricCapabilities_when_electricDrivetrain', async () => {
       // Arrange
       const electricStatus = createMockVehicleStatus(DriveTrainType.ELECTRIC);
-      const mockStateManager = vehicle['_stateManager'] as any;
+      const mockStateManager = vehicle['stateManager'] as any;
       mockStateManager.getVehicleStatus.mockReturnValue(electricStatus);
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.ELECTRIC);
 
       // Act
       await vehicle['migrate_device_capabilities']();
@@ -105,8 +119,9 @@ describe('Vehicle Capability Migration Tests', () => {
     it('should_removeElectricCapabilities_when_combustionDrivetrain', async () => {
       // Arrange
       const combustionStatus = createMockVehicleStatus(DriveTrainType.COMBUSTION);
-      const mockStateManager = vehicle['_stateManager'] as any;
+      const mockStateManager = vehicle['stateManager'] as any;
       mockStateManager.getVehicleStatus.mockReturnValue(combustionStatus);
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.COMBUSTION);
 
       // Act
       await vehicle['migrate_device_capabilities']();
@@ -122,8 +137,9 @@ describe('Vehicle Capability Migration Tests', () => {
     it('should_addFuelCapability_when_combustionDrivetrain', async () => {
       // Arrange
       const combustionStatus = createMockVehicleStatus(DriveTrainType.COMBUSTION);
-      const mockStateManager = vehicle['_stateManager'] as any;
+      const mockStateManager = vehicle['stateManager'] as any;
       mockStateManager.getVehicleStatus.mockReturnValue(combustionStatus);
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.COMBUSTION);
 
       // Act
       await vehicle['migrate_device_capabilities']();
@@ -136,8 +152,9 @@ describe('Vehicle Capability Migration Tests', () => {
     it('should_removeFuelCapability_when_electricDrivetrain', async () => {
       // Arrange
       const electricStatus = createMockVehicleStatus(DriveTrainType.ELECTRIC);
-      const mockStateManager = vehicle['_stateManager'] as any;
+      const mockStateManager = vehicle['stateManager'] as any;
       mockStateManager.getVehicleStatus.mockReturnValue(electricStatus);
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.ELECTRIC);
 
       // Act
       await vehicle['migrate_device_capabilities']();
@@ -151,8 +168,9 @@ describe('Vehicle Capability Migration Tests', () => {
     it('should_addBothElectricAndFuelCapabilities_when_hybridDrivetrain', async () => {
       // Arrange
       const hybridStatus = createMockVehicleStatus(DriveTrainType.PLUGIN_HYBRID);
-      const mockStateManager = vehicle['_stateManager'] as any;
+      const mockStateManager = vehicle['stateManager'] as any;
       mockStateManager.getVehicleStatus.mockReturnValue(hybridStatus);
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.PLUGIN_HYBRID);
 
       // Act
       await vehicle['migrate_device_capabilities']();
@@ -173,8 +191,9 @@ describe('Vehicle Capability Migration Tests', () => {
     it('should_removeAllRemoteServiceCapabilities_when_migrating', async () => {
       // Arrange
       const status = createMockVehicleStatus(DriveTrainType.ELECTRIC);
-      const mockStateManager = vehicle['_stateManager'] as any;
+      const mockStateManager = vehicle['stateManager'] as any;
       mockStateManager.getVehicleStatus.mockReturnValue(status);
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.ELECTRIC);
 
       // Act
       await vehicle['migrate_device_capabilities']();
@@ -192,15 +211,16 @@ describe('Vehicle Capability Migration Tests', () => {
   describe('Missing Status Handling', () => {
     it('should_skipMigration_when_statusUnavailable', async () => {
       // Arrange
-      const mockStateManager = vehicle['_stateManager'] as any;
+      const mockStateManager = vehicle['stateManager'] as any;
       mockStateManager.getVehicleStatus.mockReturnValue(null);
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.UNKNOWN);
 
       // Act
       await vehicle['migrate_device_capabilities']();
 
       // Assert
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        expect.stringContaining('Vehicle status not available')
+        expect.stringContaining('No drive train found in store')
       );
       // No capability changes should be made (beyond removing remote service capabilities)
     });
@@ -210,7 +230,7 @@ describe('Vehicle Capability Migration Tests', () => {
     it('should_migrateToCarClass_when_homeyVersion12Plus', async () => {
       // Arrange
       const status = createMockVehicleStatus(DriveTrainType.ELECTRIC);
-      const mockStateManager = vehicle['_stateManager'] as any;
+      const mockStateManager = vehicle['stateManager'] as any;
       mockStateManager.getVehicleStatus.mockReturnValue(status);
 
       // Act
@@ -228,7 +248,7 @@ describe('Vehicle Capability Migration Tests', () => {
     it('should_setEnergyCapabilities_when_electricVehicle', async () => {
       // Arrange
       const electricStatus = createMockVehicleStatus(DriveTrainType.ELECTRIC);
-      const mockStateManager = vehicle['_stateManager'] as any;
+      const mockStateManager = vehicle['stateManager'] as any;
       mockStateManager.getVehicleStatus.mockReturnValue(electricStatus);
 
       // Act

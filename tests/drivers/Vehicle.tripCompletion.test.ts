@@ -114,6 +114,16 @@ describe('Vehicle Trip Completion Detection', () => {
       setLastTripCompleteLocation: jest.fn().mockResolvedValue(undefined),
       setLastTripCompleteMileage: jest.fn().mockResolvedValue(undefined),
       updateFromMqttMessage: jest.fn(),
+      getLastLocation: jest.fn().mockReturnValue({
+        label: '',
+        latitude: 52.52,
+        longitude: 13.405,
+        address: 'Test Address, Berlin',
+      }),
+      setLastLocation: jest.fn().mockResolvedValue(undefined),
+      getClientId: jest.fn().mockReturnValue('test-client-id'),
+      getContainerId: jest.fn().mockReturnValue('test-container-id'),
+      getDriveTrain: jest.fn().mockReturnValue(DriveTrainType.PLUGIN_HYBRID),
     } as any;
 
     // Create mock app
@@ -130,7 +140,7 @@ describe('Vehicle Trip Completion Detection', () => {
     vehicle.deviceData = { id: 'TEST_VIN_123' };
     vehicle.settings = new DeviceSettings();
     vehicle.settings.distanceUnit = 'metric';
-    vehicle['_stateManager'] = mockStateManager;
+    vehicle['stateManager'] = mockStateManager;
     vehicle['_tripDebounceTimer'] = undefined;
   });
 
@@ -300,9 +310,9 @@ describe('Vehicle Trip Completion Detection', () => {
       expect(mockStateManager.setLastTripCompleteMileage).toHaveBeenCalledWith(15000);
     });
 
-    it('should_notTriggerFlow_when_noVehicleStatus', async () => {
+    it('should_notTriggerFlow_when_noStartLocation', async () => {
       // Arrange
-      mockStateManager.getVehicleStatus.mockReturnValue(null);
+      mockStateManager.getLastTripCompleteLocation.mockReturnValue(undefined);
 
       const tripMessage = createStreamMessage({
         'trip.distance': { value: 10, unit: 'km', timestamp: '2025-01-15T10:00:00Z' },
@@ -314,7 +324,7 @@ describe('Vehicle Trip Completion Detection', () => {
 
       // Assert
       expect(mockLogger.warn).toHaveBeenCalledWith(
-        'No current vehicle state available for trip completion'
+        'No start location available for trip completion'
       );
       expect(mockFlowCard.trigger).not.toHaveBeenCalled();
     });

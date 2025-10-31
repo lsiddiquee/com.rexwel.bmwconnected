@@ -18,6 +18,7 @@ import { DeviceStateManager } from '../utils/DeviceStateManager';
 import {
   HV_BATTERY_DRIVE_TRAINS,
   COMBUSTION_ENGINE_DRIVE_TRAINS,
+  DriveTrainType,
 } from '../lib/types/DriveTrainType';
 import { UnitConverter } from '../utils/UnitConverter';
 
@@ -35,7 +36,8 @@ export class Vehicle extends Device {
   private _mqttClient?: MqttStreamClient;
 
   // Device state manager for persistence (required - init fails if unavailable)
-  private _stateManager!: DeviceStateManager;
+  // Public to allow ConnectedDriver to access for repair/pairing operations
+  public stateManager!: DeviceStateManager;
 
   // Auth provider (needed for MQTT authentication)
   private _authProvider?: DeviceCodeAuthProvider;
@@ -64,75 +66,55 @@ export class Vehicle extends Device {
     this.deviceData = this.getData() as DeviceData;
     this.logger?.info(`Initializing BMW vehicle device: ${this.getName()} (${this.deviceData.id})`);
 
-    // Initialize per-device CarData API client
-    await this.initializeCarDataClient();
-
-    // Initialize device state manager for persistence (REQUIRED)
-    this._stateManager = new DeviceStateManager(
+    this.stateManager = new DeviceStateManager(
       this,
-      this.logger,
-      this.updateCapabilitiesFromStatus.bind(this)
+      this.deviceData.id,
+      this.updateCapabilitiesFromStatus.bind(this),
+      this.logger
     );
 
-    // Initialize state manager and seed cache if container ID available
-    // MUST happen BEFORE migrate_device_capabilities() because migration needs drivetrain info
-    if (this.api) {
-      const containerId = this.getStoreValue('containerId') as string | undefined;
+    // Initialize vehicle data and services (API client, state manager, MQTT, API polling)
+    await this.initializeVehicleDataAndServices();
 
-      this.currentVehicleState = await this._stateManager.initialize(
-        this.api,
-        this.deviceData.id,
-        containerId
-      );
+    this.currentVehicleState = this.stateManager.getVehicleStatus();
+    if (this.stateManager.getDriveTrain() === DriveTrainType.UNKNOWN) {
+      if (this.currentVehicleState.driveTrain !== DriveTrainType.UNKNOWN) {
+        await this.stateManager.setDriveTrain(this.currentVehicleState.driveTrain);
+      } else if (this.api) {
+        const status = await this.api.getVehicleStatus(this.deviceData.id);
+        await this.stateManager.setDriveTrain(status.driveTrain);
+      }
+    }
 
-      // Initialize last location if not set
-      let lastLocation = this._stateManager.getLastLocation();
-      if (!lastLocation && this.currentVehicleState?.location) {
-        lastLocation = {
-          label: '',
-          latitude: this.currentVehicleState.location.coordinates.latitude,
-          longitude: this.currentVehicleState.location.coordinates.longitude,
-          address: this.currentVehicleState.location.address?.formatted ?? '',
-        };
+    // Initialize last location if not set
+    let lastLocation = this.stateManager.getLastLocation();
+    if (!lastLocation && this.currentVehicleState.location) {
+      lastLocation = {
+        label: '',
+        latitude: this.currentVehicleState.location.coordinates.latitude,
+        longitude: this.currentVehicleState.location.coordinates.longitude,
+        address: this.currentVehicleState.location.address?.formatted ?? '',
+      };
 
-        // Check geofence to set label and address if configured, resolve via OpenStreetMap if needed
-        await this.checkGeofence(lastLocation, true);
+      // Check geofence to set label and address if configured, resolve via OpenStreetMap if needed
+      await this.checkGeofence(lastLocation, true);
 
-        await this._stateManager.setLastLocation(lastLocation);
+      await this.stateManager.setLastLocation(lastLocation);
+
+      // Initialize trip tracking if first time (check if not set)
+      const lastTripLocation = this.stateManager.getLastTripCompleteLocation();
+      if (!lastTripLocation && lastLocation) {
+        await this.stateManager.setLastTripCompleteLocation(lastLocation);
       }
 
-      // Initialize trip tracking if first time (check for default empty location)
-      const lastTripLocation = this._stateManager.getLastTripCompleteLocation();
-      if (lastTripLocation.latitude === 0 && lastLocation) {
-        await this._stateManager.setLastTripCompleteLocation(lastLocation);
+      const lastTripMileage = this.stateManager.getLastTripCompleteMileage();
+      if (lastTripMileage === undefined && this.currentVehicleState?.currentMileage) {
+        await this.stateManager.setLastTripCompleteMileage(this.currentVehicleState.currentMileage);
       }
-
-      if (
-        this._stateManager.getLastTripCompleteMileage() === 0 &&
-        this.currentVehicleState?.currentMileage
-      ) {
-        await this._stateManager.setLastTripCompleteMileage(
-          this.currentVehicleState.currentMileage
-        );
-      }
-
-      // Set app's current location from last known location
-      this.app.currentLocation = lastLocation;
     }
 
     await this.migrate_device_settings();
-    // Migrate capabilities AFTER cache is initialized (needs drivetrain from cache)
     await this.migrate_device_capabilities();
-
-    // Initialize MQTT streaming for real-time updates (after cache is initialized)
-    await this.initializeMqttStreaming();
-
-    // Start API polling for periodic updates (after cache is initialized)
-    this.startApiPolling();
-
-    // Set up unit display preferences
-    await this.setDistanceUnits(this.settings.distanceUnit);
-    await this.setFuelUnits(this.settings.fuelUnit);
 
     this.logger?.info(`${this.getName()} (${this.deviceData.id}) has been initialized`);
     this.logger?.debug('Initialized device cache state', { data: this.currentVehicleState });
@@ -146,8 +128,8 @@ export class Vehicle extends Device {
     try {
       await Promise.resolve();
 
-      // Get client ID from device store (persistent, dynamic storage)
-      const clientId = this.getStoreValue('clientId') as string | undefined;
+      // Get client ID from state manager (persistent, dynamic storage)
+      const clientId = this.stateManager.getClientId();
 
       if (!clientId || typeof clientId !== 'string') {
         this.logger?.warn(
@@ -175,6 +157,45 @@ export class Vehicle extends Device {
   }
 
   /**
+   * Initialize or reinitialize vehicle data and services
+   *
+   * Performs complete initialization/reinitialization of vehicle services:
+   * 1. Stop existing connections (safe to call even if not running)
+   * 2. Initialize API client with credentials from store
+   * 3. Initialize state manager with API data
+   * 4. Update capabilities from initial status
+   * 5. Start MQTT streaming
+   * 6. Start API polling
+   *
+   * @public Used by onInit and ConnectedDriver repair flow
+   */
+  async initializeVehicleDataAndServices(): Promise<void> {
+    // Cleanup existing connections (safe to call even if nothing running)
+    if (this._mqttClient) {
+      await this._mqttClient.disconnect();
+      this._mqttClient = undefined;
+    }
+    this.stopApiPolling();
+
+    // Initialize API client with credentials from store
+    await this.initializeCarDataClient();
+
+    // Verify API client was successfully initialized
+    if (!this.api) {
+      this.logger?.warn('API client not initialized - skipping vehicle data initialization');
+      return;
+    }
+
+    // Initialize MQTT streaming for real-time updates
+    await this.initializeMqttStreaming();
+
+    // Start API polling for periodic updates
+    this.startApiPolling();
+
+    this.logger?.info(`Vehicle data and services initialized for device ${this.deviceData.id}`);
+  }
+
+  /**
    * Initialize MQTT streaming for real-time vehicle data updates
    *
    * Connects to BMW CarData MQTT broker and subscribes to vehicle-specific topic.
@@ -183,7 +204,7 @@ export class Vehicle extends Device {
   private async initializeMqttStreaming(): Promise<void> {
     try {
       // Check if streaming is enabled
-      if (!this._stateManager.isStreamingEnabled()) {
+      if (!this.settings.streamingEnabled) {
         this.logger?.info('MQTT streaming disabled in settings');
         return;
       }
@@ -209,12 +230,10 @@ export class Vehicle extends Device {
       // Set up event handlers
       this._mqttClient.onConnect(() => {
         this.logger?.info(`MQTT connected for vehicle ${this.deviceData.id}`);
-        // TODO: Update streaming status capability when added
       });
 
       this._mqttClient.onDisconnect(() => {
         this.logger?.info(`MQTT disconnected for vehicle ${this.deviceData.id}`);
-        // TODO: Update streaming status capability when added
       });
 
       this._mqttClient.onError((error) => {
@@ -258,7 +277,7 @@ export class Vehicle extends Device {
 
     try {
       // Update state from MQTT message (ALWAYS happens regardless of trip detection)
-      this._stateManager.updateFromMqttMessage(message);
+      this.stateManager.updateFromMqttMessage(message);
 
       // Check if message contains TRIP category telematic data and update debounce
       await this.checkAndDebounceTripCompletion(message);
@@ -286,7 +305,7 @@ export class Vehicle extends Device {
       return { canStart: false, reason: 'API client not initialized - cannot start API polling' };
     }
 
-    const containerId = this.getStoreValue('containerId') as string | undefined;
+    const containerId = this.stateManager.getContainerId();
     if (!containerId) {
       return {
         canStart: false,
@@ -312,7 +331,7 @@ export class Vehicle extends Device {
         return;
       }
 
-      const containerId = this.getStoreValue('containerId') as string | undefined;
+      const containerId = this.stateManager.getContainerId();
       if (!containerId) {
         this.logger?.warn('Container ID missing - skipping API poll');
         return;
@@ -324,7 +343,7 @@ export class Vehicle extends Device {
       const rawData = await this.api.getRawTelematicData(this.deviceData.id, containerId);
 
       // Update state manager cache with API data
-      await this._stateManager.updateFromApi(rawData);
+      await this.stateManager.updateFromApi(rawData);
 
       this.logger?.debug(
         `API poll completed for vehicle ${this.deviceData.id} (${Object.keys(rawData).length} telematic keys)`
@@ -384,66 +403,6 @@ export class Vehicle extends Device {
   }
 
   /**
-   * Reinitialize device after authentication changes (called by repair flow)
-   *
-   * This is called programmatically when settings are updated via setSettings(),
-   * which does NOT trigger onSettings(). This ensures the device picks up new
-   * credentials after repair flow completes.
-   *
-   * @public Called by ConnectedDriver after repair flow updates settings
-   */
-  async reinitializeAfterAuth(): Promise<void> {
-    this.logger?.info('Reinitializing device after authentication change');
-
-    try {
-      // Reload settings from device store
-      this.settings = this.getSettings() as DeviceSettings;
-
-      // Stop existing MQTT connection and API polling
-      if (this._mqttClient) {
-        await this._mqttClient.disconnect();
-        this._mqttClient = undefined;
-      }
-      this.stopApiPolling();
-
-      // Reinitialize API client with new credentials
-      await this.initializeCarDataClient();
-
-      // Verify API client was successfully initialized
-      if (!this.api) {
-        throw new Error('Failed to initialize API client - clientId may be missing or invalid');
-      }
-
-      // Reinitialize state manager and fetch initial data
-      const containerId = this.getStoreValue('containerId') as string | undefined;
-
-      const initialStatus = await this._stateManager.initialize(
-        this.api,
-        this.deviceData.id,
-        containerId
-      );
-
-      if (initialStatus) {
-        await this.updateCapabilitiesFromStatus(initialStatus);
-      }
-
-      // Reinitialize MQTT streaming
-      await this.initializeMqttStreaming();
-
-      // Restart API polling with new client
-      this.startApiPolling();
-
-      this.logger?.info('Device reinitialized successfully after authentication change');
-    } catch (error) {
-      this.logger?.error(
-        'Failed to reinitialize device after authentication change',
-        error instanceof Error ? error : undefined
-      );
-      throw error;
-    }
-  }
-
-  /**
    * Update Homey capabilities from VehicleStatus
    *
    * Extracts data from VehicleStatus and updates corresponding Homey capabilities.
@@ -470,7 +429,7 @@ export class Vehicle extends Device {
 
     // Update location
     if (status.location) {
-      const lastLocation = this._stateManager.getLastLocation();
+      const lastLocation = this.stateManager.getLastLocation();
       const shouldUpdate =
         !lastLocation ||
         geo.distanceTo(
@@ -583,10 +542,9 @@ export class Vehicle extends Device {
     await this.removeCapabilitySafe(Capabilities.MEASURE_BATTERY_ACTUAL);
     await this.removeCapabilitySafe(Capabilities.RANGE_FUEL);
     await this.removeCapabilitySafe(Capabilities.REMAINING_FUEL_LITERS_TYPO);
-    // Removing this redundant capability. We will convert based on the cached vehicle status.
     await this.removeCapabilitySafe(Capabilities.REMAINING_FUEL_LITERS);
     await this.removeCapabilitySafe(Capabilities.LOCATION);
-    await this.removeCapabilitySafe(Capabilities.ADDRESS); // Address stored in location object
+    await this.removeCapabilitySafe(Capabilities.ADDRESS);
 
     // BMW CarData API migration: Remove all remote service capabilities
     // These are no longer supported by the CarData API
@@ -598,26 +556,21 @@ export class Vehicle extends Device {
     await this.removeCapabilitySafe(Capabilities.AC_CHARGING_LIMIT); // AC limit control
     await this.removeCapabilitySafe(Capabilities.CHARGING_TARGET_SOC); // Target charge control
 
-    // Get vehicle status to determine drivetrain type from basic data
-    let vehicleStatus: VehicleStatus | null = null;
-    try {
-      vehicleStatus = this._stateManager.getVehicleStatus();
-    } catch (err) {
-      this.logger?.error(`Failed to get vehicle status for '${this.getName()}': ${String(err)}`);
+    // Get drive train type from persisted store (set during initialization)
+    const driveTrain = this.stateManager.getDriveTrain();
+    if (driveTrain == DriveTrainType.UNKNOWN) {
+      this.logger?.warn(
+        `No drive train found in store for '${this.getName()}' - skipping capability migration`
+      );
       return;
     }
 
-    if (!vehicleStatus) {
-      this.logger?.warn('Vehicle status not available - skipping capability migration');
-      return;
-    }
-
-    // Use drive train type from basic data to determine capabilities
-    const hasElectricDriveTrain = HV_BATTERY_DRIVE_TRAINS.has(vehicleStatus.driveTrain);
-    const hasCombustionDriveTrain = COMBUSTION_ENGINE_DRIVE_TRAINS.has(vehicleStatus.driveTrain);
+    // Use drive train type to determine capabilities
+    const hasElectricDriveTrain = HV_BATTERY_DRIVE_TRAINS.has(driveTrain);
+    const hasCombustionDriveTrain = COMBUSTION_ENGINE_DRIVE_TRAINS.has(driveTrain);
 
     this.logger?.info(
-      `Vehicle '${this.getName()}' drivetrain: ${vehicleStatus.driveTrain} (electric=${hasElectricDriveTrain}, combustion=${hasCombustionDriveTrain})`
+      `Vehicle '${this.getName()}' drivetrain: ${driveTrain} (electric=${hasElectricDriveTrain}, combustion=${hasCombustionDriveTrain})`
     );
 
     // Add/remove electric capabilities based on drivetrain
@@ -677,15 +630,18 @@ export class Vehicle extends Device {
    */
   async migrate_device_settings() {
     this.settings = this.getSettings() as DeviceSettings;
-    const settings = this.settings;
-    this.logger?.info(`Settings version is ${settings.currentVersion}.`);
+    this.logger?.info(`Settings version is ${this.settings.currentVersion}.`);
 
-    if (!settings.currentVersion) {
-      settings.currentVersion = '0.0.0';
+    if (!this.settings.currentVersion) {
+      this.settings.currentVersion = '0.0.0';
     }
 
-    settings.currentVersion = (this.homey.app.manifest as { version: string })?.version;
-    await this.setSettings(settings);
+    this.settings.currentVersion = (this.homey.app.manifest as { version: string })?.version;
+    await this.setSettings(this.settings);
+
+    // Set up unit display preferences
+    await this.setDistanceUnits(this.settings.distanceUnit);
+    await this.setFuelUnits(this.settings.fuelUnit);
   }
 
   /**
@@ -774,9 +730,11 @@ export class Vehicle extends Device {
     }
 
     if (shouldUpdateState) {
-      const status = this._stateManager.getVehicleStatus();
-      if (status) {
+      try {
+        const status = this.stateManager.getVehicleStatus();
         await this.updateCapabilitiesFromStatus(status);
+      } catch (err) {
+        this.logger?.error('Failed to get vehicle status for update', err as Error);
       }
     }
   }
@@ -899,17 +857,17 @@ export class Vehicle extends Device {
   private async triggerDriveSessionCompleted(): Promise<void> {
     try {
       // Get current state (updated from latest TRIP messages)
-      const currentState = this._stateManager.getVehicleStatus();
-      if (!currentState) {
-        this.logger?.warn('No current vehicle state available for trip completion');
+      const currentState = this.stateManager.getVehicleStatus();
+
+      // Get trip start location from state manager (persisted, may be undefined on first trip)
+      const startLocation = this.stateManager.getLastTripCompleteLocation();
+      if (!startLocation) {
+        this.logger?.warn('No start location available for trip completion');
         return;
       }
 
-      // Get trip start location from state manager (persisted, returns default if not set)
-      const startLocation = this._stateManager.getLastTripCompleteLocation();
-
       // Get trip end location from last known location (already has label, address, etc.)
-      const endLocation = this._stateManager.getLastLocation();
+      const endLocation = this.stateManager.getLastLocation();
       if (!endLocation) {
         this.logger?.warn('No last location available for trip completion');
         return;
@@ -920,8 +878,8 @@ export class Vehicle extends Device {
         await this.checkGeofence(endLocation, true);
       }
 
-      // Get mileage values (trip start mileage tracked in state manager, returns 0 if not set)
-      const startMileage = this._stateManager.getLastTripCompleteMileage();
+      // Get mileage values (trip start mileage tracked in state manager, may be undefined on first trip)
+      const startMileage = this.stateManager.getLastTripCompleteMileage() ?? 0;
       const endMileage = currentState.currentMileage ?? startMileage;
 
       // Trigger flow card
@@ -950,11 +908,8 @@ export class Vehicle extends Device {
       );
 
       // Update last trip complete location/mileage in state manager (persists to store)
-      await this._stateManager.setLastTripCompleteLocation(endLocation);
-      await this._stateManager.setLastTripCompleteMileage(endMileage);
-
-      // Also update app's current location for backward compatibility
-      this.app.currentLocation = endLocation;
+      await this.stateManager.setLastTripCompleteLocation(endLocation);
+      await this.stateManager.setLastTripCompleteMileage(endMileage);
     } catch (error) {
       this.logger?.error(
         `Failed to trigger drive session completed: ${error instanceof Error ? error.message : String(error)}`
@@ -978,15 +933,10 @@ export class Vehicle extends Device {
       if (position) {
         this.logger?.info(`Inside geofence '${position.label}'.`);
         location.label = position.label;
-        // Set address from geofence if available
-        if (position.address) {
-          location.address = position.address;
-        }
+        location.address = position.address;
         return;
       }
     }
-
-    location.label = '';
 
     // Resolve address using OpenStreetMap if not available and resolveAddress is true
     if (resolveAddress && !location.address) {
@@ -1015,13 +965,10 @@ export class Vehicle extends Device {
     await this.checkGeofence(newLocation);
 
     // Get old location from state manager
-    const oldLocation = this._stateManager.getLastLocation();
+    const oldLocation = this.stateManager.getLastLocation();
 
     // Persist new location to state manager
-    await this._stateManager.setLastLocation(newLocation);
-
-    // Update app's current location
-    this.app.currentLocation = newLocation;
+    await this.stateManager.setLastLocation(newLocation);
 
     // Trigger location changed flow card
     const locationChangedFlowCard = this.homey.flow.getDeviceTriggerCard('location_changed');
@@ -1043,8 +990,6 @@ export class Vehicle extends Device {
         await geoFenceExit.trigger(this, oldLocation, {});
       }
     }
-
-    // REMOVED: drive_session_completed trigger (now handled by MQTT TRIP messages)
   }
 
   private async addCapabilitySafe(name: string): Promise<void> {
@@ -1089,11 +1034,8 @@ export class Vehicle extends Device {
     await this.setCapabilityOptions(Capabilities.RANGE, {
       units: distanceUnit === 'metric' ? 'km' : 'miles',
     });
-    if (this.hasCapability(Capabilities.MEASURE_BATTERY)) {
+    if (this.hasCapability(Capabilities.RANGE_BATTERY)) {
       await this.setCapabilityOptions(Capabilities.RANGE_BATTERY, {
-        units: distanceUnit === 'metric' ? 'km' : 'miles',
-      });
-      await this.setCapabilityOptions(Capabilities.RANGE_FUEL, {
         units: distanceUnit === 'metric' ? 'km' : 'miles',
       });
     }
