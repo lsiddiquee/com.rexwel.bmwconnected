@@ -13,4 +13,5 @@ export class Configuration {
   logEnabled: boolean = false;
   logLevel: LogLevel = LogLevel.WARN;
   logRequestCount: number = 20;
+  lokiUrl?: string;
 }

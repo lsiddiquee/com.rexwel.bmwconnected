@@ -25,14 +25,20 @@ export async function saveSettings({
   return true;
 }
 
-export async function getLogs({ homey }: { homey: Homey }): Promise<string[]> {
+export async function getLogs({
+  homey,
+}: {
+  homey: Homey;
+}): Promise<Array<{ timestamp: string; level: string; message: string }>> {
   await Promise.resolve(); // Ensure async context
 
   const app = homey.app as BMWConnectedDrive;
   app.logger?.info('getLogs invoked.');
 
-  const loggerWithRecentLogs = app.logger as unknown as { getRecentLogs: () => string[] }; // Type assertion
-  if (loggerWithRecentLogs) {
+  const loggerWithRecentLogs = app.logger as unknown as {
+    getRecentLogs: () => Array<{ timestamp: string; level: string; message: string }>;
+  };
+  if (loggerWithRecentLogs?.getRecentLogs) {
     return loggerWithRecentLogs.getRecentLogs();
   }
   return [];

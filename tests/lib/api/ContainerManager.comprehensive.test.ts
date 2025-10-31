@@ -6,7 +6,7 @@
  * - Container lifecycle (create, get, list, delete, validate)
  * - In-memory caching mechanisms
  * - Error handling and edge cases
- * 
+ *
  * Note: Storage abstraction removed - caller handles persistent storage via Homey device store
  */
 
@@ -163,7 +163,11 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
         {
           name: 'Test Container',
           purpose: 'Testing telematic data',
-          technicalDescriptors: ['vehicle.fuel_level', 'vehicle.battery_level', 'vehicle.location.latitude'],
+          technicalDescriptors: [
+            'vehicle.fuel_level',
+            'vehicle.battery_level',
+            'vehicle.location.latitude',
+          ],
         },
         expect.objectContaining({
           Authorization: 'Bearer valid_access_token',
@@ -181,8 +185,12 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       mockHttpClient.post.mockRejectedValue(apiError);
 
       // Act & Assert
-      await expect((containerManager as any).createContainer('VIN123')).rejects.toThrow('Container creation failed');
-      expect(mockLogger.error).toHaveBeenCalledWith('Container creation failed', apiError, { identifier: 'VIN123' });
+      await expect((containerManager as any).createContainer('VIN123')).rejects.toThrow(
+        'Container creation failed'
+      );
+      expect(mockLogger.error).toHaveBeenCalledWith('Container creation failed', apiError, {
+        identifier: 'VIN123',
+      });
     });
 
     it('should_includeIdentifierInContainerName_when_creating', async () => {
@@ -220,7 +228,9 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       mockGetAccessToken.mockRejectedValue(tokenError);
 
       // Act & Assert
-      await expect((containerManager as any).createContainer('VIN123')).rejects.toThrow('Token retrieval failed');
+      await expect((containerManager as any).createContainer('VIN123')).rejects.toThrow(
+        'Token retrieval failed'
+      );
     });
   });
 
@@ -270,7 +280,9 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       mockHttpClient.post.mockRejectedValue(new Error('API failure'));
 
       // Act & Assert
-      await expect(containerManager.getOrCreateContainer('VIN_ERROR')).rejects.toThrow('API failure');
+      await expect(containerManager.getOrCreateContainer('VIN_ERROR')).rejects.toThrow(
+        'API failure'
+      );
     });
   });
 
@@ -484,7 +496,9 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       mockHttpClient.delete.mockRejectedValue(deleteError);
 
       // Act & Assert
-      await expect(containerManager.deleteContainer(containerId)).rejects.toThrow('Container not found');
+      await expect(containerManager.deleteContainer(containerId)).rejects.toThrow(
+        'Container not found'
+      );
     });
 
     it('should_handleNotFoundGracefully_when_containerAlreadyDeleted', async () => {
@@ -512,7 +526,11 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
         containerId,
         name: 'Valid Container',
         purpose: 'Testing',
-        technicalDescriptors: ['vehicle.fuel_level', 'vehicle.battery_level', 'vehicle.location.latitude'],
+        technicalDescriptors: [
+          'vehicle.fuel_level',
+          'vehicle.battery_level',
+          'vehicle.location.latitude',
+        ],
       };
 
       mockHttpClient.get.mockResolvedValue(createHttpResponse(mockContainer));
@@ -579,7 +597,11 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
 
       // Assert
       expect(result.isValid).toBe(false);
-      expect(result.missingKeys).toEqual(['vehicle.fuel_level', 'vehicle.battery_level', 'vehicle.location.latitude']);
+      expect(result.missingKeys).toEqual([
+        'vehicle.fuel_level',
+        'vehicle.battery_level',
+        'vehicle.location.latitude',
+      ]);
     });
 
     it('should_throwApiError_when_containerNotFound', async () => {
@@ -590,7 +612,9 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
 
       // Act & Assert
       await expect(containerManager.validateContainer(containerId)).rejects.toThrow(ApiError);
-      await expect(containerManager.validateContainer(containerId)).rejects.toThrow('Container not found');
+      await expect(containerManager.validateContainer(containerId)).rejects.toThrow(
+        'Container not found'
+      );
       expect(mockLogger.error).toHaveBeenCalledWith('Container not found: nonexistent_container');
     });
 
@@ -601,7 +625,9 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       mockHttpClient.get.mockRejectedValue(networkError);
 
       // Act & Assert
-      await expect(containerManager.validateContainer(containerId)).rejects.toThrow('Network failure');
+      await expect(containerManager.validateContainer(containerId)).rejects.toThrow(
+        'Network failure'
+      );
     });
   });
 
@@ -616,10 +642,16 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       mockGetAccessToken.mockRejectedValue(tokenError);
 
       // Act & Assert
-      await expect(containerManager.getOrCreateContainer('VIN123')).rejects.toThrow('Token expired');
+      await expect(containerManager.getOrCreateContainer('VIN123')).rejects.toThrow(
+        'Token expired'
+      );
       await expect(containerManager.listContainers()).rejects.toThrow('Token expired');
-      await expect(containerManager.deleteContainer('container_123')).rejects.toThrow('Token expired');
-      await expect(containerManager.validateContainer('container_123')).rejects.toThrow('Token expired');
+      await expect(containerManager.deleteContainer('container_123')).rejects.toThrow(
+        'Token expired'
+      );
+      await expect(containerManager.validateContainer('container_123')).rejects.toThrow(
+        'Token expired'
+      );
     });
 
     it('should_handleNetworkErrors_gracefully', async () => {
@@ -632,8 +664,12 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
 
       // Act & Assert
       await expect(containerManager.listContainers()).rejects.toThrow('ECONNREFUSED');
-      await expect(containerManager.deleteContainer('container_123')).rejects.toThrow('ECONNREFUSED');
-      await expect(containerManager.validateContainer('container_123')).rejects.toThrow('ECONNREFUSED');
+      await expect(containerManager.deleteContainer('container_123')).rejects.toThrow(
+        'ECONNREFUSED'
+      );
+      await expect(containerManager.validateContainer('container_123')).rejects.toThrow(
+        'ECONNREFUSED'
+      );
     });
 
     it('should_logDebugInfo_when_operationsPerformed', async () => {
@@ -668,16 +704,16 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
     it('should_handleCacheManipulation_correctly', () => {
       // Arrange
       const cache = (containerManager as any).containerCache;
-      
+
       // Act
       cache.set('VIN1', 'container1');
       cache.set('VIN2', 'container2');
-      
+
       // Assert
       expect(cache.get('VIN1')).toBe('container1');
       expect(cache.get('VIN2')).toBe('container2');
       expect(cache.has('VIN3')).toBe(false);
-      
+
       cache.delete('VIN1');
       expect(cache.has('VIN1')).toBe(false);
       expect(cache.get('VIN2')).toBe('container2');

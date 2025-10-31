@@ -1,5 +1,6 @@
 import { SimpleClass } from 'homey';
 import { ILogger, LogContext, LogLevel } from '../lib';
+import { LogEntry } from './LogEntry';
 
 /**
  * Logger implementation for Homey app
@@ -8,7 +9,7 @@ import { ILogger, LogContext, LogLevel } from '../lib';
 export class Logger implements ILogger {
   logger: SimpleClass;
   getLogLevel: () => LogLevel;
-  logs: string[] = [];
+  logs: LogEntry[] = [];
 
   constructor(logger: SimpleClass, getLogLevel: () => LogLevel) {
     this.logger = logger;
@@ -41,7 +42,11 @@ export class Logger implements ILogger {
   getLevel(): LogLevel {
     throw new Error('Method not implemented.');
   }
-  getRecentLogs(): string[] {
+
+  /**
+   * Get recent logs as structured data
+   */
+  getRecentLogs(): LogEntry[] {
     return this.logs;
   }
 
@@ -54,7 +59,11 @@ export class Logger implements ILogger {
       if (this.logs.length >= 100) {
         this.logs.shift();
       }
-      this.logs.push(`[${new Date().toISOString()}] ${LogLevel[level]}: ${message}`);
+      this.logs.push({
+        timestamp: new Date().toISOString(),
+        level: LogLevel[level].toLowerCase(),
+        message,
+      });
     }
   }
 }

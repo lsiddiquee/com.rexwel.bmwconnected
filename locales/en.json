@@ -13,6 +13,7 @@
     "logLabel": "Log",
     "enabled": "Enabled",
     "logLevel": "Log Level",
+    "lokiUrl": "Grafana Loki URL (Optional)",
     "logRequestCount": "Number of requests to log (most recent)",
     "logs": "Logs",
     "developer": "Developer",

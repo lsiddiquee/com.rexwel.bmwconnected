@@ -1,6 +1,7 @@
 import { SimpleClass } from 'homey';
 import { ILogger } from '../lib';
 import { LogLevel, LogContext } from '../lib';
+import { LogEntry } from './LogEntry';
 
 // Minimal Homey manifest type
 interface HomeyManifest {
@@ -20,7 +21,7 @@ interface HomeyLike {
   cloud?: HomeyCloud;
 }
 
-interface LogEntry {
+interface LokiLogEntry {
   stream: {
     [label: string]: string;
   };
@@ -42,7 +43,7 @@ export class LokiLogger extends SimpleClass implements ILogger {
   private extra: ContextExtra = {};
   private user: ContextUser = {};
   private currentLevel: LogLevel = LogLevel.TRACE;
-  private logs: string[] = [];
+  private logs: LogEntry[] = [];
 
   // Although the reference homey-log package persists the entries for the lifetime of the app,
   // to prevent duplicate logs, this seems like it is a potential memory leak in long-running apps.
@@ -139,20 +140,7 @@ export class LokiLogger extends SimpleClass implements ILogger {
   }
 
   private logLevelToString(level: LogLevel): string {
-    switch (level) {
-      case LogLevel.TRACE:
-        return 'trace';
-      case LogLevel.DEBUG:
-        return 'debug';
-      case LogLevel.INFO:
-        return 'info';
-      case LogLevel.WARN:
-        return 'warn';
-      case LogLevel.ERROR:
-        return 'error';
-      default:
-        return 'info';
-    }
+    return LogLevel[level].toLocaleLowerCase();
   }
 
   private logWithContext(level: LogLevel, message: string, context?: LogContext): void {
@@ -160,10 +148,8 @@ export class LokiLogger extends SimpleClass implements ILogger {
       return;
     }
 
-    void this.sendLogToLoki(
-      this.logLevelToString(level),
-      `${message} ${context ? JSON.stringify(context) : ''}`
-    );
+    const fullMessage = `${message} ${context ? JSON.stringify(context) : ''}`;
+    void this.sendLogToLoki(this.logLevelToString(level), fullMessage);
   }
 
   public setTags(tags: ContextTags) {
@@ -181,7 +167,7 @@ export class LokiLogger extends SimpleClass implements ILogger {
     return this;
   }
 
-  private buildLogEntry(level: string, message: string): LogEntry {
+  private buildLogEntry(level: string, message: string): LokiLogEntry {
     // Compose all context into stream labels
     const stream: { [label: string]: string } = {
       level: level,
@@ -241,7 +227,10 @@ export class LokiLogger extends SimpleClass implements ILogger {
    * Mimic SDK log method (bound, like homey_logger.js).
    */
   private _log(level: string, ...args: unknown[]): void {
-    this.persistLogs(level, ...args);
+    // Persist the log entry (level is already a lowercase string)
+    const message = args.join(' ');
+    this.persistLog(level, message);
+
     // eslint-disable-next-line prefer-spread
     (
       console.log.bind(null, LokiLogger._consoleLogTime(), `[${level}]`) as typeof console.log
@@ -252,21 +241,34 @@ export class LokiLogger extends SimpleClass implements ILogger {
    * Mimic SDK error method (bound, like homey_logger.js).
    */
   private _error(...args: unknown[]): void {
-    this.persistLogs('error', ...args);
+    // Persist the error entry
+    const message = args.join(' ');
+    this.persistLog('error', message);
+
     // eslint-disable-next-line prefer-spread
     (
       console.error.bind(null, LokiLogger._consoleLogTime(), '[loki-log]') as typeof console.error
     ).apply(null, args);
   }
 
-  private persistLogs(level: string, ...args: unknown[]): void {
+  /**
+   * Store a structured log entry
+   */
+  private persistLog(level: string, message: string): void {
     if (this.logs.length >= 100) {
       this.logs.shift();
     }
-    this.logs.push(`[${new Date().toISOString()}] ${level}: ${args.join(' ')}`);
+    this.logs.push({
+      timestamp: LokiLogger._consoleLogTime(),
+      level: level,
+      message,
+    });
   }
 
-  public getRecentLogs(): string[] {
+  /**
+   * Get recent logs as structured data
+   */
+  public getRecentLogs(): LogEntry[] {
     return this.logs;
   }
 }

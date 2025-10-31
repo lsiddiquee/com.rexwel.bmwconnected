@@ -10,11 +10,11 @@ import * as semver from 'semver';
 import { ArgumentAutocompleteResults } from 'homey/lib/FlowCard';
 import { Capabilities } from './utils/Capabilities';
 import { LokiLogger } from './utils/LokiLogger';
+import { Logger } from './utils/Logger';
 import { DeviceCodeAuthProvider } from './lib/auth/DeviceCodeAuthProvider';
 import { CarDataClient } from './lib/api/CarDataClient';
 import { HttpClient } from './lib/http/HttpClient';
 import { HomeyTokenStore } from './utils/HomeyTokenStore';
-// import { Logger } from './utils/Logger';
 
 // TODO:
 // Window states capability
@@ -122,21 +122,7 @@ export class BMWConnectedDrive extends Homey.App {
    * onInit is called when the app is initialized.
    */
   async onInit(): Promise<void> {
-    // (this as any).homeyLog = new LokiLogger(
-    //   this.homey,
-    //   'http://192.168.2.184:3100/loki/api/v1/push'
-    // );
-
-    // this.logger = new Logger(this.homey, () => LogLevel.DEBUG);
-    this.logger = new LokiLogger(
-      this.homey,
-      'http://192.168.2.184:3100/loki/api/v1/push',
-      () => LogLevel.TRACE
-    );
-
-    // Initialize app-level token store
-    this.tokenStore = new HomeyTokenStore(this.homey);
-
+    // Load configuration first to determine logger type
     let configuration = ConfigurationManager.getConfiguration(this.homey);
     if (!configuration) {
       configuration = new Configuration();
@@ -144,6 +130,23 @@ export class BMWConnectedDrive extends Homey.App {
     } else {
       await this.migrate_configuration();
     }
+
+    // Initialize logger based on configuration
+    // If Loki URL is provided, use LokiLogger; otherwise use standard Logger
+    if (configuration.lokiUrl && configuration.lokiUrl.trim() !== '') {
+      this.logger = new LokiLogger(this.homey, configuration.lokiUrl, () =>
+        configuration.logEnabled ? configuration.logLevel : LogLevel.ERROR
+      );
+      this.logger.info(`Initialized with Loki logger at ${configuration.lokiUrl}`);
+    } else {
+      this.logger = new Logger(this.homey, () =>
+        configuration.logEnabled ? configuration.logLevel : LogLevel.ERROR
+      );
+      this.logger.info('Initialized with standard logger');
+    }
+
+    // Initialize app-level token store
+    this.tokenStore = new HomeyTokenStore(this.homey, this.logger);
 
     // Note: Auth providers and API clients are created on-demand per client ID
     // Devices call getAuthProvider() and getApiClient() to get shared instances

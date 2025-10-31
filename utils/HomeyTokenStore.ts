@@ -1,6 +1,7 @@
 import Homey from 'homey/lib/Homey';
 import { ITokenStore } from '../lib/types/ITokenStore';
 import { AuthToken } from '../lib/models/AuthToken';
+import { ILogger } from '../lib';
 
 /**
  * Homey-based token storage implementation
@@ -20,9 +21,11 @@ import { AuthToken } from '../lib/models/AuthToken';
  */
 export class HomeyTokenStore implements ITokenStore {
   private homey: Homey;
+  private logger?: ILogger;
 
-  constructor(homey: Homey) {
+  constructor(homey: Homey, logger?: ILogger) {
     this.homey = homey;
+    this.logger = logger;
   }
 
   /**
@@ -44,7 +47,7 @@ export class HomeyTokenStore implements ITokenStore {
   storeToken(token: AuthToken, clientId: string): Promise<void> {
     const key = this.getTokenKey(clientId);
     this.homey.settings.set(key, token);
-    this.homey.app.log(`[HomeyTokenStore] Stored token for client ID: ${clientId}`);
+    this.logger?.info(`[HomeyTokenStore] Stored token for client ID: ${clientId}`);
     return Promise.resolve();
   }
 
@@ -59,11 +62,11 @@ export class HomeyTokenStore implements ITokenStore {
     const token = this.homey.settings.get(key) as AuthToken | undefined;
 
     if (!token) {
-      this.homey.app.log(`[HomeyTokenStore] No token found for client ID: ${clientId}`);
+      this.logger?.info(`[HomeyTokenStore] No token found for client ID: ${clientId}`);
       return Promise.resolve(undefined);
     }
 
-    this.homey.app.log(`[HomeyTokenStore] Retrieved token for client ID: ${clientId}`);
+    this.logger?.info(`[HomeyTokenStore] Retrieved token for client ID: ${clientId}`);
     return Promise.resolve(token);
   }
 
@@ -75,7 +78,7 @@ export class HomeyTokenStore implements ITokenStore {
   deleteToken(clientId: string): Promise<void> {
     const key = this.getTokenKey(clientId);
     this.homey.settings.unset(key);
-    this.homey.app.log(`[HomeyTokenStore] Deleted token for client ID: ${clientId}`);
+    this.logger?.info(`[HomeyTokenStore] Deleted token for client ID: ${clientId}`);
     return Promise.resolve();
   }
 

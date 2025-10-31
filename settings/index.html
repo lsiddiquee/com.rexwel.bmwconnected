@@ -76,10 +76,12 @@
         margin: 8px 0;
         font-family: 'Monaco', 'Menlo', 'Consolas', 'Courier New', monospace;
         font-size: 11px;
-        line-height: 1.4;
+        line-height: 1.6;
         white-space: pre-wrap;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
         overflow-x: auto;
-        max-height: 400px;
+        max-height: 600px;
         overflow-y: auto;
         color: var(--homey-text-color, #333);
         user-select: text;
@@ -222,6 +224,26 @@
             </select>
           </div>
 
+          <div class="homey-form-group">
+            <label class="homey-form-label" for="lokiUrl" data-i18n="settings.lokiUrl"></label>
+            <input
+              class="homey-form-input"
+              id="lokiUrl"
+              type="url"
+              placeholder="http://your-loki-server:3100/loki/api/v1/push"
+            />
+            <p class="homey-form-hint" style="margin-top: 4px">
+              Optional: Enter your Grafana Loki endpoint to enable centralized logging.
+              <a
+                href="https://grafana.com/oss/loki/"
+                target="_blank"
+                rel="noopener noreferrer"
+                style="color: #5fd225"
+                >Learn more about Grafana Loki</a
+              >
+            </p>
+          </div>
+
           <div class="homey-form-group" style="display: none">
             <label
               class="homey-form-label"
@@ -240,19 +262,31 @@
     </div>
     <div id="logs" class="tabcontent">
       <div class="homey-form">
-        <div class="homey-form-group">
-          <button
-            type="button"
-            class="homey-button-secondary"
-            onclick="reloadLogs()"
-            data-i18n="settings.reloadLogs"
-          >
+        <fieldset class="homey-form-fieldset">
+          <legend class="homey-form-legend" data-i18n="settings.logs">
             <!-- Translated -->
-          </button>
-        </div>
-        <div class="homey-form-group">
-          <p id="logMessages"></p>
-        </div>
+          </legend>
+          <div class="homey-form-group">
+            <button
+              type="button"
+              class="homey-button-secondary"
+              onclick="reloadLogs()"
+              data-i18n="settings.reloadLogs"
+            >
+              <!-- Translated -->
+            </button>
+          </div>
+          <div class="homey-form-group">
+            <div
+              id="logMessages"
+              class="json-display"
+              style="display: none; user-select: text"
+            ></div>
+            <p id="noLogs" style="opacity: 0.7; font-style: italic">
+              No logs available. Click "Reload Logs" to fetch the latest logs.
+            </p>
+          </div>
+        </fieldset>
       </div>
     </div>
     <div id="developer" class="tabcontent">
@@ -301,6 +335,7 @@
         var logEnabledElement = document.getElementById('logEnabled');
         var logRequestCountElement = document.getElementById('logRequestCount');
         var logLevelElement = document.getElementById('logLevel');
+        var lokiUrlElement = document.getElementById('lokiUrl');
         var errorElement = document.getElementById('error');
         var successElement = document.getElementById('success');
         var devicesListElement = document.getElementById('devicesList');
@@ -312,13 +347,24 @@
             return;
           }
 
+          // Store the full configuration to preserve all fields when saving
+          currentConfiguration = data;
+
           logEnabledElement.checked = data.logEnabled;
           logLevel.value = data.logLevel;
           logRequestCountElement.value = data.logRequestCount;
+          lokiUrlElement.value = data.lokiUrl || '';
 
           geofencesElement.innerHTML = '';
           data.geofences.forEach((item) => {
-            addGeofenceEntry(item.label, item.latitude, item.longitude, item.radius, item.address);
+            addGeofenceEntry(
+              item.label,
+              item.latitude,
+              item.longitude,
+              item.radius,
+              item.address,
+              false
+            );
           });
         };
 
@@ -328,6 +374,8 @@
             Homey.get('com.rexwel.bmwconnected', initializeSettings);
           }
         });
+
+        var currentConfiguration = null;
 
         var saveElement = document.getElementById('save');
         saveElement.addEventListener('click', function (e) {
@@ -345,23 +393,22 @@
               };
             }) ?? [];
 
-          Homey.api(
-            'POST',
-            '/saveSettings',
-            {
-              geofences: geofences,
-              logEnabled: logEnabledElement.checked,
-              logLevel: parseInt(logLevelElement.value) ?? 3,
-            },
-            function (err, result) {
-              if (err) return Homey.alert(err);
-              if (result === true) {
-                successElement.innerHTML = 'Settings saved.';
-              } else {
-                errorElement.innerHTML = 'Failed';
-              }
+          // Preserve all existing configuration fields
+          var updatedConfig = Object.assign({}, currentConfiguration, {
+            geofences: geofences,
+            logEnabled: logEnabledElement.checked,
+            logLevel: parseInt(logLevelElement.value) ?? 3,
+            lokiUrl: lokiUrlElement.value.trim(),
+          });
+
+          Homey.api('POST', '/saveSettings', updatedConfig, function (err, result) {
+            if (err) return Homey.alert(err);
+            if (result === true) {
+              successElement.innerHTML = 'Settings saved.';
+            } else {
+              errorElement.innerHTML = 'Failed';
             }
-          );
+          });
         });
 
         reloadLogs();
@@ -419,10 +466,8 @@
           if (err) return Homey.alert(err);
 
           if (result && result.latitude && result.longitude) {
-            labelElement.value = '';
             latitudeElement.value = result.latitude;
             longitudeElement.value = result.longitude;
-            radiusElement.value = '20';
           }
         });
       }
@@ -525,13 +570,39 @@
       function reloadLogs() {
         Homey.api('GET', '/getLogs', {}, function (err, result) {
           if (err) return Homey.alert(err);
+
           var logMessagesElement = document.getElementById('logMessages');
-          logMessagesElement.innerHTML = result.join(
-            '<br/><hr style="border-top: 3px dashed #bbb;">'
-          );
+          var noLogsElement = document.getElementById('noLogs');
+
+          if (!result || result.length === 0) {
+            logMessagesElement.style.display = 'none';
+            noLogsElement.style.display = 'block';
+            noLogsElement.textContent = 'No logs available.';
+            return;
+          }
+
+          // Format logs with color-coded levels using structured data
+          var formattedLogs = result
+            .map(function (log) {
+              var level = log.level; // already lowercase
+
+              // Color-code based on level
+              var levelColor = '#999'; // default
+              if (level === 'error' || level === 'fatal') levelColor = '#d00';
+              else if (level === 'warn') levelColor = '#f90';
+              else if (level === 'info') levelColor = '#5fd225';
+              else if (level === 'debug') levelColor = '#09f';
+              else if (level === 'trace') levelColor = '#999';
+
+              return `<span style="opacity: 0.7;">${log.timestamp}</span> <span style="color: ${levelColor}; font-weight: 600;">[${level.toUpperCase()}]</span> ${log.message}`;
+            })
+            .join('<br/><br/>');
+
+          logMessagesElement.innerHTML = formattedLogs;
+          logMessagesElement.style.display = 'block';
+          noLogsElement.style.display = 'none';
         });
       }
-
       function addGeofence() {
         var labelElement = document.getElementById('locationLabel');
         var latitudeElement = document.getElementById('latitude');
@@ -561,15 +632,21 @@
         );
       }
 
-      function addGeofenceEntry(label, latitude, longitude, radius, address) {
+      function addGeofenceEntry(label, latitude, longitude, radius, address, showAlerts = true) {
         var rowId = latitude + '=' + longitude + '=' + address;
         var geofencesElement = document.getElementById('geofences');
 
         if (document.getElementById(rowId)) {
-          return Homey.alert('This location is already added.');
+          if (showAlerts) {
+            return Homey.alert('This location is already added.');
+          }
+          return;
         }
         if (Array.from(geofencesElement.rows).find((row) => row.cells[0].innerText === label)) {
-          return Homey.alert('This location label is already used.');
+          if (showAlerts) {
+            return Homey.alert('This location label is already used.');
+          }
+          return;
         }
 
         var newRow = geofencesElement.insertRow();
