@@ -250,6 +250,7 @@ describe('Vehicle API Polling', () => {
         clearInterval(vehicle['_apiPollingTimer']);
         vehicle['_apiPollingTimer'] = undefined;
       }
+      jest.clearAllTimers();
       jest.useRealTimers();
     });
 

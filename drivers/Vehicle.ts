@@ -23,11 +23,17 @@ import {
 import { UnitConverter } from '../utils/UnitConverter';
 
 export class Vehicle extends Device {
-  logger?: ILogger;
-  app!: BMWConnectedDrive;
   deviceData!: DeviceData;
   settings: DeviceSettings = new DeviceSettings();
   currentVehicleState: VehicleStatus | null = null;
+
+  protected get app(): BMWConnectedDrive {
+    return this.homey.app as BMWConnectedDrive;
+  }
+
+  protected get logger(): ILogger | undefined {
+    return this.app.logger;
+  }
 
   // Per-device CarData API client
   private _carDataClient?: IVehicleClient;
@@ -60,9 +66,6 @@ export class Vehicle extends Device {
    * onInit is called when the device is initialized.
    */
   async onInit() {
-    this.app = this.homey.app as BMWConnectedDrive;
-
-    this.logger = this.app.logger;
     this.deviceData = this.getData() as DeviceData;
     this.logger?.info(`Initializing BMW vehicle device: ${this.getName()} (${this.deviceData.id})`);
 

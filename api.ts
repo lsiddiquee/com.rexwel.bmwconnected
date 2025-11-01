@@ -94,9 +94,8 @@ export async function clearTokenStore({ homey }: { homey: Homey }): Promise<bool
   // Clear all app-level tokens (keyed by client ID)
   // Tokens are stored in homey.settings with keys like "token_<clientId>"
   if (app['tokenStore']) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const tokenStore = app['tokenStore'] as any;
-    const clientIds = tokenStore.getStoredClientIds() as string[];
+    const tokenStore = app['tokenStore'];
+    const clientIds = tokenStore.getStoredClientIds();
 
     app.logger?.info(`Clearing tokens for ${clientIds.length} client IDs`);
 

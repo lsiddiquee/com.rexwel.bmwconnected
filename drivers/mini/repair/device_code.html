@@ -179,9 +179,6 @@
           .getElementById('statusMessage')
           .setAttribute('data-i18n', 'pair.device_code.success');
         document.getElementById('pollingSpinner').style.display = 'none';
-        setTimeout(() => {
-          Homey.nextView();
-        }, 1500);
       });
 
       // Listen for authentication error from backend

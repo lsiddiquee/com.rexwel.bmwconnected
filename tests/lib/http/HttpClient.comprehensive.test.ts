@@ -104,6 +104,7 @@ describe('HttpClient - Comprehensive Tests', () => {
   });
 
   afterEach(() => {
+    jest.clearAllTimers();
     jest.useRealTimers();
   });
 

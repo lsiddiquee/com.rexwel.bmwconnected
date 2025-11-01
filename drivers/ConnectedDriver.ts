@@ -18,19 +18,24 @@ type CarDataClient = import('../lib/api/CarDataClient').CarDataClient;
 type ContainerManager = import('../lib/api/ContainerManager').ContainerManager;
 type Vehicle = import('./Vehicle').Vehicle;
 
-export class ConnectedDriver extends Driver {
-  private app!: BMWConnectedDrive;
-  logger?: ILogger;
+export abstract class ConnectedDriver extends Driver {
   protected currentDeviceCodeResponse?: DeviceCodeResponse;
   protected currentClientId?: string;
   protected currentContainerId?: string;
   protected pollingCancelled: boolean = false;
 
-  async onInit() {
-    await Promise.resolve();
+  protected abstract get brand(): string;
 
-    this.app = this.homey.app as BMWConnectedDrive;
-    this.logger = this.app.logger;
+  protected get app(): BMWConnectedDrive {
+    return this.homey.app as BMWConnectedDrive;
+  }
+
+  protected get logger(): ILogger | undefined {
+    return this.app.logger;
+  }
+
+  async onInit() {
+    await super.onInit();
   }
 
   /**
@@ -120,44 +125,44 @@ export class ConnectedDriver extends Driver {
 
       const vehicles = await api.getVehicles();
 
-      vehicles.forEach((vehicle) => {
-        this.logger?.info(
-          `Vehicle found: ${vehicle.brand ?? 'BMW'}: ${vehicle.vin}, ${vehicle.model ?? 'Unknown Model'}`
-        );
-      });
+      return vehicles
+        .filter((vehicle) => vehicle.brand.toLowerCase() == this.brand.toLowerCase())
+        .map((vehicle) => {
+          this.logger?.info(
+            `Vehicle found: ${vehicle.brand}: ${vehicle.vin}, ${vehicle.model ?? 'Unknown Model'}`
+          );
 
-      return vehicles.map((vehicle) => {
-        if (!vehicle.vin) {
-          throw new Error('Cannot list vehicle as VIN is empty.');
-        }
+          if (!vehicle.vin) {
+            throw new Error('Cannot list vehicle as VIN is empty.');
+          }
 
-        // Store VIN as immutable device data
-        const deviceData = new DeviceData(vehicle.vin);
+          // Store VIN as immutable device data
+          const deviceData = new DeviceData(vehicle.vin);
 
-        // Store authentication credentials and default device state in device store (dynamic, persistent)
-        // Initialize all store keys with defaults to ensure consistent structure
-        const deviceState: DeviceStoreData = {
-          telematicCache: {},
-          vin: vehicle.vin,
-          driveTrain: vehicle.driveTrain,
-        };
-        const store = {
-          [STORE_KEY_DEVICE_STATE]: deviceState,
-          [STORE_KEY_CLIENT_ID]: this.currentClientId,
-          [STORE_KEY_CONTAINER_ID]: this.currentContainerId,
-        };
+          // Store authentication credentials and default device state in device store (dynamic, persistent)
+          // Initialize all store keys with defaults to ensure consistent structure
+          const deviceState: DeviceStoreData = {
+            telematicCache: {},
+            vin: vehicle.vin,
+            driveTrain: vehicle.driveTrain,
+          };
+          const store = {
+            [STORE_KEY_DEVICE_STATE]: deviceState,
+            [STORE_KEY_CLIENT_ID]: this.currentClientId,
+            [STORE_KEY_CONTAINER_ID]: this.currentContainerId,
+          };
 
-        // Device settings are for user preferences only
-        const settings = new DeviceSettings();
+          // Device settings are for user preferences only
+          const settings = new DeviceSettings();
 
-        return {
-          name: `${vehicle.model} (${vehicle.vin})`,
-          data: deviceData,
-          store,
-          settings,
-          icon: 'icon.svg',
-        };
-      });
+          return {
+            name: `${vehicle.model} (${vehicle.vin})`,
+            data: deviceData,
+            store,
+            settings,
+            icon: 'icon.svg',
+          };
+        });
     });
   }
 
@@ -210,14 +215,17 @@ export class ConnectedDriver extends Driver {
             // Validate/create container now since we're skipping device code flow
             await this.validateOrCreateContainer();
 
+            await session.emit('authentication_success', {});
+
             // Update device store if this is a repair flow
             if (device) {
               await this.updateDeviceStore(device);
+              await session.done();
+            } else {
+              // Skip device code view and go directly to list_devices/completion
+              await session.showView('list_devices');
             }
 
-            // Skip device code view and go directly to list_devices/completion
-            await session.emit('authentication_success', {});
-            await session.done();
             return;
           }
         } catch {
