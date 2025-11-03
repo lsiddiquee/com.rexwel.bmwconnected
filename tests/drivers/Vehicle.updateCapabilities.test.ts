@@ -20,6 +20,7 @@ import { Vehicle } from '../../drivers/Vehicle';
 import type { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { Capabilities } from '../../utils/Capabilities';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
+import { createMockedVehicle } from '../helpers/vehicleTestHelper';
 
 describe('Vehicle.updateCapabilitiesFromStatus', () => {
   let vehicle: Vehicle;
@@ -29,27 +30,13 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
   let onLocationChangedSpy: jest.SpyInstance;
 
   beforeEach(() => {
-    // Create mock app
-    mockApp = {
-      logger: {
-        info: jest.fn(),
-        error: jest.fn(),
-        debug: jest.fn(),
-      },
-      currentLocation: undefined,
-    };
+    // Create vehicle instance using helper
+    const result = createMockedVehicle();
+    vehicle = result.vehicle;
+    mockApp = result.mocks.mockApp;
+    mockLogger = result.mocks.mockLogger;
 
-    // Create mock logger
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      debug: jest.fn(),
-    };
-
-    // Create vehicle instance using Object.create to bypass constructor
-    vehicle = Object.create(Vehicle.prototype);
-    vehicle.app = mockApp;
-    vehicle.logger = mockLogger;
+    mockApp.currentLocation = undefined;
     vehicle.homey = { app: mockApp } as any;
 
     // Create mock state manager
@@ -79,13 +66,6 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
 
     // Mock convertChargingStatus
     jest.spyOn(vehicle as any, 'convertChargingStatus').mockReturnValue('charging');
-
-    // Initialize settings with defaults
-    vehicle.settings = {
-      distanceUnit: 'metric',
-      fuelUnit: 'metric',
-      locationUpdateThreshold: 100,
-    } as any;
 
     // Initialize current state as null (first update)
     vehicle.currentVehicleState = null;

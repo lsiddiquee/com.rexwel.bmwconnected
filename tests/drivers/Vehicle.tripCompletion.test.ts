@@ -10,13 +10,13 @@
  */
 
 import { Vehicle } from '../../drivers/Vehicle';
-import { DeviceSettings } from '../../utils/DeviceSettings';
 import { StreamMessage } from '../../lib/streaming/StreamMessage';
 import { DeviceStateManager } from '../../utils/DeviceStateManager';
 import { ILogger } from '../../lib/types/ILogger';
 import { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { TelematicCategory, getKeysByCategory } from '../../lib/types/TelematicKeys';
+import { createMockedVehicle } from '../helpers/vehicleTestHelper';
 
 // Mock TelematicKeys module
 jest.mock('../../lib/types/TelematicKeys', () => ({
@@ -48,6 +48,7 @@ describe('Vehicle Trip Completion Detection', () => {
   let mockLogger: ILogger;
   let mockStateManager: jest.Mocked<DeviceStateManager>;
   let mockFlowCard: any;
+  let mockSettings: any;
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -62,18 +63,12 @@ describe('Vehicle Trip Completion Detection', () => {
       { key: 'trip.averageSpeed', category: TelematicCategory.TRIP },
     ]);
 
-    // Create mock logger
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-      log: jest.fn(),
-      trace: jest.fn(),
-      fatal: jest.fn(),
-      setLevel: jest.fn(),
-      getLevel: jest.fn(),
-    };
+    // Create vehicle instance using helper
+    const result = createMockedVehicle();
+    vehicle = result.vehicle;
+    mockApp = result.mocks.mockApp;
+    mockLogger = result.mocks.mockLogger as ILogger;
+    mockSettings = result.mocks.mockSettings;
 
     // Create mock flow card
     mockFlowCard = {
@@ -82,6 +77,7 @@ describe('Vehicle Trip Completion Detection', () => {
 
     // Create mock Homey
     mockHomey = {
+      app: mockApp,
       settings: {
         get: jest.fn().mockReturnValue({ geofences: [] }),
       },
@@ -126,20 +122,11 @@ describe('Vehicle Trip Completion Detection', () => {
       getDriveTrain: jest.fn().mockReturnValue(DriveTrainType.PLUGIN_HYBRID),
     } as any;
 
-    // Create mock app
-    mockApp = {
-      logger: mockLogger,
-      currentLocation: { latitude: 52.52, longitude: 13.405, label: '', address: '' },
-    };
+    // Configure mock app
+    mockApp.currentLocation = { latitude: 52.52, longitude: 13.405, label: '', address: '' };
 
-    // Create Vehicle instance bypassing constructor
-    vehicle = Object.create(Vehicle.prototype);
-    vehicle.app = mockApp;
-    vehicle.logger = mockLogger;
     vehicle.homey = mockHomey;
-    vehicle.deviceData = { id: 'TEST_VIN_123' };
-    vehicle.settings = new DeviceSettings();
-    vehicle.settings.distanceUnit = 'metric';
+    mockSettings.distanceUnit = 'metric';
     vehicle['stateManager'] = mockStateManager;
     vehicle['_tripDebounceTimer'] = undefined;
   });

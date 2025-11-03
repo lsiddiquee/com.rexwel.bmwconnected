@@ -8,13 +8,13 @@
  */
 
 import { Vehicle } from '../../drivers/Vehicle';
-import { DeviceSettings } from '../../utils/DeviceSettings';
 import { MqttStreamClient } from '../../lib/streaming/MqttStreamClient';
 import { StreamMessage } from '../../lib/streaming/StreamMessage';
 import { DeviceStateManager } from '../../utils/DeviceStateManager';
 import { ILogger } from '../../lib/types/ILogger';
 import { DeviceCodeAuthProvider } from '../../lib/auth/DeviceCodeAuthProvider';
 import { CarDataClient } from '../../lib/api/CarDataClient';
+import { createMockedVehicle } from '../helpers/vehicleTestHelper';
 
 // Mock dependencies
 jest.mock('../../lib/streaming/MqttStreamClient');
@@ -30,23 +30,19 @@ describe('Vehicle MQTT and Initialization', () => {
   let mockAuthProvider: jest.Mocked<DeviceCodeAuthProvider>;
   let mockCarDataClient: jest.Mocked<CarDataClient>;
   let mockMqttClient: jest.Mocked<MqttStreamClient>;
+  let mockSettings: any;
 
   beforeEach(() => {
-    // Create mock logger
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-      log: jest.fn(),
-      trace: jest.fn(),
-      fatal: jest.fn(),
-      setLevel: jest.fn(),
-      getLevel: jest.fn(),
-    };
+    // Create vehicle instance using helper
+    const result = createMockedVehicle();
+    vehicle = result.vehicle;
+    mockApp = result.mocks.mockApp;
+    mockLogger = result.mocks.mockLogger as ILogger;
+    mockSettings = result.mocks.mockSettings;
 
     // Create mock Homey
     mockHomey = {
+      app: mockApp,
       settings: {
         get: jest.fn(),
         set: jest.fn(),
@@ -104,21 +100,12 @@ describe('Vehicle MQTT and Initialization', () => {
     // Setup MqttStreamClient mock constructor
     (MqttStreamClient as jest.Mock).mockImplementation(() => mockMqttClient);
 
-    // Create mock app with auth provider and API client
-    mockApp = {
-      logger: mockLogger,
-      currentLocation: { latitude: 0, longitude: 0, label: '', address: '' },
-      getAuthProvider: jest.fn().mockReturnValue(mockAuthProvider),
-      getApiClient: jest.fn().mockReturnValue(mockCarDataClient),
-    };
+    // Add auth provider and API client methods to mockApp
+    mockApp.currentLocation = { latitude: 0, longitude: 0, label: '', address: '' };
+    mockApp.getAuthProvider = jest.fn().mockReturnValue(mockAuthProvider);
+    mockApp.getApiClient = jest.fn().mockReturnValue(mockCarDataClient);
 
-    // Create Vehicle instance bypassing constructor
-    vehicle = Object.create(Vehicle.prototype);
-    vehicle.app = mockApp;
-    vehicle.logger = mockLogger;
     vehicle.homey = mockHomey;
-    vehicle.deviceData = { id: 'TEST_VIN_123' };
-    vehicle.settings = new DeviceSettings();
     vehicle['stateManager'] = mockStateManager;
     vehicle['_authProvider'] = undefined;
     vehicle['_carDataClient'] = undefined;
@@ -409,7 +396,7 @@ describe('Vehicle MQTT and Initialization', () => {
 
     it('should_logInfo_when_streamingDisabled', async () => {
       // Arrange
-      vehicle.settings.streamingEnabled = false;
+      mockSettings.streamingEnabled = false;
 
       // Act
       await vehicle['initializeMqttStreaming']();

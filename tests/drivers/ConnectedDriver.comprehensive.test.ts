@@ -51,8 +51,17 @@ class TestableConnectedDriver extends ConnectedDriver {
   public readonly mockCarDataClient: MockCarDataClient;
   public readonly mockContainerManager: MockContainerManager;
 
+  protected get brand(): string {
+    return 'BMW';
+  }
+
   constructor() {
     super();
+
+    // Mock the Homey Driver base class onInit method
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (ConnectedDriver.prototype as any).__proto__.onInit = jest.fn().mockResolvedValue(undefined);
+
     this.mockAuthProvider = {
       getValidAccessToken: jest.fn().mockResolvedValue(undefined),
       requestDeviceCode: jest.fn(),
@@ -125,6 +134,10 @@ class TestableConnectedDriver extends ConnectedDriver {
   public async testUpdateDeviceStore(device: Vehicle): Promise<void> {
     return this.updateDeviceStore(device);
   }
+
+  public getLoggerForTest() {
+    return this.logger;
+  }
 }
 
 describe('ConnectedDriver - Comprehensive', () => {
@@ -175,7 +188,7 @@ describe('ConnectedDriver - Comprehensive', () => {
     it('should initialize logger during onInit', async () => {
       await driver.onInit();
 
-      expect(driver.logger).toBe(mockLogger);
+      expect(driver.getLoggerForTest()).toBe(mockLogger);
     });
   });
 

@@ -23,8 +23,6 @@ import {
 import { UnitConverter } from '../utils/UnitConverter';
 
 export class Vehicle extends Device {
-  deviceData!: DeviceData;
-  settings: DeviceSettings = new DeviceSettings();
   currentVehicleState: VehicleStatus | null = null;
 
   protected get app(): BMWConnectedDrive {
@@ -33,6 +31,14 @@ export class Vehicle extends Device {
 
   protected get logger(): ILogger | undefined {
     return this.app.logger;
+  }
+
+  protected get deviceData(): DeviceData {
+    return this.getData() as DeviceData;
+  }
+
+  protected get settings(): DeviceSettings {
+    return this.getSettings() as DeviceSettings;
   }
 
   // Per-device CarData API client
@@ -66,7 +72,6 @@ export class Vehicle extends Device {
    * onInit is called when the device is initialized.
    */
   async onInit() {
-    this.deviceData = this.getData() as DeviceData;
     this.logger?.info(`Initializing BMW vehicle device: ${this.getName()} (${this.deviceData.id})`);
 
     this.stateManager = new DeviceStateManager(
@@ -301,8 +306,8 @@ export class Vehicle extends Device {
    *
    * @returns Validation result with canStart flag and optional reason
    */
-  private canStartApiPolling(): { canStart: boolean; reason?: string } {
-    if (!this.settings.apiPollingEnabled) {
+  private canStartApiPolling(settings: DeviceSettings): { canStart: boolean; reason?: string } {
+    if (!settings.apiPollingEnabled) {
       return { canStart: false, reason: 'API polling is disabled in settings' };
     }
 
@@ -370,11 +375,13 @@ export class Vehicle extends Device {
    * Recommended minimum interval: 30 minutes (48 requests/day).
    */
   private startApiPolling(): void {
+    const settings = this.settings;
+
     // Stop existing timer if running
     this.stopApiPolling();
 
     // Validate prerequisites
-    const validation = this.canStartApiPolling();
+    const validation = this.canStartApiPolling(settings);
     if (!validation.canStart) {
       if (validation.reason) {
         this.logger?.info(validation.reason);
@@ -382,9 +389,9 @@ export class Vehicle extends Device {
       return;
     }
 
-    const intervalMs = this.settings.apiPollingInterval * 60 * 1000;
+    const intervalMs = settings.apiPollingInterval * 60 * 1000;
     this.logger?.info(
-      `Starting API polling for vehicle ${this.deviceData.id} (interval: ${this.settings.apiPollingInterval} minutes)`
+      `Starting API polling for vehicle ${this.deviceData.id} (interval: ${settings.apiPollingInterval} minutes)`
     );
 
     // Set up polling timer
@@ -416,11 +423,14 @@ export class Vehicle extends Device {
    * @param status - Vehicle status with telematic data
    */
   private async updateCapabilitiesFromStatus(status: VehicleStatus): Promise<void> {
+    const settings = this.settings;
+
+    // Update drive train type capability
     // Update mileage
     if (status.currentMileage !== undefined) {
       await this.setCapabilityValueSafe(
         Capabilities.MILEAGE,
-        UnitConverter.ConvertDistance(status.currentMileage, this.settings.distanceUnit)
+        UnitConverter.ConvertDistance(status.currentMileage, settings.distanceUnit)
       );
     }
 
@@ -428,7 +438,7 @@ export class Vehicle extends Device {
     if (status.range !== undefined) {
       await this.setCapabilityValueSafe(
         Capabilities.RANGE,
-        UnitConverter.ConvertDistance(status.range, this.settings.distanceUnit)
+        UnitConverter.ConvertDistance(status.range, settings.distanceUnit)
       );
     }
 
@@ -446,7 +456,7 @@ export class Vehicle extends Device {
             latitude: lastLocation.latitude,
             longitude: lastLocation.longitude,
           }
-        ) > this.settings.locationUpdateThreshold;
+        ) > settings.locationUpdateThreshold;
 
       if (shouldUpdate) {
         await this.onLocationChanged({
@@ -486,7 +496,7 @@ export class Vehicle extends Device {
         // If it is only electric, we do not need a separate RANGE_BATTERY capability
         await this.setCapabilityValueSafe(
           Capabilities.RANGE_BATTERY,
-          UnitConverter.ConvertDistance(status.electric.range, this.settings.distanceUnit)
+          UnitConverter.ConvertDistance(status.electric.range, settings.distanceUnit)
         );
       }
 
@@ -523,7 +533,7 @@ export class Vehicle extends Device {
         await this.setCapabilityValueSafe(
           Capabilities.REMAINING_FUEL,
           status.combustion.fuelLevelLiters
-            ? UnitConverter.ConvertFuel(status.combustion.fuelLevelLiters, this.settings.fuelUnit)
+            ? UnitConverter.ConvertFuel(status.combustion.fuelLevelLiters, settings.fuelUnit)
             : null
 
           // TODO: Refuelling trigger needs to be implemented
@@ -634,19 +644,17 @@ export class Vehicle extends Device {
    * Migrate settings to ensure proper functionality after upgrading
    */
   async migrate_device_settings() {
-    this.settings = this.getSettings() as DeviceSettings;
-    this.logger?.info(`Settings version is ${this.settings.currentVersion}.`);
+    const settings = this.settings;
+    this.logger?.info(`Settings version is ${settings.currentVersion}.`);
 
-    if (!this.settings.currentVersion) {
-      this.settings.currentVersion = '0.0.0';
+    const homeyVersion = (this.homey.app.manifest as { version: string })?.version;
+    if (homeyVersion && settings.currentVersion !== homeyVersion) {
+      await this.setSettings({ ...settings, currentVersion: homeyVersion });
     }
 
-    this.settings.currentVersion = (this.homey.app.manifest as { version: string })?.version;
-    await this.setSettings(this.settings);
-
     // Set up unit display preferences
-    await this.setDistanceUnits(this.settings.distanceUnit);
-    await this.setFuelUnits(this.settings.fuelUnit);
+    await this.setDistanceUnits(settings.distanceUnit);
+    await this.setFuelUnits(settings.fuelUnit);
   }
 
   /**
@@ -668,10 +676,11 @@ export class Vehicle extends Device {
       `onSettings called - changedKeys: ${JSON.stringify(changedKeys)}, newSettings: ${JSON.stringify(newSettings)}`
     );
 
-    this.settings = {
-      ...this.settings,
-      ...newSettings,
-    };
+    // Persist the new settings
+    await this.setSettings({ ...this.settings, ...newSettings });
+
+    // Get fresh settings after update
+    const settings = this.settings;
 
     // Note: Authentication changes (clientId, containerId) trigger reinitializeAfterAuth()
     // from repair flow directly. onSettings() is NOT called by setSettings().
@@ -684,18 +693,14 @@ export class Vehicle extends Device {
 
     if (apiPollingChanged) {
       if (changedKeys.includes(nameOf<DeviceSettings>('apiPollingInterval'))) {
-        this.logger?.info(
-          `API polling interval changed to ${this.settings.apiPollingInterval} minutes`
-        );
+        this.logger?.info(`API polling interval changed to ${settings.apiPollingInterval} minutes`);
       }
       if (changedKeys.includes(nameOf<DeviceSettings>('apiPollingEnabled'))) {
-        this.logger?.info(
-          `API polling ${this.settings.apiPollingEnabled ? 'enabled' : 'disabled'}`
-        );
+        this.logger?.info(`API polling ${settings.apiPollingEnabled ? 'enabled' : 'disabled'}`);
       }
 
       // Start or stop API polling based on current enabled state
-      if (this.settings.apiPollingEnabled) {
+      if (settings.apiPollingEnabled) {
         this.startApiPolling();
       } else {
         this.stopApiPolling();
@@ -704,11 +709,9 @@ export class Vehicle extends Device {
 
     // Handle streaming enabled/disabled changes
     if (changedKeys.includes(nameOf<DeviceSettings>('streamingEnabled'))) {
-      this.logger?.info(
-        `MQTT streaming ${this.settings.streamingEnabled ? 'enabled' : 'disabled'}`
-      );
+      this.logger?.info(`MQTT streaming ${settings.streamingEnabled ? 'enabled' : 'disabled'}`);
       // Start or stop MQTT streaming
-      if (this.settings.streamingEnabled) {
+      if (settings.streamingEnabled) {
         await this.initializeMqttStreaming();
       } else {
         if (this._mqttClient) {
@@ -723,14 +726,14 @@ export class Vehicle extends Device {
     if (changedKeys.includes(nameOf<DeviceSettings>('distanceUnit'))) {
       this.app.logger?.info(`Distance unit changed.`);
 
-      await this.setDistanceUnits(this.settings.distanceUnit);
+      await this.setDistanceUnits(settings.distanceUnit);
       shouldUpdateState = true;
     }
 
     if (changedKeys.includes(nameOf<DeviceSettings>('fuelUnit'))) {
       this.app.logger?.info(`Fuel unit changed.`);
 
-      await this.setFuelUnits(this.settings.fuelUnit);
+      await this.setFuelUnits(settings.fuelUnit);
       shouldUpdateState = true;
     }
 
@@ -860,6 +863,7 @@ export class Vehicle extends Device {
    * Extracts trip data from current and previous vehicle state.
    */
   private async triggerDriveSessionCompleted(): Promise<void> {
+    const settings = this.settings;
     try {
       // Get current state (updated from latest TRIP messages)
       const currentState = this.stateManager.getVehicleStatus();
@@ -898,12 +902,12 @@ export class Vehicle extends Device {
           StartLatitude: startLocation.latitude,
           StartLongitude: startLocation.longitude,
           StartAddress: startLocation.address,
-          StartMileage: UnitConverter.ConvertDistance(startMileage, this.settings.distanceUnit),
+          StartMileage: UnitConverter.ConvertDistance(startMileage, settings.distanceUnit),
           EndLabel: endLocation.label,
           EndLatitude: endLocation.latitude,
           EndLongitude: endLocation.longitude,
           EndAddress: endLocation.address,
-          EndMileage: UnitConverter.ConvertDistance(endMileage, this.settings.distanceUnit),
+          EndMileage: UnitConverter.ConvertDistance(endMileage, settings.distanceUnit),
         },
         {}
       );

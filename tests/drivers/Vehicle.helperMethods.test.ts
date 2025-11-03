@@ -13,50 +13,17 @@ jest.mock('semver');
 
 import { Vehicle } from '../../drivers/Vehicle';
 import { Capabilities } from '../../utils/Capabilities';
+import { createMockedVehicle, updateMockDeviceData } from '../helpers/vehicleTestHelper';
+import type { VehicleTestMocks } from '../helpers/vehicleTestHelper';
 
 describe('Vehicle Helper Methods Tests', () => {
   let vehicle: Vehicle;
-  let mockApp: any;
-  let mockLogger: any;
+  let mocks: VehicleTestMocks;
 
   beforeEach(() => {
-    // Create mock app and logger
-    mockApp = {
-      logger: {
-        info: jest.fn(),
-        error: jest.fn(),
-        warn: jest.fn(),
-        debug: jest.fn(),
-      },
-    };
-
-    mockLogger = mockApp.logger;
-
-    // Create vehicle instance using Object.create to bypass constructor
-    vehicle = Object.create(Vehicle.prototype);
-    vehicle.app = mockApp;
-    vehicle.logger = mockLogger;
-
-    // Mock homey object
-    vehicle.homey = {
-      app: mockApp,
-      version: '12.5.0',
-    } as any;
-
-    // Mock Device methods
-    vehicle.getName = jest.fn().mockReturnValue('Test BMW i4');
-    vehicle.hasCapability = jest.fn().mockReturnValue(false);
-    vehicle.addCapability = jest.fn().mockResolvedValue(undefined);
-    vehicle.removeCapability = jest.fn().mockResolvedValue(undefined);
-    vehicle.getCapabilityValue = jest.fn().mockResolvedValue(100);
-    vehicle.setCapabilityValue = jest.fn().mockResolvedValue(undefined);
-    vehicle.setCapabilityOptions = jest.fn().mockResolvedValue(undefined);
-
-    // Initialize settings
-    vehicle.settings = {
-      distanceUnit: 'metric',
-      fuelUnit: 'liter',
-    } as any;
+    const result = createMockedVehicle();
+    vehicle = result.vehicle;
+    mocks = result.mocks;
   });
 
   afterEach(() => {
@@ -78,7 +45,9 @@ describe('Vehicle Helper Methods Tests', () => {
       await vehicle['addCapabilitySafe'](Capabilities.MEASURE_BATTERY);
 
       // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Adding capability'));
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Adding capability')
+      );
       expect(vehicle.addCapability).toHaveBeenCalledWith(Capabilities.MEASURE_BATTERY);
     });
 
@@ -90,7 +59,7 @@ describe('Vehicle Helper Methods Tests', () => {
       await vehicle['addCapabilitySafe'](Capabilities.MEASURE_BATTERY);
 
       // Assert
-      expect(mockLogger.info).not.toHaveBeenCalled();
+      expect(mocks.mockLogger.info).not.toHaveBeenCalled();
       expect(vehicle.addCapability).not.toHaveBeenCalled();
     });
   });
@@ -105,7 +74,9 @@ describe('Vehicle Helper Methods Tests', () => {
       const result = await vehicle['removeCapabilitySafe'](Capabilities.MEASURE_BATTERY);
 
       // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Removing capability'));
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Removing capability')
+      );
       expect(vehicle.removeCapability).toHaveBeenCalledWith(Capabilities.MEASURE_BATTERY);
       expect(result).toBe(75);
     });
@@ -118,7 +89,7 @@ describe('Vehicle Helper Methods Tests', () => {
       const result = await vehicle['removeCapabilitySafe'](Capabilities.MEASURE_BATTERY);
 
       // Assert
-      expect(mockLogger.info).not.toHaveBeenCalled();
+      expect(mocks.mockLogger.info).not.toHaveBeenCalled();
       expect(vehicle.removeCapability).not.toHaveBeenCalled();
       expect(result).toBeUndefined();
     });
@@ -187,7 +158,7 @@ describe('Vehicle Helper Methods Tests', () => {
       await vehicle['setDistanceUnits']('metric');
 
       // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith('Setting distance unit to metric');
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith('Setting distance unit to metric');
       expect(vehicle.setCapabilityOptions).toHaveBeenCalledWith(Capabilities.MILEAGE, {
         units: 'km',
       });
@@ -204,7 +175,7 @@ describe('Vehicle Helper Methods Tests', () => {
       await vehicle['setDistanceUnits']('imperial');
 
       // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith('Setting distance unit to imperial');
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith('Setting distance unit to imperial');
       expect(vehicle.setCapabilityOptions).toHaveBeenCalledWith(Capabilities.MILEAGE, {
         units: 'miles',
       });
@@ -233,7 +204,7 @@ describe('Vehicle Helper Methods Tests', () => {
       await vehicle['setFuelUnits']('liter');
 
       // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith('Setting fuel unit to liter');
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith('Setting fuel unit to liter');
       expect(vehicle.setCapabilityOptions).toHaveBeenCalledWith(Capabilities.REMAINING_FUEL, {
         units: 'l',
       });
@@ -244,7 +215,7 @@ describe('Vehicle Helper Methods Tests', () => {
       await vehicle['setFuelUnits']('gallon');
 
       // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith('Setting fuel unit to gallon');
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith('Setting fuel unit to gallon');
       expect(vehicle.setCapabilityOptions).toHaveBeenCalledWith(Capabilities.REMAINING_FUEL, {
         units: 'gal',
       });
@@ -351,26 +322,17 @@ describe('Vehicle Helper Methods Tests', () => {
 
   describe('migrate_device_settings', () => {
     it('should_updateVersionToCurrentAppVersion_when_migrating', async () => {
-      // Arrange
-      vehicle.getSettings = jest.fn().mockReturnValue({
-        currentVersion: '2.0.0',
-      });
-      vehicle.setSettings = jest.fn().mockResolvedValue(undefined);
-      vehicle.homey = {
-        app: {
-          manifest: { version: '3.0.0' },
-        },
-      } as any;
+      // Arrange - Update mock settings to return version 2.0.0
+      mocks.mockSettings.currentVersion = '2.0.0';
+      vehicle.homey.app.manifest = { version: '3.0.0' };
 
       // Act
       await vehicle['migrate_device_settings']();
 
       // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith('Settings version is 2.0.0.');
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith('Settings version is 2.0.0.');
       expect(vehicle.setSettings).toHaveBeenCalledWith(
-        expect.objectContaining({
-          currentVersion: '3.0.0',
-        })
+        expect.objectContaining({ currentVersion: '3.0.0' })
       );
     });
 
@@ -402,7 +364,7 @@ describe('Vehicle Helper Methods Tests', () => {
       vehicle.onRenamed('New Vehicle Name');
 
       // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith('Vehicle was renamed');
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith('Vehicle was renamed');
     });
   });
 
@@ -422,7 +384,7 @@ describe('Vehicle Helper Methods Tests', () => {
       vehicle.onDeleted();
 
       // Assert
-      expect(mockLogger.info).toHaveBeenCalledWith('Vehicle has been deleted');
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith('Vehicle has been deleted');
       expect(mockMqttClient.disconnect).toHaveBeenCalled();
       expect(vehicle['stopApiPolling']).toHaveBeenCalled();
     });
@@ -433,7 +395,7 @@ describe('Vehicle Helper Methods Tests', () => {
 
       // Act & Assert - Should not throw
       expect(() => vehicle.onDeleted()).not.toThrow();
-      expect(mockLogger.info).toHaveBeenCalledWith('Vehicle has been deleted');
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith('Vehicle has been deleted');
     });
   });
 
@@ -442,14 +404,16 @@ describe('Vehicle Helper Methods Tests', () => {
       // Arrange
       const mockTimer = setTimeout(() => {}, 10000);
       vehicle['_apiPollingTimer'] = mockTimer;
-      vehicle.deviceData = { id: 'TEST123' } as any;
+      updateMockDeviceData(vehicle, { id: 'TEST123' });
 
       // Act
       vehicle['stopApiPolling']();
 
       // Assert
       expect(vehicle['_apiPollingTimer']).toBeUndefined();
-      expect(mockLogger.info).toHaveBeenCalledWith(expect.stringContaining('Stopped API polling'));
+      expect(mocks.mockLogger.info).toHaveBeenCalledWith(
+        expect.stringContaining('Stopped API polling')
+      );
     });
 
     it('should_doNothing_when_noActivePolling', () => {
@@ -460,7 +424,7 @@ describe('Vehicle Helper Methods Tests', () => {
       vehicle['stopApiPolling']();
 
       // Assert
-      expect(mockLogger.info).not.toHaveBeenCalled();
+      expect(mocks.mockLogger.info).not.toHaveBeenCalled();
     });
   });
 });

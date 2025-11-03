@@ -18,6 +18,7 @@ import { Vehicle } from '../../drivers/Vehicle';
 import type { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { Capabilities } from '../../utils/Capabilities';
+import { createMockedVehicle } from '../helpers/vehicleTestHelper';
 
 describe('Vehicle Capability Migration Tests', () => {
   let vehicle: Vehicle;
@@ -34,22 +35,11 @@ describe('Vehicle Capability Migration Tests', () => {
   });
 
   beforeEach(() => {
-    // Create mock app and logger
-    mockApp = {
-      logger: {
-        info: jest.fn(),
-        error: jest.fn(),
-        warn: jest.fn(),
-        debug: jest.fn(),
-      },
-    };
-
-    mockLogger = mockApp.logger;
-
-    // Create vehicle instance using Object.create to bypass constructor
-    vehicle = Object.create(Vehicle.prototype);
-    vehicle.app = mockApp;
-    vehicle.logger = mockLogger;
+    // Create vehicle instance using helper
+    const result = createMockedVehicle();
+    vehicle = result.vehicle;
+    mockApp = result.mocks.mockApp;
+    mockLogger = result.mocks.mockLogger;
 
     // Mock homey object
     vehicle.homey = {
@@ -59,7 +49,6 @@ describe('Vehicle Capability Migration Tests', () => {
 
     // Mock Device methods
     vehicle.getName = jest.fn().mockReturnValue('Test BMW');
-    vehicle.getData = jest.fn().mockReturnValue({ id: 'TEST123' });
     vehicle.getClass = jest.fn().mockReturnValue('other');
     vehicle.setClass = jest.fn().mockResolvedValue(undefined);
     vehicle.getEnergy = jest.fn().mockReturnValue({});

@@ -6,11 +6,11 @@
  */
 
 import { Vehicle } from '../../drivers/Vehicle';
-import { DeviceSettings } from '../../utils/DeviceSettings';
 import { LocationType } from '../../utils/LocationType';
 import { ConfigurationManager } from '../../utils/ConfigurationManager';
 import { Configuration } from '../../utils/Configuration';
 import * as geo from 'geolocation-utils';
+import { createMockedVehicle } from '../helpers/vehicleTestHelper';
 
 // Mock geolocation-utils
 jest.mock('geolocation-utils');
@@ -25,14 +25,6 @@ describe('Vehicle Geofencing and Location', () => {
   let mockStateManager: any;
 
   beforeEach(() => {
-    // Create mock logger
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-    };
-
     // Create mock flow cards
     mockFlowCards = {
       location_changed: {
@@ -49,6 +41,12 @@ describe('Vehicle Geofencing and Location', () => {
       },
     };
 
+    // Create vehicle instance using helper
+    const result = createMockedVehicle();
+    vehicle = result.vehicle;
+    mockApp = result.mocks.mockApp;
+    mockLogger = result.mocks.mockLogger;
+
     // Create mock homey
     mockHomey = {
       app: mockApp,
@@ -59,12 +57,6 @@ describe('Vehicle Geofencing and Location', () => {
         get: jest.fn(),
         set: jest.fn(),
       },
-    };
-
-    // Create mock app
-    mockApp = {
-      logger: mockLogger,
-      currentLocation: undefined,
     };
 
     // Create mock configuration
@@ -111,13 +103,7 @@ describe('Vehicle Geofencing and Location', () => {
       clearCache: jest.fn(),
     } as any;
 
-    // Create Vehicle instance bypassing constructor
-    vehicle = Object.create(Vehicle.prototype);
-    vehicle.app = mockApp;
-    vehicle.logger = mockLogger;
     vehicle.homey = mockHomey;
-    vehicle.deviceData = { id: 'TEST_VIN_123' };
-    vehicle.settings = new DeviceSettings();
     vehicle.currentVehicleState = null;
     vehicle['stateManager'] = mockStateManager;
 

@@ -6,30 +6,18 @@
  */
 
 import { Vehicle } from '../../drivers/Vehicle';
-import { DeviceSettings } from '../../utils/DeviceSettings';
+import { createMockedVehicle } from '../helpers/vehicleTestHelper';
 
 describe('Vehicle API Polling', () => {
   let vehicle: Vehicle;
-  let mockApp: any;
   let mockLogger: any;
   let mockStateManager: any;
   let mockApiClient: any;
+  let mockSettings: any;
+  let mockDeviceData: any;
   let mockStore: Record<string, any>;
 
   beforeEach(() => {
-    // Create mock logger
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-    };
-
-    // Create mock app
-    mockApp = {
-      logger: mockLogger,
-    };
-
     // Create mock API client
     mockApiClient = {
       getRawTelematicData: jest.fn(),
@@ -57,15 +45,20 @@ describe('Vehicle API Polling', () => {
     // Create mock store
     mockStore = {};
 
-    // Create Vehicle instance bypassing constructor
-    vehicle = Object.create(Vehicle.prototype);
-    vehicle.app = mockApp;
-    vehicle.logger = mockLogger;
-    vehicle.homey = { app: mockApp } as any;
-    vehicle.deviceData = { id: 'TEST_VIN_123' };
-    vehicle.settings = new DeviceSettings();
-    vehicle.settings.apiPollingEnabled = true;
-    vehicle.settings.apiPollingInterval = 60;
+    // Create Vehicle instance using helper
+    const result = createMockedVehicle();
+    vehicle = result.vehicle;
+    mockLogger = result.mocks.mockLogger;
+    mockSettings = result.mocks.mockSettings;
+    mockDeviceData = result.mocks.mockDeviceData;
+
+    // Override device data
+    mockDeviceData.id = 'TEST_VIN_123';
+
+    // Configure settings for polling tests
+    mockSettings.apiPollingEnabled = true;
+    mockSettings.apiPollingInterval = 60;
+
     vehicle['stateManager'] = mockStateManager;
     vehicle['_carDataClient'] = mockApiClient;
     vehicle['_apiPollingTimer'] = undefined;
@@ -97,7 +90,7 @@ describe('Vehicle API Polling', () => {
       // Arrange - all prerequisites already set in beforeEach
 
       // Act
-      const result = vehicle['canStartApiPolling']();
+      const result = vehicle['canStartApiPolling'](mockSettings);
 
       // Assert
       expect(result.canStart).toBe(true);
@@ -106,10 +99,10 @@ describe('Vehicle API Polling', () => {
 
     it('should_returnFalse_when_apiPollingDisabled', () => {
       // Arrange
-      vehicle.settings.apiPollingEnabled = false;
+      mockSettings.apiPollingEnabled = false;
 
       // Act
-      const result = vehicle['canStartApiPolling']();
+      const result = vehicle['canStartApiPolling'](mockSettings);
 
       // Assert
       expect(result.canStart).toBe(false);
@@ -121,7 +114,7 @@ describe('Vehicle API Polling', () => {
       vehicle['_carDataClient'] = undefined;
 
       // Act
-      const result = vehicle['canStartApiPolling']();
+      const result = vehicle['canStartApiPolling'](mockSettings);
 
       // Assert
       expect(result.canStart).toBe(false);
@@ -133,7 +126,7 @@ describe('Vehicle API Polling', () => {
       mockStateManager.getContainerId.mockReturnValue(undefined);
 
       // Act
-      const result = vehicle['canStartApiPolling']();
+      const result = vehicle['canStartApiPolling'](mockSettings);
 
       // Assert
       expect(result.canStart).toBe(false);
@@ -298,7 +291,7 @@ describe('Vehicle API Polling', () => {
 
     it('should_notStartPolling_when_apiPollingDisabled', () => {
       // Arrange
-      vehicle.settings.apiPollingEnabled = false;
+      mockSettings.apiPollingEnabled = false;
 
       // Act
       vehicle['startApiPolling']();
@@ -339,7 +332,7 @@ describe('Vehicle API Polling', () => {
 
     it('should_useCustomInterval_when_intervalSet', () => {
       // Arrange
-      vehicle.settings.apiPollingInterval = 45; // 45 minutes
+      mockSettings.apiPollingInterval = 45; // 45 minutes
 
       // Act
       vehicle['startApiPolling']();

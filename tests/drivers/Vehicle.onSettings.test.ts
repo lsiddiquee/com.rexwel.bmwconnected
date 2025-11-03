@@ -5,8 +5,8 @@
  */
 
 import { Vehicle } from '../../drivers/Vehicle';
-import { DeviceSettings } from '../../utils/DeviceSettings';
 import { VehicleStatus } from '../../lib/models/VehicleStatus';
+import { createMockedVehicle } from '../helpers/vehicleTestHelper';
 
 describe('Vehicle.onSettings', () => {
   let vehicle: Vehicle;
@@ -14,20 +14,15 @@ describe('Vehicle.onSettings', () => {
   let mockLogger: any;
   let mockStateManager: any;
   let mockMqttClient: any;
+  let mockSettings: any;
 
   beforeEach(() => {
-    // Create mock logger
-    mockLogger = {
-      info: jest.fn(),
-      error: jest.fn(),
-      warn: jest.fn(),
-      debug: jest.fn(),
-    };
-
-    // Create mock app
-    mockApp = {
-      logger: mockLogger,
-    };
+    // Create vehicle instance using helper
+    const result = createMockedVehicle();
+    vehicle = result.vehicle;
+    mockApp = result.mocks.mockApp;
+    mockLogger = result.mocks.mockLogger;
+    mockSettings = result.mocks.mockSettings;
 
     // Create mock MQTT client
     mockMqttClient = {
@@ -52,12 +47,7 @@ describe('Vehicle.onSettings', () => {
       clearCache: jest.fn(),
     };
 
-    // Create Vehicle instance bypassing constructor
-    vehicle = Object.create(Vehicle.prototype);
-    vehicle.app = mockApp;
-    vehicle.logger = mockLogger;
     vehicle.homey = { app: mockApp } as any;
-    vehicle.settings = new DeviceSettings();
     vehicle['stateManager'] = mockStateManager;
 
     // Mock private methods
@@ -72,7 +62,7 @@ describe('Vehicle.onSettings', () => {
   describe('API Polling Settings', () => {
     it('should_startApiPolling_when_apiPollingEnabledChangedToTrue', async () => {
       // Arrange
-      vehicle.settings.apiPollingEnabled = true;
+      mockSettings.apiPollingEnabled = true;
       const newSettings = { apiPollingEnabled: true };
       const changedKeys = ['apiPollingEnabled'];
 
@@ -87,7 +77,7 @@ describe('Vehicle.onSettings', () => {
 
     it('should_stopApiPolling_when_apiPollingEnabledChangedToFalse', async () => {
       // Arrange
-      vehicle.settings.apiPollingEnabled = false;
+      mockSettings.apiPollingEnabled = false;
       const newSettings = { apiPollingEnabled: false };
       const changedKeys = ['apiPollingEnabled'];
 
@@ -102,8 +92,8 @@ describe('Vehicle.onSettings', () => {
 
     it('should_restartApiPolling_when_apiPollingIntervalChanged', async () => {
       // Arrange
-      vehicle.settings.apiPollingEnabled = true;
-      vehicle.settings.apiPollingInterval = 60;
+      mockSettings.apiPollingEnabled = true;
+      mockSettings.apiPollingInterval = 60;
       const newSettings = { apiPollingInterval: 60 };
       const changedKeys = ['apiPollingInterval'];
 
@@ -117,8 +107,8 @@ describe('Vehicle.onSettings', () => {
 
     it('should_handleBothIntervalAndEnabledChange_when_bothChanged', async () => {
       // Arrange
-      vehicle.settings.apiPollingEnabled = true;
-      vehicle.settings.apiPollingInterval = 45;
+      mockSettings.apiPollingEnabled = true;
+      mockSettings.apiPollingInterval = 45;
       const newSettings = { apiPollingEnabled: true, apiPollingInterval: 45 };
       const changedKeys = ['apiPollingEnabled', 'apiPollingInterval'];
 
@@ -135,7 +125,7 @@ describe('Vehicle.onSettings', () => {
   describe('MQTT Streaming Settings', () => {
     it('should_initializeMqttStreaming_when_streamingEnabledChangedToTrue', async () => {
       // Arrange
-      vehicle.settings.streamingEnabled = true;
+      mockSettings.streamingEnabled = true;
       const newSettings = { streamingEnabled: true };
       const changedKeys = ['streamingEnabled'];
 
@@ -149,7 +139,7 @@ describe('Vehicle.onSettings', () => {
 
     it('should_disconnectMqttClient_when_streamingEnabledChangedToFalse', async () => {
       // Arrange
-      vehicle.settings.streamingEnabled = false;
+      mockSettings.streamingEnabled = false;
       vehicle['_mqttClient'] = mockMqttClient;
       const newSettings = { streamingEnabled: false };
       const changedKeys = ['streamingEnabled'];
@@ -165,7 +155,7 @@ describe('Vehicle.onSettings', () => {
 
     it('should_notDisconnectMqttClient_when_noMqttClientExists', async () => {
       // Arrange
-      vehicle.settings.streamingEnabled = false;
+      mockSettings.streamingEnabled = false;
       vehicle['_mqttClient'] = undefined;
       const newSettings = { streamingEnabled: false };
       const changedKeys = ['streamingEnabled'];
@@ -182,7 +172,7 @@ describe('Vehicle.onSettings', () => {
   describe('Distance Unit Settings', () => {
     it('should_updateDistanceUnits_when_distanceUnitChanged', async () => {
       // Arrange
-      vehicle.settings.distanceUnit = 'imperial';
+      mockSettings.distanceUnit = 'imperial';
       const mockStatus: VehicleStatus = {
         vin: 'TEST123',
         driveTrain: 'ELECTRIC',
@@ -204,7 +194,7 @@ describe('Vehicle.onSettings', () => {
 
     it('should_updateDistanceUnitsToMetric_when_distanceUnitChangedToMetric', async () => {
       // Arrange
-      vehicle.settings.distanceUnit = 'metric';
+      mockSettings.distanceUnit = 'metric';
       const mockStatus: VehicleStatus = {
         vin: 'TEST123',
         driveTrain: 'ELECTRIC',
@@ -225,7 +215,7 @@ describe('Vehicle.onSettings', () => {
 
     it('should_notUpdateCapabilities_when_distanceUnitChangedButNoStatus', async () => {
       // Arrange
-      vehicle.settings.distanceUnit = 'imperial';
+      mockSettings.distanceUnit = 'imperial';
       mockStateManager.getVehicleStatus.mockReturnValue(null);
 
       const newSettings = { distanceUnit: 'imperial' };
@@ -243,7 +233,7 @@ describe('Vehicle.onSettings', () => {
   describe('Fuel Unit Settings', () => {
     it('should_updateFuelUnits_when_fuelUnitChanged', async () => {
       // Arrange
-      vehicle.settings.fuelUnit = 'gallonUS';
+      mockSettings.fuelUnit = 'gallonUS';
       const mockStatus: VehicleStatus = {
         vin: 'TEST123',
         driveTrain: 'COMBUSTION',
@@ -265,7 +255,7 @@ describe('Vehicle.onSettings', () => {
 
     it('should_updateFuelUnitsToLiter_when_fuelUnitChangedToLiter', async () => {
       // Arrange
-      vehicle.settings.fuelUnit = 'liter';
+      mockSettings.fuelUnit = 'liter';
       const mockStatus: VehicleStatus = {
         vin: 'TEST123',
         driveTrain: 'COMBUSTION',
@@ -286,7 +276,7 @@ describe('Vehicle.onSettings', () => {
 
     it('should_notUpdateCapabilities_when_fuelUnitChangedButNoStatus', async () => {
       // Arrange
-      vehicle.settings.fuelUnit = 'gallonUK';
+      mockSettings.fuelUnit = 'gallonUK';
       mockStateManager.getVehicleStatus.mockReturnValue(null);
 
       const newSettings = { fuelUnit: 'gallonUK' };
@@ -304,8 +294,8 @@ describe('Vehicle.onSettings', () => {
   describe('Combined Settings Changes', () => {
     it('should_updateBothDistanceAndFuelUnits_when_bothChanged', async () => {
       // Arrange
-      vehicle.settings.distanceUnit = 'imperial';
-      vehicle.settings.fuelUnit = 'gallonUS';
+      mockSettings.distanceUnit = 'imperial';
+      mockSettings.fuelUnit = 'gallonUS';
       const mockStatus = {
         vin: 'TEST123',
         driveTrain: 'PHEV',
@@ -328,9 +318,9 @@ describe('Vehicle.onSettings', () => {
 
     it('should_handleAllSettingsChanges_when_multipleKeysChanged', async () => {
       // Arrange
-      vehicle.settings.apiPollingEnabled = true;
-      vehicle.settings.streamingEnabled = true;
-      vehicle.settings.distanceUnit = 'metric';
+      mockSettings.apiPollingEnabled = true;
+      mockSettings.streamingEnabled = true;
+      mockSettings.distanceUnit = 'metric';
       const mockStatus: VehicleStatus = {
         vin: 'TEST123',
         driveTrain: 'ELECTRIC',
@@ -395,7 +385,7 @@ describe('Vehicle.onSettings', () => {
   describe('Settings Merge', () => {
     it('should_mergeNewSettingsWithExisting_when_called', async () => {
       // Arrange
-      vehicle.settings = {
+      Object.assign(mockSettings, {
         currentVersion: '1.0.0',
         apiPollingEnabled: false,
         apiPollingInterval: 30,
@@ -405,7 +395,7 @@ describe('Vehicle.onSettings', () => {
         locationUpdateThreshold: 100,
         refuellingTriggerThreshold: 5,
         autoRetry: false,
-      };
+      });
 
       const newSettings = {
         apiPollingEnabled: true,
@@ -417,10 +407,10 @@ describe('Vehicle.onSettings', () => {
       await vehicle.onSettings({ newSettings, changedKeys });
 
       // Assert
-      expect(vehicle.settings.apiPollingEnabled).toBe(true);
-      expect(vehicle.settings.apiPollingInterval).toBe(60);
-      expect(vehicle.settings.distanceUnit).toBe('metric'); // Unchanged
-      expect(vehicle.settings.fuelUnit).toBe('liter'); // Unchanged
+      expect(mockSettings.apiPollingEnabled).toBe(true);
+      expect(mockSettings.apiPollingInterval).toBe(60);
+      expect(mockSettings.distanceUnit).toBe('metric'); // Unchanged
+      expect(mockSettings.fuelUnit).toBe('liter'); // Unchanged
     });
   });
 });
