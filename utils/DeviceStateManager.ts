@@ -69,8 +69,16 @@ export interface DeviceStoreData {
 
   /**
    * Last known location with geofence info (Homey LocationType format)
+   * Updated on every location change (no threshold)
    */
   lastLocation?: LocationType;
+
+  /**
+   * Location when flow cards were last triggered
+   * Only updated when location flows trigger (distance threshold or geofence change)
+   * Used to accumulate distance correctly for flow trigger logic
+   */
+  lastFlowTriggeredLocation?: LocationType;
 }
 
 /**
@@ -474,6 +482,33 @@ export class DeviceStateManager {
     storeData.lastLocation = location;
     await this.saveStoreData(storeData);
     this.logger?.debug('Persisted last location', { location });
+  }
+
+  /**
+   * Get last flow triggered location (persisted)
+   *
+   * Returns the location when flow cards were last triggered.
+   * Used to accumulate distance correctly for flow trigger logic.
+   *
+   * @returns Last flow triggered location or undefined if not set
+   */
+  getLastFlowTriggeredLocation(): LocationType | undefined {
+    const storeData = this.loadStoreData();
+    return storeData.lastFlowTriggeredLocation;
+  }
+
+  /**
+   * Set last flow triggered location (persists to store)
+   *
+   * Updates the marker for where flow cards were last triggered.
+   *
+   * @param location - Location to persist
+   */
+  async setLastFlowTriggeredLocation(location: LocationType): Promise<void> {
+    const storeData = this.loadStoreData();
+    storeData.lastFlowTriggeredLocation = location;
+    await this.saveStoreData(storeData);
+    this.logger?.debug('Persisted last flow triggered location', { location });
   }
 
   /**

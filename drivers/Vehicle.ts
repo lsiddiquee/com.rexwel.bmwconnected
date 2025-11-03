@@ -112,17 +112,25 @@ export class Vehicle extends Device {
       await this.checkGeofence(lastLocation, true);
 
       await this.stateManager.setLastLocation(lastLocation);
+    }
 
-      // Initialize trip tracking if first time (check if not set)
-      const lastTripLocation = this.stateManager.getLastTripCompleteLocation();
-      if (!lastTripLocation && lastLocation) {
-        await this.stateManager.setLastTripCompleteLocation(lastLocation);
-      }
+    // Initialize flow trigger location independently (needed for two-location tracking)
+    // This ensures upgraded devices get this property initialized
+    const lastFlowLocation = this.stateManager.getLastFlowTriggeredLocation();
+    if (!lastFlowLocation && lastLocation) {
+      await this.stateManager.setLastFlowTriggeredLocation(lastLocation);
+    }
 
-      const lastTripMileage = this.stateManager.getLastTripCompleteMileage();
-      if (lastTripMileage === undefined && this.currentVehicleState?.currentMileage) {
-        await this.stateManager.setLastTripCompleteMileage(this.currentVehicleState.currentMileage);
-      }
+    // Initialize trip tracking independently (needed for drive session tracking)
+    // This ensures upgraded devices get these properties initialized
+    const lastTripLocation = this.stateManager.getLastTripCompleteLocation();
+    if (!lastTripLocation && lastLocation) {
+      await this.stateManager.setLastTripCompleteLocation(lastLocation);
+    }
+
+    const lastTripMileage = this.stateManager.getLastTripCompleteMileage();
+    if (lastTripMileage === undefined && this.currentVehicleState?.currentMileage) {
+      await this.stateManager.setLastTripCompleteMileage(this.currentVehicleState.currentMileage);
     }
 
     await this.migrate_device_capabilities();
@@ -455,16 +463,20 @@ export class Vehicle extends Device {
       // Check geofence (sets label and address if within configured zones)
       await this.checkGeofence(newLocation);
 
-      // Get previous location before updating
-      const oldLocation = this.stateManager.getLastLocation();
+      // Get locations for flow trigger logic
+      const currentLocation = this.stateManager.getLastLocation();
+      const lastFlowLocation = this.stateManager.getLastFlowTriggeredLocation() ?? currentLocation;
 
       // Always persist new location to state (no threshold - ensures accurate trip tracking)
       await this.stateManager.setLastLocation(newLocation);
 
-      // Only trigger flow cards if there's a significant change
-      const shouldTriggerFlows = this.shouldTriggerLocationFlows(oldLocation, newLocation);
+      // Check if flows should trigger (compares against last FLOW location, not current)
+      const shouldTriggerFlows = this.shouldTriggerLocationFlows(lastFlowLocation, newLocation);
       if (shouldTriggerFlows) {
-        await this.triggerLocationFlows(oldLocation, newLocation);
+        // Update flow trigger marker
+        await this.stateManager.setLastFlowTriggeredLocation(newLocation);
+        // Trigger flows with previous current location and new location
+        await this.triggerLocationFlows(currentLocation, newLocation);
       }
     }
 
