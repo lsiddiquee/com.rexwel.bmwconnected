@@ -4,9 +4,6 @@ export class DeviceSettings {
   fuelUnit: string = 'liter';
   autoRetry: boolean = false;
 
-  // Distance in meters traveled before a location update is triggered
-  locationUpdateThreshold: number = 50;
-
   currentVersion: string = '0.0.0';
 
   /**

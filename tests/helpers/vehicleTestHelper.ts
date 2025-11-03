@@ -50,7 +50,6 @@ export function createMockedVehicle(
     apiPollingEnabled: true,
     apiPollingInterval: 60,
     streamingEnabled: true,
-    locationUpdateThreshold: 50,
     ...customSettings,
   };
 

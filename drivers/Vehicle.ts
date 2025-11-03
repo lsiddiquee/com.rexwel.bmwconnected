@@ -60,6 +60,7 @@ export class Vehicle extends Device {
   // Trip session debouncing
   private _tripDebounceTimer?: NodeJS.Timeout;
   private static readonly TRIP_DEBOUNCE_WINDOW_MS = 5000; // 5 seconds - allow time for final location updates
+  private static readonly LOCATION_CHANGE_THRESHOLD_METERS = 50; // 50 meters - significant location change to consider location update
 
   // Cached TRIP category keys for efficient filtering
   private static _tripCategoryKeys?: Set<string>;
@@ -442,29 +443,28 @@ export class Vehicle extends Device {
       );
     }
 
-    // Update location
+    // Update location - always update state for accurate tracking
     if (status.location) {
-      const lastLocation = this.stateManager.getLastLocation();
-      const shouldUpdate =
-        !lastLocation ||
-        geo.distanceTo(
-          {
-            latitude: status.location.coordinates.latitude,
-            longitude: status.location.coordinates.longitude,
-          },
-          {
-            latitude: lastLocation.latitude,
-            longitude: lastLocation.longitude,
-          }
-        ) > settings.locationUpdateThreshold;
+      const newLocation: LocationType = {
+        label: '',
+        latitude: status.location.coordinates.latitude,
+        longitude: status.location.coordinates.longitude,
+        address: status.location.address?.formatted ?? '',
+      };
 
-      if (shouldUpdate) {
-        await this.onLocationChanged({
-          label: '',
-          latitude: status.location.coordinates.latitude,
-          longitude: status.location.coordinates.longitude,
-          address: status.location.address?.formatted ?? '',
-        });
+      // Check geofence (sets label and address if within configured zones)
+      await this.checkGeofence(newLocation);
+
+      // Get previous location before updating
+      const oldLocation = this.stateManager.getLastLocation();
+
+      // Always persist new location to state (no threshold - ensures accurate trip tracking)
+      await this.stateManager.setLastLocation(newLocation);
+
+      // Only trigger flow cards if there's a significant change
+      const shouldTriggerFlows = this.shouldTriggerLocationFlows(oldLocation, newLocation);
+      if (shouldTriggerFlows) {
+        await this.triggerLocationFlows(oldLocation, newLocation);
       }
     }
 
@@ -968,18 +968,61 @@ export class Vehicle extends Device {
     }
   }
 
-  private async onLocationChanged(newLocation: LocationType) {
-    this.logger?.info('Location changed.');
+  /**
+   * Determines if location flow cards should be triggered
+   *
+   * Flow cards are triggered if:
+   * - No previous location exists (first location update), OR
+   * - Geofence changed (entering/exiting labeled zones), OR
+   * - Significant distance change (>50 meters to reduce GPS noise spam)
+   *
+   * @param oldLocation - Previous location from state
+   * @param newLocation - New location with geofence info already set
+   * @returns True if flows should trigger
+   */
+  private shouldTriggerLocationFlows(
+    oldLocation: LocationType | undefined,
+    newLocation: LocationType
+  ): boolean {
+    // Always trigger on first location
+    if (!oldLocation) {
+      return true;
+    }
 
-    await this.checkGeofence(newLocation);
+    // Always trigger if geofence changed (entering/exiting labeled zones)
+    // This takes priority over distance threshold
+    if (oldLocation.label !== newLocation.label) {
+      return true;
+    }
 
-    // Get old location from state manager
-    const oldLocation = this.stateManager.getLastLocation();
+    // Only check distance if geofence didn't change
+    // Trigger if significant distance change (>50 meters)
+    const distance = geo.distanceTo(
+      { latitude: newLocation.latitude, longitude: newLocation.longitude },
+      { latitude: oldLocation.latitude, longitude: oldLocation.longitude }
+    );
 
-    // Persist new location to state manager
-    await this.stateManager.setLastLocation(newLocation);
+    return distance > Vehicle.LOCATION_CHANGE_THRESHOLD_METERS;
+  }
 
-    // Trigger location changed flow card
+  /**
+   * Triggers location-related flow cards
+   *
+   * Triggers:
+   * - location_changed: Always when this method is called
+   * - geo_fence_enter: When entering a labeled geofence
+   * - geo_fence_exit: When exiting a labeled geofence
+   *
+   * @param oldLocation - Previous location (may be undefined)
+   * @param newLocation - New location with geofence info
+   */
+  private async triggerLocationFlows(
+    oldLocation: LocationType | undefined,
+    newLocation: LocationType
+  ): Promise<void> {
+    this.logger?.info('Location changed - triggering flow cards');
+
+    // Always trigger location changed flow
     const locationChangedFlowCard = this.homey.flow.getDeviceTriggerCard('location_changed');
     await locationChangedFlowCard.trigger(this, newLocation, {});
 
@@ -988,11 +1031,13 @@ export class Vehicle extends Device {
       this.logger?.info(
         `Geofence changed. Old Location: [${oldLocation.label}]. New Location: [${newLocation.label}]`
       );
+
       if (newLocation.label) {
         this.logger?.info('Entered geofence.');
         const geoFenceEnter = this.homey.flow.getDeviceTriggerCard('geo_fence_enter');
         await geoFenceEnter.trigger(this, newLocation, {});
       }
+
       if (oldLocation.label) {
         this.logger?.info('Exit geofence.');
         const geoFenceExit = this.homey.flow.getDeviceTriggerCard('geo_fence_exit');

@@ -392,7 +392,6 @@ describe('Vehicle.onSettings', () => {
         streamingEnabled: false,
         distanceUnit: 'metric',
         fuelUnit: 'liter',
-        locationUpdateThreshold: 100,
         refuellingTriggerThreshold: 5,
         autoRetry: false,
       });
