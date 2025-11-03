@@ -98,6 +98,7 @@ export interface DeviceStoreData {
 export type StateUpdateDelegate = (status: VehicleStatus) => void | Promise<void>;
 
 export class DeviceStateManager {
+  private readonly vin: string;
   private readonly device: Homey.Device;
   private readonly logger?: ILogger;
 
@@ -124,6 +125,7 @@ export class DeviceStateManager {
     logger?: ILogger
   ) {
     this.device = device;
+    this.vin = vin;
     this.logger = logger;
     this.stateUpdateDelegate = stateUpdateDelegate;
     let deviceState = this.device.getStoreValue(STORE_KEY_DEVICE_STATE) as
@@ -171,14 +173,12 @@ export class DeviceStateManager {
 
         // Merge all data points from all messages (last one wins per key within batch)
         const mergedData: Record<string, TelematicDataPoint> = {};
-        let vin = '';
         for (const msg of batch) {
-          vin = msg.vin; // All messages should be for the same VIN
-          Object.assign(mergedData, msg.data);
+          this.mergeTelematicData(mergedData, msg.data);
         }
 
-        this.logger?.info('Batch updating state from MQTT messages', {
-          vin,
+        this.logger?.info('Batch processing MQTT messages', {
+          vin: this.vin,
           batchCount: batch.length,
           keysCount: Object.keys(mergedData).length,
         });
@@ -244,6 +244,39 @@ export class DeviceStateManager {
   }
 
   /**
+   * Merges telematic data with timestamp-based comparison
+   *
+   * Merges source telematic data into target cache, only updating keys where
+   * source data is newer than target data (or target doesn't exist).
+   *
+   * @param target - Target cache to merge into (modified in-place)
+   * @param source - Source telematic data to merge from (read-only)
+   * @returns Number of keys updated in target
+   * @private
+   */
+  private mergeTelematicData(
+    target: Record<string, TelematicDataPoint>,
+    source: Record<string, TelematicDataPoint>
+  ): number {
+    let updatedCount = 0;
+
+    // Merge with timestamp-based comparison
+    // Only update if source is newer OR target doesn't exist
+    for (const [key, sourceDataPoint] of Object.entries(source)) {
+      const targetDataPoint = target[key];
+      const sourceTimestamp = new Date(sourceDataPoint.timestamp);
+      const targetTimestamp = targetDataPoint ? new Date(targetDataPoint.timestamp) : null;
+
+      if (!targetTimestamp || sourceTimestamp >= targetTimestamp) {
+        target[key] = sourceDataPoint;
+        updatedCount++;
+      }
+    }
+
+    return updatedCount;
+  }
+
+  /**
    * Updates cache from telematic data with timestamp-based merging
    *
    * Shared method for both MQTT and API updates.
@@ -266,17 +299,7 @@ export class DeviceStateManager {
 
     const storeData = this.loadStoreData();
 
-    // Update cache with timestamp-based merging
-    // Only update if newer OR doesn't exist
-    for (const [key, dataPoint] of Object.entries(telematicData)) {
-      const existing = storeData.telematicCache[key];
-      const incomingTimestamp = new Date(dataPoint.timestamp);
-      const existingTimestamp = existing ? new Date(existing.timestamp) : null;
-
-      if (!existingTimestamp || incomingTimestamp >= existingTimestamp) {
-        storeData.telematicCache[key] = dataPoint;
-      }
-    }
+    const updatedCount = this.mergeTelematicData(storeData.telematicCache, telematicData);
 
     // Update last update timestamp
     if (source === 'api') {
@@ -290,6 +313,7 @@ export class DeviceStateManager {
     this.logger?.debug('Updated telematic cache', { data: storeData.telematicCache });
     this.logger?.info(`Cache updated from ${source.toUpperCase()} telematic data`, {
       cacheSize: Object.keys(storeData.telematicCache).length,
+      updatedKeys: updatedCount,
     });
   }
 
