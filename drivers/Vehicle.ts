@@ -76,6 +76,9 @@ export class Vehicle extends Device {
       this.logger
     );
 
+    // Load persisted settings before starting any services so we respect user preferences
+    await this.migrate_device_settings();
+
     // Initialize vehicle data and services (API client, state manager, MQTT, API polling)
     await this.initializeVehicleDataAndServices();
 
@@ -116,7 +119,6 @@ export class Vehicle extends Device {
       }
     }
 
-    await this.migrate_device_settings();
     await this.migrate_device_capabilities();
 
     this.logger?.info(`${this.getName()} (${this.deviceData.id}) has been initialized`);
