@@ -59,7 +59,7 @@ export class Vehicle extends Device {
 
   // Trip session debouncing
   private _tripDebounceTimer?: NodeJS.Timeout;
-  private static readonly TRIP_DEBOUNCE_WINDOW_MS = 1000; // 1 second
+  private static readonly TRIP_DEBOUNCE_WINDOW_MS = 5000; // 5 seconds - allow time for final location updates
 
   // Cached TRIP category keys for efficient filtering
   private static _tripCategoryKeys?: Set<string>;
