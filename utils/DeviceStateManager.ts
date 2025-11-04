@@ -79,6 +79,14 @@ export interface DeviceStoreData {
    * Used to accumulate distance correctly for flow trigger logic
    */
   lastFlowTriggeredLocation?: LocationType;
+
+  /**
+   * Whether vehicle is currently driving
+   * Set to true when drive starts (first significant location change)
+   * Set to false when trip completes (TRIP category messages stop)
+   * Persists across app restarts for better UX during long drives
+   */
+  isDriving?: boolean;
 }
 
 /**
@@ -512,7 +520,35 @@ export class DeviceStateManager {
   }
 
   /**
-   * Get client ID for BMW CarData API authentication (persisted)
+   * Get driving state
+   *
+   * Returns whether vehicle is currently driving (between drive start and trip completion).
+   *
+   * @returns True if driving, false if stopped, undefined if never set
+   */
+  getIsDriving(): boolean | undefined {
+    const storeData = this.loadStoreData();
+    return storeData.isDriving;
+  }
+
+  /**
+   * Set driving state (persists to store)
+   *
+   * Updates whether vehicle is currently driving.
+   * Set to true on drive start, false on trip completion.
+   * Persists across app restarts for better UX during long drives.
+   *
+   * @param isDriving - True if driving, false if stopped
+   */
+  async setIsDriving(isDriving: boolean): Promise<void> {
+    const storeData = this.loadStoreData();
+    storeData.isDriving = isDriving;
+    await this.saveStoreData(storeData);
+    this.logger?.debug('Persisted driving state', { isDriving });
+  }
+
+  /**
+   * Get last trip completion location from state
    *
    * @returns Client ID or undefined if not set
    */

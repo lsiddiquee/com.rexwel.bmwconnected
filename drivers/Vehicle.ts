@@ -870,6 +870,59 @@ export class Vehicle extends Device {
   }
 
   /**
+   * Trigger drive session started flow card
+   *
+   * Extracts trip start data from current state.
+   * Called when first significant location change detected while not driving.
+   */
+  private async triggerDriveSessionStarted(): Promise<void> {
+    const settings = this.settings;
+    try {
+      // Get drive start location from last trip complete location (where previous trip ended)
+      const startLocation = this.stateManager.getLastTripCompleteLocation();
+      if (!startLocation) {
+        this.logger?.warn('No start location available for drive session started');
+        return;
+      }
+
+      // Ensure address is resolved if not already set
+      if (!startLocation.address) {
+        await this.checkGeofence(startLocation, true);
+      }
+
+      // Get starting mileage
+      const startMileage = this.stateManager.getLastTripCompleteMileage() ?? 0;
+
+      // Trigger flow card
+      const driveSessionStartedFlowCard =
+        this.homey.flow.getDeviceTriggerCard('drive_session_started');
+
+      await driveSessionStartedFlowCard.trigger(
+        this,
+        {
+          StartLabel: startLocation.label,
+          StartLatitude: startLocation.latitude,
+          StartLongitude: startLocation.longitude,
+          StartAddress: startLocation.address,
+          StartMileage: UnitConverter.ConvertDistance(startMileage, settings.distanceUnit),
+        },
+        {}
+      );
+
+      this.logger?.info(
+        `Drive session started flow triggered from ${startLocation.label || 'location'} at ${startMileage} km`
+      );
+
+      // Set driving state
+      await this.stateManager.setIsDriving(true);
+    } catch (error) {
+      this.logger?.error(
+        `Failed to trigger drive session started: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+
+  /**
    * Trigger drive session completed flow card
    *
    * Extracts trip data from current and previous vehicle state.
@@ -931,6 +984,9 @@ export class Vehicle extends Device {
       // Update last trip complete location/mileage in state manager (persists to store)
       await this.stateManager.setLastTripCompleteLocation(endLocation);
       await this.stateManager.setLastTripCompleteMileage(endMileage);
+
+      // Reset driving state
+      await this.stateManager.setIsDriving(false);
     } catch (error) {
       this.logger?.error(
         `Failed to trigger drive session completed: ${error instanceof Error ? error.message : String(error)}`
@@ -1021,6 +1077,7 @@ export class Vehicle extends Device {
    * Triggers location-related flow cards
    *
    * Triggers:
+   * - drive_session_started: When first significant location change detected while not driving
    * - location_changed: Always when this method is called
    * - geo_fence_enter: When entering a labeled geofence
    * - geo_fence_exit: When exiting a labeled geofence
@@ -1033,6 +1090,13 @@ export class Vehicle extends Device {
     newLocation: LocationType
   ): Promise<void> {
     this.logger?.info('Location changed - triggering flow cards');
+
+    // Check if drive is starting (first significant location change while not driving)
+    const isDriving = this.stateManager.getIsDriving();
+    if (!isDriving) {
+      this.logger?.info('Drive starting - vehicle was not driving');
+      await this.triggerDriveSessionStarted();
+    }
 
     // Always trigger location changed flow
     const locationChangedFlowCard = this.homey.flow.getDeviceTriggerCard('location_changed');
