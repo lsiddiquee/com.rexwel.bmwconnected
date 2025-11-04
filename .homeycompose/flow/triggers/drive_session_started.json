@@ -2,7 +2,7 @@
     "id": "drive_session_started",
     "title": {
         "en": "Drive session started",
-        "nl": "Rit gestart"	
+        "nl": "Rit gestart"
     },
     "tokens": [
         {
@@ -53,5 +53,10 @@
             },
             "example": "45875"
         }
-    ]
+    ],
+    "args": [{
+        "name": "device",
+        "type": "device",
+        "filter": "driver_id=bmw|mini"
+    }]
 }
