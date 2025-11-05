@@ -107,7 +107,7 @@
   "0.8.3": {
     "en": "Advanced charging control"
   },
-  "1.0.9": {
+  "1.0.10": {
     "en": "App is now Read-Only. Switching to CarData API and MQTT streaming."
   }
 }
