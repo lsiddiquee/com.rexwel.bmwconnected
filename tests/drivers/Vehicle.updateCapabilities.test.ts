@@ -27,7 +27,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
   let mockApp: any;
   let mockLogger: any;
   let setCapabilityValueSafeSpy: jest.SpyInstance;
-  let onLocationChangedSpy: jest.SpyInstance;
+  let checkGeofenceSpy: jest.SpyInstance;
 
   beforeEach(() => {
     // Create vehicle instance using helper
@@ -37,12 +37,32 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
     mockLogger = result.mocks.mockLogger;
 
     mockApp.currentLocation = undefined;
-    vehicle.homey = { app: mockApp } as any;
+
+    // Create mock flow cards
+    const mockFlowCard = {
+      trigger: jest.fn().mockResolvedValue(undefined),
+    };
+    const mockFlow = {
+      getDeviceTriggerCard: jest.fn().mockReturnValue(mockFlowCard),
+    };
+    const mockSettings = {
+      get: jest.fn().mockReturnValue(null), // No geofences
+    };
+
+    vehicle.homey = {
+      app: mockApp,
+      flow: mockFlow,
+      settings: mockSettings,
+    } as any;
 
     // Create mock state manager
     const mockStateManager = {
       getLastLocation: jest.fn().mockReturnValue(null),
       setLastLocation: jest.fn().mockResolvedValue(undefined),
+      getLastFlowTriggeredLocation: jest.fn().mockReturnValue(null),
+      setLastFlowTriggeredLocation: jest.fn().mockResolvedValue(undefined),
+      getIsDriving: jest.fn().mockReturnValue(false),
+      setIsDriving: jest.fn().mockResolvedValue(undefined),
       getVehicleStatus: jest.fn().mockReturnValue({
         vin: 'TEST_VIN',
         driveTrain: DriveTrainType.ELECTRIC,
@@ -59,10 +79,8 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
       .spyOn(vehicle as any, 'setCapabilityValueSafe')
       .mockResolvedValue(true);
 
-    // Mock onLocationChanged
-    onLocationChangedSpy = jest
-      .spyOn(vehicle as any, 'onLocationChanged')
-      .mockResolvedValue(undefined);
+    // Mock location handling methods (now inline in updateCapabilitiesFromStatus)
+    checkGeofenceSpy = jest.spyOn(vehicle as any, 'checkGeofence').mockResolvedValue(undefined);
 
     // Mock convertChargingStatus
     jest.spyOn(vehicle as any, 'convertChargingStatus').mockReturnValue('charging');
@@ -118,8 +136,8 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         expect.any(String)
       );
 
-      // Verify location was updated
-      expect(onLocationChangedSpy).toHaveBeenCalledWith({
+      // Verify location was updated (checkGeofence called with new location)
+      expect(checkGeofenceSpy).toHaveBeenCalledWith({
         label: '',
         latitude: 52.52,
         longitude: 13.405,
@@ -175,7 +193,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
       );
 
       // Verify location was NOT updated (undefined in status)
-      expect(onLocationChangedSpy).not.toHaveBeenCalled();
+      expect(checkGeofenceSpy).not.toHaveBeenCalled();
 
       // Verify current state was still stored
       expect(vehicle.currentVehicleState).toEqual(sparseStatus);

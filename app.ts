@@ -206,15 +206,17 @@ export class BMWConnectedDrive extends Homey.App {
         return battery_percentage && battery_percentage < args.battery_charge_test;
       });
 
-    // TODO: Fix conditions
     this.homey.flow
       .getConditionCard('charging_status')
       .registerRunListener(async (args: any, _: any) => {
-        const charging_state = await Capabilities.GetCapabilityValueSafe<string>(
+        // Get the current Homey charging state (plugged_in_charging, plugged_in, plugged_out)
+        const currentChargingState = await Capabilities.GetCapabilityValueSafe<string>(
           args.device,
           Capabilities.EV_CHARGING_STATE
         );
-        return charging_state === args.charging_state;
+
+        // Compare with the Homey-standard charging state from flow card
+        return currentChargingState === args.charging_state;
       });
   }
 

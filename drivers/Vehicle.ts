@@ -541,15 +541,31 @@ export class Vehicle extends Device {
       //   await this.updateCapabilityValue('fuel_level_percentage', status.combustion.fuelLevelPercent);
       // }
 
-      if (status.combustion.fuelLevelLiters !== undefined) {
+      const newFuelValue = status.combustion.fuelLevelLiters;
+      if (newFuelValue !== undefined) {
         await this.setCapabilityValueSafe(
           Capabilities.REMAINING_FUEL,
-          status.combustion.fuelLevelLiters
-            ? UnitConverter.ConvertFuel(status.combustion.fuelLevelLiters, settings.fuelUnit)
-            : null
-
-          // TODO: Refuelling trigger needs to be implemented
+          newFuelValue ? UnitConverter.ConvertFuel(newFuelValue, settings.fuelUnit) : null
         );
+
+        const oldFuelValue = this.currentVehicleState?.combustion?.fuelLevelLiters;
+        // Trigger refuelled flow if fuel level increased beyond threshold
+        if (
+          oldFuelValue &&
+          newFuelValue - oldFuelValue >= this.settings.refuellingTriggerThreshold
+        ) {
+          const refuelledFlowCard: any = this.homey.flow.getDeviceTriggerCard('refuelled');
+          refuelledFlowCard.trigger(
+            this,
+            {
+              FuelBeforeRefuelling: oldFuelValue,
+              FuelAfterRefuelling: newFuelValue,
+              RefuelledLiters: newFuelValue - oldFuelValue,
+              Location: this.currentVehicleState?.location?.address?.formatted,
+            },
+            {}
+          );
+        }
       }
     }
 

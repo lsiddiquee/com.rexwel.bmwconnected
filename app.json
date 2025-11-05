@@ -574,7 +574,7 @@
           "en": "Charging Status !{{is|is not}} '[[charging_state]]'"
         },
         "hint": {
-          "en": "Checks if the car is inside/outside a geofence location."
+          "en": "Checks the current charging state of the vehicle."
         },
         "args": [
           {
@@ -586,94 +586,24 @@
             },
             "values": [
               {
-                "id": "DEFAULT",
+                "id": "plugged_in_charging",
                 "title": {
-                  "en": "Default",
-                  "nl": "Standaard"
+                  "en": "Plugged in and charging",
+                  "nl": "Aangesloten en aan het laden"
                 }
               },
               {
-                "id": "CHARGING",
+                "id": "plugged_in",
                 "title": {
-                  "en": "Charging",
-                  "nl": "Opladen"
+                  "en": "Plugged in (not charging)",
+                  "nl": "Aangesloten (niet aan het laden)"
                 }
               },
               {
-                "id": "ERROR",
+                "id": "plugged_out",
                 "title": {
-                  "en": "Error",
-                  "nl": "Fout"
-                }
-              },
-              {
-                "id": "COMPLETE",
-                "title": {
-                  "en": "Complete",
-                  "nl": "Voltooid"
-                }
-              },
-              {
-                "id": "FULLY_CHARGED",
-                "title": {
-                  "en": "Fully charged",
-                  "nl": "Volledig geladen"
-                }
-              },
-              {
-                "id": "FINISHED_FULLY_CHARGED",
-                "title": {
-                  "en": "Finished and fully charged",
-                  "nl": "Afgerond en volledig geladen"
-                }
-              },
-              {
-                "id": "FINISHED_NOT_FULL",
-                "title": {
-                  "en": "Finished but not fully charged",
-                  "nl": "Afgerond maar niet volledig geladen"
-                }
-              },
-              {
-                "id": "INVALID",
-                "title": {
-                  "en": "Invalid",
-                  "nl": "Ongeldig"
-                }
-              },
-              {
-                "id": "NOT_CHARGING",
-                "title": {
-                  "en": "Not charging",
-                  "nl": "Niet aan het laden"
-                }
-              },
-              {
-                "id": "PLUGGED_IN",
-                "title": {
-                  "en": "Plugged in",
-                  "nl": "Aangesloten"
-                }
-              },
-              {
-                "id": "WAITING_FOR_CHARGING",
-                "title": {
-                  "en": "Waiting for charging",
-                  "nl": "Wacht om te laden"
-                }
-              },
-              {
-                "id": "TARGET_REACHED",
-                "title": {
-                  "en": "Target reached",
-                  "nl": "Doel bereikt"
-                }
-              },
-              {
-                "id": "UNKNOWN",
-                "title": {
-                  "en": "Unknown",
-                  "nl": "Onbekend"
+                  "en": "Not plugged in",
+                  "nl": "Niet aangesloten"
                 }
               }
             ]
