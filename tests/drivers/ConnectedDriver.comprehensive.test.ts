@@ -59,7 +59,7 @@ class TestableConnectedDriver extends ConnectedDriver {
     super();
 
     // Mock the Homey Driver base class onInit method
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+     
     (ConnectedDriver.prototype as any).__proto__.onInit = jest.fn().mockResolvedValue(undefined);
 
     this.mockAuthProvider = {
@@ -407,7 +407,7 @@ describe('ConnectedDriver - Comprehensive', () => {
       expect(devices[0].name).toBe('BMW X5 (VIN123)');
       expect(devices[0].data.id).toBe('VIN123');
 
-      const store = devices[0].store as Record<string, unknown>;
+      const store = devices[0].store;
       expect(store[STORE_KEY_CLIENT_ID]).toBe('pair-client-id');
       expect(store[STORE_KEY_CONTAINER_ID]).toBe('pair-container-id');
 

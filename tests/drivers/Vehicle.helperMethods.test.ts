@@ -375,7 +375,7 @@ describe('Vehicle Helper Methods Tests', () => {
         disconnect: jest.fn().mockResolvedValue(undefined),
       };
       vehicle['_mqttClient'] = mockMqttClient as any;
-      vehicle['_apiPollingTimer'] = setTimeout(() => {}, 10000) as NodeJS.Timeout;
+      vehicle['_apiPollingTimer'] = setTimeout(() => {}, 10000);
 
       // Mock stopApiPolling
       jest.spyOn(vehicle as any, 'stopApiPolling').mockImplementation(() => {});

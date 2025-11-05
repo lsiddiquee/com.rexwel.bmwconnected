@@ -4,5 +4,5 @@ node_modules/
 .homeybuild/
 .homeycompose/
 package-lock.json
-.github/*.*
+.github/
 app.json

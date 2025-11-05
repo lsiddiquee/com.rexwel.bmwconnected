@@ -7,7 +7,9 @@ export class ConfigurationManager {
 
   static getConfiguration(homey: Homey): Configuration {
     if (!this.configurationCache) {
-      this.configurationCache = homey.settings.get(ConfigurationManager._settingsKey);
+      this.configurationCache = homey.settings.get(
+        ConfigurationManager._settingsKey
+      ) as Configuration;
     }
     return this.configurationCache;
   }
