@@ -39,4 +39,13 @@ module.exports = {
     '!**/tests/**',
     '!**/coverage/**',
   ],
+  // Coverage thresholds - centralized for easier management
+  coverageThreshold: {
+    global: {
+      statements: 75,
+      branches: 60,
+      functions: 75,
+      lines: 75,
+    },
+  },
 };

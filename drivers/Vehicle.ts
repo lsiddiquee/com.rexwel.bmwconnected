@@ -514,10 +514,26 @@ export class Vehicle extends Device {
 
       // Convert BMW charging status to Homey EV charging state
       if (status.electric.chargingStatus) {
+        const oldChargingStatus = this.currentVehicleState?.electric?.chargingStatus;
+        const newChargingStatus = status.electric.chargingStatus;
+
         await this.setCapabilityValueSafe(
           Capabilities.EV_CHARGING_STATE,
-          this.convertChargingStatus(status.electric.chargingStatus)
+          this.convertChargingStatus(newChargingStatus)
         );
+
+        // Trigger charging status change flow if status changed or first status update
+        if (!oldChargingStatus || oldChargingStatus !== newChargingStatus) {
+          const chargingStatusChangeFlowCard: any =
+            this.homey.flow.getDeviceTriggerCard('charging_status_change');
+          await chargingStatusChangeFlowCard.trigger(
+            this,
+            {
+              charging_status: newChargingStatus,
+            },
+            {}
+          );
+        }
       }
 
       // TODO: Add these capabilities if needed
