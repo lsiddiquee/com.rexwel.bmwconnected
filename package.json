@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "app.ts",
   "scripts": {
-    "prebuild": "copyfiles -f -V -E \".\\shared\\pair_repair\\*.*\" .\\drivers\\bmw\\pair && copyfiles -f -V -E \".\\shared\\pair_repair\\*.*\" .\\drivers\\bmw\\repair && copyfiles -f -V -E \".\\shared\\pair_repair\\*.*\" .\\drivers\\mini\\pair && copyfiles -f -V -E \".\\shared\\pair_repair\\*.*\" .\\drivers\\mini\\repair",
+    "prebuild": "copyfiles -f -V -E \"./shared/pair_repair/*.*\" ./drivers/bmw/pair && copyfiles -f -V -E \"./shared/pair_repair/*.*\" ./drivers/bmw/repair && copyfiles -f -V -E \"./shared/pair_repair/*.*\" ./drivers/mini/pair && copyfiles -f -V -E \"./shared/pair_repair/*.*\" ./drivers/mini/repair",
     "build": "tsc",
     "build:tests": "tsc -p tsconfig.tests.json",
     "test": "jest",

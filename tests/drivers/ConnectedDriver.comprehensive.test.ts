@@ -59,7 +59,7 @@ class TestableConnectedDriver extends ConnectedDriver {
     super();
 
     // Mock the Homey Driver base class onInit method
-     
+
     (ConnectedDriver.prototype as any).__proto__.onInit = jest.fn().mockResolvedValue(undefined);
 
     this.mockAuthProvider = {
