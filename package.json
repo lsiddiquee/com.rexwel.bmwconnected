@@ -14,8 +14,8 @@
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write \"**/*.{ts,json,md}\"",
     "format:check": "prettier --check \"**/*.{ts,json,md}\"",
-    "lint:md": "markdownlint-cli2 \"**/*.md\" \"!node_modules\" \"!build\" \"!build-tests\"",
-    "lint:md:fix": "markdownlint-cli2 --fix \"**/*.md\" \"!node_modules\" \"!build\" \"!build-tests\"",
+    "lint:md": "markdownlint-cli2 \"**/*.md\" \"!node_modules\" \"!build\" \"!build-tests\" \"!.homeybuild\" \"!.github\"",
+    "lint:md:fix": "markdownlint-cli2 --fix \"**/*.md\" \"!node_modules\" \"!build\" \"!build-tests\" \"!.homeybuild\" \"!.github\"",
     "validate": "npm run format:check && npm run lint && npm run lint:md",
     "fix": "npm run format && npm run lint:fix && npm run lint:md:fix"
   },
