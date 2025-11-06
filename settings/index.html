@@ -688,16 +688,7 @@
               ${device.deviceId} - ${device.deviceName}
               <small style="opacity: 0.7; font-weight: normal;"> (${device.capabilities.length} capabilities)</small>
             </legend>
-            <div class="capabilities-list" id="caps-${device.deviceId}">
-              <div class="homey-form-group">
-                <button type="button" class="homey-button-secondary" onclick="getDeviceJson('/getDeviceStatus', 'status-json-${device.deviceId}', '${device.brand}', '${device.deviceId}')">Get Device Status</button>
-                <div id="status-json-${device.deviceId}" class="json-display" style="display: none;"></div>
-              </div>
-
-              <div class="homey-form-group">
-                <button type="button" class="homey-button-secondary" onclick="getDeviceJson('/getDeviceCapabilities', 'capabilities-json-${device.deviceId}', '${device.brand}', '${device.deviceId}')">Get Device Capabilities</button>
-                <div id="capabilities-json-${device.deviceId}" class="json-display" style="display: none;"></div>
-              </div>`;
+            <div class="capabilities-list" id="caps-${device.deviceId}">`;
 
           if (device.capabilities.length === 0) {
             html +=
@@ -713,6 +704,16 @@
               </div>`;
             });
           }
+          html += `
+              <div class="homey-form-group">
+                <button type="button" class="homey-button-secondary" onclick="getDeviceJson('/getDeviceStatus', 'status-json-${device.deviceId}', '${device.brand}', '${device.deviceId}')">Get Device Status</button>
+                <div id="status-json-${device.deviceId}" class="json-display" style="display: none;"></div>
+              </div>
+
+              <div class="homey-form-group">
+                <button type="button" class="homey-button-secondary" onclick="getDeviceJson('/getDeviceCapabilities', 'capabilities-json-${device.deviceId}', '${device.brand}', '${device.deviceId}')">Get Device Capabilities</button>
+                <div id="capabilities-json-${device.deviceId}" class="json-display" style="display: none;"></div>
+              </div>`;
 
           html += '</div></fieldset>';
         });

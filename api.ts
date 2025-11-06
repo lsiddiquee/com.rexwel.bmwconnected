@@ -15,6 +15,8 @@ export async function saveSettings({
   homey: Homey;
   body: Configuration;
 }): Promise<boolean> {
+  await Promise.resolve(); // Ensure async context
+
   body.geofences.forEach((fence) => {
     if (!fence.label || !fence.latitude || !fence.longitude || !fence.radius) {
       throw new Error('Geofence information cannot be empty.');
@@ -50,14 +52,12 @@ export async function resolveAddress({
   query,
 }: {
   homey: Homey;
-  query: any;
+  query: { latitude?: number; longitude?: number };
 }): Promise<string | undefined> {
   const app = homey.app as BMWConnectedDrive;
   app.logger?.info('resolveAddress invoked.');
 
-  const latitude = parseFloat(query.latitude);
-  const longitude = parseFloat(query.longitude);
-  if (isNaN(latitude) || isNaN(longitude)) {
+  if (!query.latitude || !query.longitude || isNaN(query.latitude) || isNaN(query.longitude)) {
     throw new Error('Latitude and longitude must be valid numbers.');
   }
   return await OpenStreetMap.GetAddress(query.latitude, query.longitude, app.logger);
@@ -68,7 +68,7 @@ export async function getCurrentLocation({
 }: {
   homey: Homey;
 }): Promise<LocationType | undefined> {
-  await Promise.resolve();
+  await Promise.resolve(); // Ensure async context
 
   // TODO: Improve to be able to select vehicle if multiple are registered
   const app = homey.app as BMWConnectedDrive;
@@ -130,6 +130,8 @@ export async function getRegisteredDevices({
 }: {
   homey: Homey;
 }): Promise<DeviceCapabilities[]> {
+  await Promise.resolve(); // Ensure async context
+
   const app = homey.app as BMWConnectedDrive;
   app.logger?.info('getRegisteredDevices invoked.');
 
@@ -147,7 +149,7 @@ export async function getRegisteredDevices({
           device.getCapabilities().map((cap) => ({
             id: cap,
             name: cap,
-            value: device.getCapabilityValue(cap)?.toString() ?? 'N/A',
+            value: String(device.getCapabilityValue(cap)),
           }))
         )
       );
@@ -167,6 +169,8 @@ export async function getDeviceStatus({
   homey: Homey;
   query: { deviceId: string };
 }): Promise<any> {
+  await Promise.resolve(); // Ensure async context
+
   const app = homey.app as BMWConnectedDrive;
   app.logger?.info(`getDeviceStatus invoked. DeviceId: ${query.deviceId}`);
 
@@ -185,6 +189,8 @@ export async function getDeviceCapabilities({
   homey: Homey;
   query: { deviceId: string };
 }): Promise<any> {
+  await Promise.resolve(); // Ensure async context
+
   const app = homey.app as BMWConnectedDrive;
   app.logger?.warn(
     `getDeviceCapabilities invoked but not supported by CarData API. DeviceId: ${query.deviceId}`

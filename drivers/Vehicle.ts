@@ -524,7 +524,7 @@ export class Vehicle extends Device {
 
         // Trigger charging status change flow if status changed or first status update
         if (!oldChargingStatus || oldChargingStatus !== newChargingStatus) {
-          const chargingStatusChangeFlowCard: any =
+          const chargingStatusChangeFlowCard =
             this.homey.flow.getDeviceTriggerCard('charging_status_change');
           await chargingStatusChangeFlowCard.trigger(
             this,
@@ -570,14 +570,19 @@ export class Vehicle extends Device {
           oldFuelValue &&
           newFuelValue - oldFuelValue >= this.settings.refuellingTriggerThreshold
         ) {
-          const refuelledFlowCard: any = this.homey.flow.getDeviceTriggerCard('refuelled');
-          refuelledFlowCard.trigger(
+          const refuelledFlowCard = this.homey.flow.getDeviceTriggerCard('refuelled');
+          const location = this.stateManager.getLastLocation();
+          if (location && !location.address) {
+            await this.resolveAddress(location);
+            await this.stateManager.setLastLocation(location);
+          }
+          await refuelledFlowCard.trigger(
             this,
             {
               FuelBeforeRefuelling: oldFuelValue,
               FuelAfterRefuelling: newFuelValue,
               RefuelledLiters: newFuelValue - oldFuelValue,
-              Location: this.currentVehicleState?.location?.address?.formatted,
+              Location: location?.address ?? '',
             },
             {}
           );
@@ -1048,23 +1053,8 @@ export class Vehicle extends Device {
     }
 
     // Resolve address using OpenStreetMap if not available and resolveAddress is true
-    if (resolveAddress && !location.address) {
-      try {
-        const { OpenStreetMap } = await import('../utils/OpenStreetMap');
-        const resolvedAddress = await OpenStreetMap.GetAddress(
-          location.latitude,
-          location.longitude,
-          this.logger
-        );
-        if (resolvedAddress) {
-          location.address = resolvedAddress;
-          this.logger?.info(`Resolved address via OpenStreetMap: ${resolvedAddress}`);
-        }
-      } catch (error) {
-        this.logger?.error(
-          `Failed to resolve address via OpenStreetMap: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
+    if (resolveAddress) {
+      await this.resolveAddress(location);
     }
   }
 
@@ -1246,6 +1236,28 @@ export class Vehicle extends Device {
       case 'INVALID':
       default:
         return 'plugged_out';
+    }
+  }
+
+  private async resolveAddress(location: LocationType): Promise<void> {
+    // Resolve address using OpenStreetMap if not available and resolveAddress is true
+    if (!location.address) {
+      try {
+        const { OpenStreetMap } = await import('../utils/OpenStreetMap');
+        const resolvedAddress = await OpenStreetMap.GetAddress(
+          location.latitude,
+          location.longitude,
+          this.logger
+        );
+        if (resolvedAddress) {
+          location.address = resolvedAddress;
+          this.logger?.info(`Resolved address via OpenStreetMap: ${resolvedAddress}`);
+        }
+      } catch (error) {
+        this.logger?.error(
+          `Failed to resolve address via OpenStreetMap: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
     }
   }
 }

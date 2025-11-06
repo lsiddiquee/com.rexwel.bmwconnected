@@ -106,6 +106,15 @@ describe('Vehicle Refueling Flow', () => {
         range: 100,
       } as VehicleStatus;
 
+      // Mock stateManager to return location with address
+      const mockStateManager = vehicle['stateManager'] as any;
+      mockStateManager.getLastLocation = jest.fn().mockReturnValue({
+        label: '',
+        latitude: 52.52,
+        longitude: 13.405,
+        address: 'Berlin, Germany',
+      });
+
       // New status after refueling - fuel increased by 30 liters (>5 threshold)
       const newStatus: VehicleStatus = {
         vin: 'WBA12345678901234',
@@ -255,6 +264,15 @@ describe('Vehicle Refueling Flow', () => {
         range: 150,
       } as VehicleStatus;
 
+      // Mock stateManager to return location with address
+      const mockStateManager = vehicle['stateManager'] as any;
+      mockStateManager.getLastLocation = jest.fn().mockReturnValue({
+        label: '',
+        latitude: 52.37,
+        longitude: 4.9,
+        address: 'Amsterdam, Netherlands',
+      });
+
       // New status after refueling at gas station
       const newStatus: VehicleStatus = {
         vin: 'WBA12345678901234',
@@ -275,14 +293,14 @@ describe('Vehicle Refueling Flow', () => {
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
 
       // Assert - Verify location was included in flow card tokens
-      // Note: Location comes from currentVehicleState (old state before this update)
+      // Note: Location comes from stateManager.getLastLocation() (persisted location)
       expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledWith(
         vehicle,
         {
           FuelBeforeRefuelling: 15,
           FuelAfterRefuelling: 50,
           RefuelledLiters: 35,
-          Location: 'Amsterdam, Netherlands', // From currentVehicleState (before update)
+          Location: 'Amsterdam, Netherlands', // From stateManager.getLastLocation()
         },
         {}
       );
@@ -316,14 +334,14 @@ describe('Vehicle Refueling Flow', () => {
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
 
-      // Assert - Verify refuelled flow was triggered with undefined location
+      // Assert - Verify refuelled flow was triggered with empty string location
       expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledWith(
         vehicle,
         {
           FuelBeforeRefuelling: 20,
           FuelAfterRefuelling: 55,
           RefuelledLiters: 35,
-          Location: undefined,
+          Location: '', // Empty string instead of undefined
         },
         {}
       );
@@ -439,7 +457,77 @@ describe('Vehicle Refueling Flow', () => {
           FuelBeforeRefuelling: 30,
           FuelAfterRefuelling: 35,
           RefuelledLiters: 5,
-          Location: undefined,
+          Location: '', // Empty string when no location available
+        },
+        {}
+      );
+    });
+
+    it('should_resolveAddressViaOpenStreetMap_when_locationHasNoAddress', async () => {
+      // Arrange - Set initial state with low fuel
+      vehicle.currentVehicleState = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.COMBUSTION,
+        lastUpdatedAt: new Date('2025-11-04T10:00:00Z'),
+        combustion: {
+          fuelLevelLiters: 10,
+          fuelLevelPercent: 15,
+        },
+        range: 100,
+      } as VehicleStatus;
+
+      // Mock stateManager to return location WITHOUT address
+      const mockStateManager = vehicle['stateManager'] as any;
+      const locationWithoutAddress = {
+        label: '',
+        latitude: 48.1351,
+        longitude: 11.582,
+        address: '', // No address - should trigger OpenStreetMap call
+      };
+      mockStateManager.getLastLocation = jest.fn().mockReturnValue(locationWithoutAddress);
+
+      // Mock resolveAddress to simulate OpenStreetMap resolution
+      const resolveAddressSpy = jest
+        .spyOn(vehicle as any, 'resolveAddress')
+        .mockImplementation(async (location: any) => {
+          // Simulate what OpenStreetMap.GetAddress would do - update location in place
+          location.address = '123 Main St, Munich, Germany';
+        });
+
+      // New status after refueling - fuel increased by 30 liters (>5 threshold)
+      const newStatus: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.COMBUSTION,
+        lastUpdatedAt: new Date('2025-11-04T10:05:00Z'),
+        combustion: {
+          fuelLevelLiters: 40, // Refueled to 40 liters
+          fuelLevelPercent: 60,
+        },
+        range: 400,
+      };
+
+      // Act
+      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+
+      // Assert - Verify resolveAddress was called to fetch missing address
+      expect(resolveAddressSpy).toHaveBeenCalledTimes(1);
+      expect(resolveAddressSpy).toHaveBeenCalledWith(locationWithoutAddress);
+
+      // Verify setLastLocation was called to persist the resolved address
+      expect(mockStateManager.setLastLocation).toHaveBeenCalledWith(locationWithoutAddress);
+
+      // Verify the location object was updated with resolved address
+      expect(locationWithoutAddress.address).toBe('123 Main St, Munich, Germany');
+
+      // Verify refuelled flow was triggered with the resolved address
+      expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledTimes(1);
+      expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledWith(
+        vehicle,
+        {
+          FuelBeforeRefuelling: 10,
+          FuelAfterRefuelling: 40,
+          RefuelledLiters: 30,
+          Location: '123 Main St, Munich, Germany', // Resolved address from OpenStreetMap
         },
         {}
       );
