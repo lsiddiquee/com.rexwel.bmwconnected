@@ -529,7 +529,7 @@ export class Vehicle extends Device {
           await chargingStatusChangeFlowCard.trigger(
             this,
             {
-              charging_status: newChargingStatus,
+              charging_status: newChargingStatus ?? 'UNKNOWN',
             },
             {}
           );
@@ -937,10 +937,10 @@ export class Vehicle extends Device {
       await driveSessionStartedFlowCard.trigger(
         this,
         {
-          StartLabel: startLocation.label,
+          StartLabel: startLocation.label ?? '',
           StartLatitude: startLocation.latitude,
           StartLongitude: startLocation.longitude,
-          StartAddress: startLocation.address,
+          StartAddress: startLocation.address ?? '',
           StartMileage: UnitConverter.ConvertDistance(startMileage, settings.distanceUnit),
         },
         {}
@@ -1000,15 +1000,15 @@ export class Vehicle extends Device {
       await driveSessionCompletedFlowCard.trigger(
         this,
         {
-          StartLabel: startLocation.label,
+          StartLabel: startLocation.label ?? '',
           StartLatitude: startLocation.latitude,
           StartLongitude: startLocation.longitude,
-          StartAddress: startLocation.address,
+          StartAddress: startLocation.address ?? '',
           StartMileage: UnitConverter.ConvertDistance(startMileage, settings.distanceUnit),
-          EndLabel: endLocation.label,
+          EndLabel: endLocation.label ?? '',
           EndLatitude: endLocation.latitude,
           EndLongitude: endLocation.longitude,
-          EndAddress: endLocation.address,
+          EndAddress: endLocation.address ?? '',
           EndMileage: UnitConverter.ConvertDistance(endMileage, settings.distanceUnit),
         },
         {}
@@ -1122,7 +1122,16 @@ export class Vehicle extends Device {
 
     // Always trigger location changed flow
     const locationChangedFlowCard = this.homey.flow.getDeviceTriggerCard('location_changed');
-    await locationChangedFlowCard.trigger(this, newLocation, {});
+    await locationChangedFlowCard.trigger(
+      this,
+      {
+        label: newLocation.label ?? '',
+        latitude: newLocation.latitude,
+        longitude: newLocation.longitude,
+        address: newLocation.address ?? '',
+      },
+      {}
+    );
 
     // Trigger geofence flow cards if geofence changed
     if (oldLocation && oldLocation.label !== newLocation.label) {
@@ -1133,13 +1142,31 @@ export class Vehicle extends Device {
       if (newLocation.label) {
         this.logger?.info('Entered geofence.');
         const geoFenceEnter = this.homey.flow.getDeviceTriggerCard('geo_fence_enter');
-        await geoFenceEnter.trigger(this, newLocation, {});
+        await geoFenceEnter.trigger(
+          this,
+          {
+            label: newLocation.label ?? '',
+            latitude: newLocation.latitude,
+            longitude: newLocation.longitude,
+            address: newLocation.address ?? '',
+          },
+          {}
+        );
       }
 
       if (oldLocation.label) {
         this.logger?.info('Exit geofence.');
         const geoFenceExit = this.homey.flow.getDeviceTriggerCard('geo_fence_exit');
-        await geoFenceExit.trigger(this, oldLocation, {});
+        await geoFenceExit.trigger(
+          this,
+          {
+            label: oldLocation.label ?? '',
+            latitude: oldLocation.latitude,
+            longitude: oldLocation.longitude,
+            address: oldLocation.address ?? '',
+          },
+          {}
+        );
       }
     }
   }
