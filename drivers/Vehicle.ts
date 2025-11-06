@@ -21,6 +21,7 @@ import {
   DriveTrainType,
 } from '../lib/types/DriveTrainType';
 import { UnitConverter } from '../utils/UnitConverter';
+import { Flows } from '../utils/Flows';
 
 export class Vehicle extends Device {
   currentVehicleState: VehicleStatus | null = null;
@@ -524,8 +525,8 @@ export class Vehicle extends Device {
 
         // Trigger charging status change flow if status changed or first status update
         if (!oldChargingStatus || oldChargingStatus !== newChargingStatus) {
-          const chargingStatusChangeFlowCard =
-            this.homey.flow.getDeviceTriggerCard('charging_status_change');
+      const chargingStatusChangeFlowCard =
+        this.homey.flow.getDeviceTriggerCard(Flows.CHARGING_STATUS_CHANGE);
           await chargingStatusChangeFlowCard.trigger(
             this,
             {
@@ -570,7 +571,7 @@ export class Vehicle extends Device {
           oldFuelValue &&
           newFuelValue - oldFuelValue >= this.settings.refuellingTriggerThreshold
         ) {
-          const refuelledFlowCard = this.homey.flow.getDeviceTriggerCard('refuelled');
+          const refuelledFlowCard = this.homey.flow.getDeviceTriggerCard(Flows.REFUELLED);
           const location = this.stateManager.getLastLocation();
           if (location && !location.address) {
             await this.resolveAddress(location);
@@ -932,7 +933,7 @@ export class Vehicle extends Device {
 
       // Trigger flow card
       const driveSessionStartedFlowCard =
-        this.homey.flow.getDeviceTriggerCard('drive_session_started');
+        this.homey.flow.getDeviceTriggerCard(Flows.DRIVE_SESSION_STARTED);
 
       await driveSessionStartedFlowCard.trigger(
         this,
@@ -995,7 +996,7 @@ export class Vehicle extends Device {
 
       // Trigger flow card
       const driveSessionCompletedFlowCard =
-        this.homey.flow.getDeviceTriggerCard('drive_session_completed');
+        this.homey.flow.getDeviceTriggerCard(Flows.DRIVE_SESSION_COMPLETED);
 
       await driveSessionCompletedFlowCard.trigger(
         this,
@@ -1121,7 +1122,7 @@ export class Vehicle extends Device {
     }
 
     // Always trigger location changed flow
-    const locationChangedFlowCard = this.homey.flow.getDeviceTriggerCard('location_changed');
+  const locationChangedFlowCard = this.homey.flow.getDeviceTriggerCard(Flows.LOCATION_CHANGED);
     await locationChangedFlowCard.trigger(
       this,
       {
@@ -1141,7 +1142,7 @@ export class Vehicle extends Device {
 
       if (newLocation.label) {
         this.logger?.info('Entered geofence.');
-        const geoFenceEnter = this.homey.flow.getDeviceTriggerCard('geo_fence_enter');
+  const geoFenceEnter = this.homey.flow.getDeviceTriggerCard(Flows.GEO_FENCE_ENTER);
         await geoFenceEnter.trigger(
           this,
           {
@@ -1156,7 +1157,7 @@ export class Vehicle extends Device {
 
       if (oldLocation.label) {
         this.logger?.info('Exit geofence.');
-        const geoFenceExit = this.homey.flow.getDeviceTriggerCard('geo_fence_exit');
+  const geoFenceExit = this.homey.flow.getDeviceTriggerCard(Flows.GEO_FENCE_EXIT);
         await geoFenceExit.trigger(
           this,
           {

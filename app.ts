@@ -8,6 +8,7 @@ import { Configuration } from './utils/Configuration';
 import * as semver from 'semver';
 import { ArgumentAutocompleteResults } from 'homey/lib/FlowCard';
 import { Capabilities } from './utils/Capabilities';
+import { Flows } from './utils/Flows';
 import { LokiLogger } from './utils/LokiLogger';
 import { Logger } from './utils/Logger';
 import { DeviceCodeAuthProvider } from './lib/auth/DeviceCodeAuthProvider';
@@ -170,7 +171,7 @@ export class BMWConnectedDrive extends Homey.App {
   }
 
   private registerConditionCards() {
-    const geofenceCard = this.homey.flow.getConditionCard('geofence');
+    const geofenceCard = this.homey.flow.getConditionCard(Flows.GEOFENCE_CONDITION);
     geofenceCard.registerArgumentAutocompleteListener(
       'geo_fence',
       async (query: string, _args: any): Promise<ArgumentAutocompleteResults> => {
@@ -197,7 +198,7 @@ export class BMWConnectedDrive extends Homey.App {
     });
 
     this.homey.flow
-      .getConditionCard('battery_percentage')
+      .getConditionCard(Flows.BATTERY_PERCENTAGE_CONDITION)
       .registerRunListener(async (args: any, _: any) => {
         const battery_percentage = await Capabilities.GetCapabilityValueSafe<number>(
           args.device,
@@ -207,7 +208,7 @@ export class BMWConnectedDrive extends Homey.App {
       });
 
     this.homey.flow
-      .getConditionCard('charging_status')
+      .getConditionCard(Flows.CHARGING_STATUS_CONDITION)
       .registerRunListener(async (args: any, _: any) => {
         // Get the current Homey charging state (plugged_in_charging, plugged_in, plugged_out)
         const currentChargingState = await Capabilities.GetCapabilityValueSafe<string>(
