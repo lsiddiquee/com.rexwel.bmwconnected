@@ -63,14 +63,6 @@
       "method": "GET",
       "path": "/getRegisteredDevices"
     },
-    "getDeviceStatus": {
-      "method": "GET",
-      "path": "/getDeviceStatus"
-    },
-    "getDeviceCapabilities": {
-      "method": "GET",
-      "path": "/getDeviceCapabilities"
-    },
     "getClientTokens": {
       "method": "GET",
       "path": "/getClientTokens"

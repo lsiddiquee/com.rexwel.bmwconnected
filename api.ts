@@ -7,6 +7,9 @@ import { OpenStreetMap } from './utils/OpenStreetMap';
 import { LocationType } from './utils/LocationType';
 import { DeviceData } from './utils/DeviceData';
 import { Vehicle } from './drivers/Vehicle';
+import { VehicleStatus } from './lib';
+import { DeviceStoreData } from './utils/DeviceStateManager';
+import { STORE_KEY_DEVICE_STATE } from './utils/StoreKeys';
 
 export async function saveSettings({
   homey,
@@ -109,101 +112,59 @@ export async function clearTokenStore({ homey }: { homey: Homey }): Promise<bool
 }
 
 // Internal class for device capabilities data structure
-class DeviceCapabilities {
+class DeviceDetails {
   deviceId: string;
   deviceName: string;
   capabilities: { id: string; name: string; value: string }[];
+  state: VehicleStatus;
+  storeData: DeviceStoreData;
 
   constructor(
     deviceId: string,
     deviceName: string,
-    capabilities: { id: string; name: string; value: string }[]
+    capabilities: { id: string; name: string; value: string }[],
+    state: VehicleStatus,
+    storeData: DeviceStoreData
   ) {
     this.deviceId = deviceId;
     this.deviceName = deviceName;
     this.capabilities = capabilities;
+    this.state = state;
+    this.storeData = storeData;
   }
 }
 
-export async function getRegisteredDevices({
-  homey,
-}: {
-  homey: Homey;
-}): Promise<DeviceCapabilities[]> {
+export async function getRegisteredDevices({ homey }: { homey: Homey }): Promise<DeviceDetails[]> {
   await Promise.resolve(); // Ensure async context
 
   const app = homey.app as BMWConnectedDrive;
   app.logger?.info('getRegisteredDevices invoked.');
 
-  const devicesCapabilities: DeviceCapabilities[] = [];
+  const devicesCapabilities: DeviceDetails[] = [];
 
   const drivers = homey.drivers.getDrivers() as { [key: string]: Driver };
   for (const key in drivers) {
     const driver = drivers[key];
     for (const device of driver.getDevices()) {
       const data = device.getData() as DeviceData;
+      const vehicle = device as Vehicle;
       devicesCapabilities.push(
-        new DeviceCapabilities(
+        new DeviceDetails(
           data.id,
           device.getName(),
           device.getCapabilities().map((cap) => ({
             id: cap,
             name: cap,
             value: String(device.getCapabilityValue(cap)),
-          }))
+          })),
+          vehicle.stateManager.getVehicleStatus(),
+          device.getStoreValue(STORE_KEY_DEVICE_STATE) as DeviceStoreData
         )
       );
     }
   }
 
   return devicesCapabilities;
-}
-
-// Note: The following functions have been disabled during BMW CarData API migration
-// as they are no longer supported by the CarData API
-
-export async function getDeviceStatus({
-  homey,
-  query,
-}: {
-  homey: Homey;
-  query: { deviceId: string };
-}): Promise<any> {
-  await Promise.resolve(); // Ensure async context
-
-  const app = homey.app as BMWConnectedDrive;
-  app.logger?.info(`getDeviceStatus invoked. DeviceId: ${query.deviceId}`);
-
-  // Note: CarDataClient is now per-device, not app-level
-  // Device status is fetched by the Vehicle device itself during polling
-  app.logger?.warn('Device status should be accessed from individual vehicle devices');
-
-  throw new Error('Device status API endpoint disabled - use per-device polling instead');
-}
-
-// Vehicle capabilities endpoint not supported by BMW CarData API
-export async function getDeviceCapabilities({
-  homey,
-  query,
-}: {
-  homey: Homey;
-  query: { deviceId: string };
-}): Promise<any> {
-  await Promise.resolve(); // Ensure async context
-
-  const app = homey.app as BMWConnectedDrive;
-  app.logger?.warn(
-    `getDeviceCapabilities invoked but not supported by CarData API. DeviceId: ${query.deviceId}`
-  );
-
-  // Return empty capabilities object - CarData API does not provide this endpoint
-  return {
-    isChargingPowerLimitEnabled: false,
-    isChargingTargetSocEnabled: false,
-    remoteChargingCommands: {
-      chargingControl: [],
-    },
-  };
 }
 
 /**
