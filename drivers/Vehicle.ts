@@ -727,15 +727,8 @@ export class Vehicle extends Device {
       `onSettings called - changedKeys: ${JSON.stringify(changedKeys)}, newSettings: ${JSON.stringify(newSettings)}`
     );
 
-    // Persist the new settings
-    await this.setSettings({ ...this.settings, ...newSettings });
-
     // Get fresh settings after update
-    const settings = this.settings;
-
-    // Note: Authentication changes (clientId, containerId) trigger reinitializeAfterAuth()
-    // from repair flow directly. onSettings() is NOT called by setSettings().
-    // See: https://apps.developer.homey.app/the-basics/devices/settings
+    const settings = newSettings as unknown as DeviceSettings;
 
     // Handle API polling changes (interval and/or enabled state)
     const apiPollingChanged =
@@ -790,8 +783,11 @@ export class Vehicle extends Device {
 
     if (shouldUpdateState) {
       try {
-        const status = this.stateManager.getVehicleStatus();
-        await this.updateCapabilitiesFromStatus(status);
+        setTimeout(() => {
+          // Need to let the settings save complete before updating the status.
+          const status = this.stateManager.getVehicleStatus();
+          void this.updateCapabilitiesFromStatus(status);
+        }, 500);
       } catch (err) {
         this.logger?.error('Failed to get vehicle status for update', err as Error);
       }
