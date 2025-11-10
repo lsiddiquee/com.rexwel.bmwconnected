@@ -63,7 +63,8 @@ describe('Vehicle.onSettings', () => {
     it('should_startApiPolling_when_apiPollingEnabledChangedToTrue', async () => {
       // Arrange
       mockSettings.apiPollingEnabled = true;
-      const newSettings = { apiPollingEnabled: true };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, apiPollingEnabled: true };
       const changedKeys = ['apiPollingEnabled'];
 
       // Act
@@ -78,7 +79,8 @@ describe('Vehicle.onSettings', () => {
     it('should_stopApiPolling_when_apiPollingEnabledChangedToFalse', async () => {
       // Arrange
       mockSettings.apiPollingEnabled = false;
-      const newSettings = { apiPollingEnabled: false };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, apiPollingEnabled: false };
       const changedKeys = ['apiPollingEnabled'];
 
       // Act
@@ -94,7 +96,8 @@ describe('Vehicle.onSettings', () => {
       // Arrange
       mockSettings.apiPollingEnabled = true;
       mockSettings.apiPollingInterval = 60;
-      const newSettings = { apiPollingInterval: 60 };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, apiPollingInterval: 60 };
       const changedKeys = ['apiPollingInterval'];
 
       // Act
@@ -109,7 +112,8 @@ describe('Vehicle.onSettings', () => {
       // Arrange
       mockSettings.apiPollingEnabled = true;
       mockSettings.apiPollingInterval = 45;
-      const newSettings = { apiPollingEnabled: true, apiPollingInterval: 45 };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, apiPollingEnabled: true, apiPollingInterval: 45 };
       const changedKeys = ['apiPollingEnabled', 'apiPollingInterval'];
 
       // Act
@@ -126,7 +130,8 @@ describe('Vehicle.onSettings', () => {
     it('should_initializeMqttStreaming_when_streamingEnabledChangedToTrue', async () => {
       // Arrange
       mockSettings.streamingEnabled = true;
-      const newSettings = { streamingEnabled: true };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, streamingEnabled: true };
       const changedKeys = ['streamingEnabled'];
 
       // Act
@@ -141,7 +146,8 @@ describe('Vehicle.onSettings', () => {
       // Arrange
       mockSettings.streamingEnabled = false;
       vehicle['_mqttClient'] = mockMqttClient;
-      const newSettings = { streamingEnabled: false };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, streamingEnabled: false };
       const changedKeys = ['streamingEnabled'];
 
       // Act
@@ -157,7 +163,8 @@ describe('Vehicle.onSettings', () => {
       // Arrange
       mockSettings.streamingEnabled = false;
       vehicle['_mqttClient'] = undefined;
-      const newSettings = { streamingEnabled: false };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, streamingEnabled: false };
       const changedKeys = ['streamingEnabled'];
 
       // Act
@@ -180,7 +187,8 @@ describe('Vehicle.onSettings', () => {
       } as VehicleStatus;
       mockStateManager.getVehicleStatus.mockReturnValue(mockStatus);
 
-      const newSettings = { distanceUnit: 'imperial' };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, distanceUnit: 'imperial' };
       const changedKeys = ['distanceUnit'];
 
       // Act
@@ -188,7 +196,7 @@ describe('Vehicle.onSettings', () => {
 
       // Assert
       expect(vehicle['setDistanceUnits']).toHaveBeenCalledWith('imperial');
-      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus);
+      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus, newSettings);
       expect(mockApp.logger.info).toHaveBeenCalledWith('Distance unit changed.');
     });
 
@@ -202,7 +210,8 @@ describe('Vehicle.onSettings', () => {
       } as VehicleStatus;
       mockStateManager.getVehicleStatus.mockReturnValue(mockStatus);
 
-      const newSettings = { distanceUnit: 'metric' };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, distanceUnit: 'metric' };
       const changedKeys = ['distanceUnit'];
 
       // Act
@@ -210,7 +219,7 @@ describe('Vehicle.onSettings', () => {
 
       // Assert
       expect(vehicle['setDistanceUnits']).toHaveBeenCalledWith('metric');
-      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus);
+      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus, newSettings);
     });
 
     it('should_notUpdateCapabilities_when_distanceUnitChangedButNoStatus', async () => {
@@ -218,7 +227,8 @@ describe('Vehicle.onSettings', () => {
       mockSettings.distanceUnit = 'imperial';
       mockStateManager.getVehicleStatus.mockReturnValue(null);
 
-      const newSettings = { distanceUnit: 'imperial' };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, distanceUnit: 'imperial' };
       const changedKeys = ['distanceUnit'];
 
       // Act
@@ -226,7 +236,7 @@ describe('Vehicle.onSettings', () => {
 
       // Assert
       expect(vehicle['setDistanceUnits']).toHaveBeenCalledWith('imperial');
-      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(null);
+      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(null, newSettings);
     });
   });
 
@@ -241,7 +251,8 @@ describe('Vehicle.onSettings', () => {
       } as VehicleStatus;
       mockStateManager.getVehicleStatus.mockReturnValue(mockStatus);
 
-      const newSettings = { fuelUnit: 'gallonUS' };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, fuelUnit: 'gallonUS' };
       const changedKeys = ['fuelUnit'];
 
       // Act
@@ -249,7 +260,7 @@ describe('Vehicle.onSettings', () => {
 
       // Assert
       expect(vehicle['setFuelUnits']).toHaveBeenCalledWith('gallonUS');
-      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus);
+      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus, newSettings);
       expect(mockApp.logger.info).toHaveBeenCalledWith('Fuel unit changed.');
     });
 
@@ -263,7 +274,8 @@ describe('Vehicle.onSettings', () => {
       } as VehicleStatus;
       mockStateManager.getVehicleStatus.mockReturnValue(mockStatus);
 
-      const newSettings = { fuelUnit: 'liter' };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, fuelUnit: 'liter' };
       const changedKeys = ['fuelUnit'];
 
       // Act
@@ -271,7 +283,7 @@ describe('Vehicle.onSettings', () => {
 
       // Assert
       expect(vehicle['setFuelUnits']).toHaveBeenCalledWith('liter');
-      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus);
+      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus, newSettings);
     });
 
     it('should_notUpdateCapabilities_when_fuelUnitChangedButNoStatus', async () => {
@@ -279,7 +291,8 @@ describe('Vehicle.onSettings', () => {
       mockSettings.fuelUnit = 'gallonUK';
       mockStateManager.getVehicleStatus.mockReturnValue(null);
 
-      const newSettings = { fuelUnit: 'gallonUK' };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, fuelUnit: 'gallonUK' };
       const changedKeys = ['fuelUnit'];
 
       // Act
@@ -287,7 +300,7 @@ describe('Vehicle.onSettings', () => {
 
       // Assert
       expect(vehicle['setFuelUnits']).toHaveBeenCalledWith('gallonUK');
-      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(null);
+      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(null, newSettings);
     });
   });
 
@@ -303,7 +316,8 @@ describe('Vehicle.onSettings', () => {
       } as unknown as VehicleStatus;
       mockStateManager.getVehicleStatus.mockReturnValue(mockStatus);
 
-      const newSettings = { distanceUnit: 'imperial', fuelUnit: 'gallonUS' };
+      // Homey SDK merges settings before calling onSettings
+      const newSettings = { ...mockSettings, distanceUnit: 'imperial', fuelUnit: 'gallonUS' };
       const changedKeys = ['distanceUnit', 'fuelUnit'];
 
       // Act
@@ -313,7 +327,7 @@ describe('Vehicle.onSettings', () => {
       expect(vehicle['setDistanceUnits']).toHaveBeenCalledWith('imperial');
       expect(vehicle['setFuelUnits']).toHaveBeenCalledWith('gallonUS');
       expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledTimes(1); // Only once
-      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus);
+      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus, newSettings);
     });
 
     it('should_handleAllSettingsChanges_when_multipleKeysChanged', async () => {
@@ -328,7 +342,9 @@ describe('Vehicle.onSettings', () => {
       } as VehicleStatus;
       mockStateManager.getVehicleStatus.mockReturnValue(mockStatus);
 
+      // Homey SDK merges settings before calling onSettings
       const newSettings = {
+        ...mockSettings,
         apiPollingEnabled: true,
         streamingEnabled: true,
         distanceUnit: 'metric',
@@ -342,7 +358,7 @@ describe('Vehicle.onSettings', () => {
       expect(vehicle['startApiPolling']).toHaveBeenCalled();
       expect(vehicle['initializeMqttStreaming']).toHaveBeenCalled();
       expect(vehicle['setDistanceUnits']).toHaveBeenCalledWith('metric');
-      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus);
+      expect(vehicle['updateCapabilitiesFromStatus']).toHaveBeenCalledWith(mockStatus, newSettings);
     });
   });
 
@@ -383,7 +399,7 @@ describe('Vehicle.onSettings', () => {
   });
 
   describe('Settings Merge', () => {
-    it('should_mergeNewSettingsWithExisting_when_called', async () => {
+    it('should_useHomeyMergedSettings_when_called', async () => {
       // Arrange
       Object.assign(mockSettings, {
         currentVersion: '1.0.0',
@@ -396,7 +412,9 @@ describe('Vehicle.onSettings', () => {
         autoRetry: false,
       });
 
+      // Homey SDK merges settings before calling onSettings
       const newSettings = {
+        ...mockSettings,
         apiPollingEnabled: true,
         apiPollingInterval: 60,
       };
@@ -406,10 +424,10 @@ describe('Vehicle.onSettings', () => {
       await vehicle.onSettings({ newSettings, changedKeys });
 
       // Assert
-      expect(mockSettings.apiPollingEnabled).toBe(true);
-      expect(mockSettings.apiPollingInterval).toBe(60);
-      expect(mockSettings.distanceUnit).toBe('metric'); // Unchanged
-      expect(mockSettings.fuelUnit).toBe('liter'); // Unchanged
+      // Verify code uses the merged newSettings correctly
+      expect(vehicle['startApiPolling']).toHaveBeenCalled(); // Should work because newSettings has apiPollingEnabled: true
+      expect(mockLogger.info).toHaveBeenCalledWith('API polling enabled');
+      expect(mockLogger.info).toHaveBeenCalledWith('API polling interval changed to 60 minutes');
     });
   });
 });

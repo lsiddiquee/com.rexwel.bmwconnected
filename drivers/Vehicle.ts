@@ -431,9 +431,13 @@ export class Vehicle extends Device {
    * Only updates capabilities that have changed to avoid unnecessary events.
    *
    * @param status - Vehicle status with telematic data
+   * @param settingsOverride - Optional settings to use instead of reading from device (used during onSettings)
    */
-  private async updateCapabilitiesFromStatus(status: VehicleStatus): Promise<void> {
-    const settings = this.settings;
+  private async updateCapabilitiesFromStatus(
+    status: VehicleStatus,
+    settingsOverride?: DeviceSettings
+  ): Promise<void> {
+    const settings = settingsOverride ?? this.settings;
 
     // Update drive train type capability
     // Update mileage
@@ -727,7 +731,7 @@ export class Vehicle extends Device {
       `onSettings called - changedKeys: ${JSON.stringify(changedKeys)}, newSettings: ${JSON.stringify(newSettings)}`
     );
 
-    // Get fresh settings after update
+    // Use newSettings directly - Homey SDK already merged it with current settings
     const settings = newSettings as unknown as DeviceSettings;
 
     // Handle API polling changes (interval and/or enabled state)
@@ -783,11 +787,9 @@ export class Vehicle extends Device {
 
     if (shouldUpdateState) {
       try {
-        setTimeout(() => {
-          // Need to let the settings save complete before updating the status.
-          const status = this.stateManager.getVehicleStatus();
-          void this.updateCapabilitiesFromStatus(status);
-        }, 500);
+        const status = this.stateManager.getVehicleStatus();
+        // Pass new settings explicitly since they're not persisted yet
+        await this.updateCapabilitiesFromStatus(status, settings);
       } catch (err) {
         this.logger?.error('Failed to get vehicle status for update', err as Error);
       }
