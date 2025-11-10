@@ -361,16 +361,32 @@
           lokiUrlElement.value = data.lokiUrl || '';
 
           geofencesElement.innerHTML = '';
-          data.geofences.forEach((item) => {
-            addGeofenceEntry(
-              item.label,
-              item.latitude,
-              item.longitude,
-              item.radius,
-              item.address,
-              false
-            );
-          });
+
+          // Validate and filter geofences before displaying
+          if (Array.isArray(data.geofences)) {
+            data.geofences.forEach((item) => {
+              // Skip invalid geofences (missing required fields)
+              if (
+                !item ||
+                !item.label ||
+                item.latitude === undefined ||
+                item.longitude === undefined ||
+                item.radius === undefined
+              ) {
+                console.warn('Skipping invalid geofence entry:', item);
+                return;
+              }
+
+              addGeofenceEntry(
+                item.label,
+                item.latitude,
+                item.longitude,
+                item.radius,
+                item.address || '',
+                false
+              );
+            });
+          }
         };
 
         Homey.get('com.rexwel.bmwconnected', initializeSettings);
@@ -388,15 +404,34 @@
           errorElement.innerHTML = '';
 
           var geofences =
-            Array.from(document.getElementById('geofences').rows).map((item) => {
-              return {
-                label: item.cells[0].innerText,
-                latitude: parseFloat(item.cells[1].innerText),
-                longitude: parseFloat(item.cells[2].innerText),
-                radius: parseFloat(item.cells[3].innerText),
-                address: item.cells[4].innerText,
-              };
-            }) ?? [];
+            Array.from(document.getElementById('geofences').rows)
+              .map((item) => {
+                var label = (item.cells[0].innerText || '').trim();
+                var latitude = parseFloat(item.cells[1].innerText);
+                var longitude = parseFloat(item.cells[2].innerText);
+                var radius = parseFloat(item.cells[3].innerText);
+                var address = (item.cells[4].innerText || '').trim();
+
+                // Validate each geofence entry
+                if (!label || isNaN(latitude) || isNaN(longitude) || isNaN(radius)) {
+                  console.warn('Skipping invalid geofence during save:', {
+                    label,
+                    latitude,
+                    longitude,
+                    radius,
+                  });
+                  return null;
+                }
+
+                return {
+                  label: label,
+                  latitude: latitude,
+                  longitude: longitude,
+                  radius: radius,
+                  address: address,
+                };
+              })
+              .filter((item) => item !== null) ?? [];
 
           // Preserve all existing configuration fields
           var updatedConfig = Object.assign({}, currentConfiguration, {
@@ -609,13 +644,10 @@
         var latitudeElement = document.getElementById('latitude');
         var longitudeElement = document.getElementById('longitude');
         var radiusElement = document.getElementById('radius');
+        var label = (labelElement.value || '').trim();
         var latitude = parseFloat(latitudeElement.value);
         var longitude = parseFloat(longitudeElement.value);
         var radius = parseFloat(radiusElement.value);
-
-        if (isNaN(latitude) || isNaN(longitude) || isNaN(radius)) {
-          return Homey.alert('Latitude, longitude and radius should be numbers.');
-        }
 
         Homey.api(
           'GET',
@@ -623,8 +655,11 @@
           {},
           function (err, result) {
             if (err) return Homey.alert(err);
-            addGeofenceEntry(labelElement.value, latitude, longitude, radius, result);
+            if (!result) return Homey.alert('Failed to resolve address for the given coordinates.');
 
+            addGeofenceEntry(label, latitude, longitude, radius, result || '');
+
+            // Clear form after successful add
             labelElement.value = '';
             latitudeElement.value = '';
             longitudeElement.value = '';
@@ -634,22 +669,53 @@
       }
 
       function addGeofenceEntry(label, latitude, longitude, radius, address, showAlerts = true) {
-        var rowId = latitude + '=' + longitude + '=' + address;
+        // Validate and sanitize inputs
+        label = (label || '').trim();
+        address = (address || '').trim();
+
+        // Ensure label is not empty
+        if (!label) {
+          if (showAlerts) {
+            Homey.alert('Label is required and cannot be empty.');
+          }
+          return;
+        }
+
+        // Validate numeric values
+        if (isNaN(latitude) || isNaN(longitude) || isNaN(radius)) {
+          if (showAlerts) {
+            Homey.alert(
+              'Invalid geofence data: latitude, longitude, and radius must be valid numbers.'
+            );
+          }
+          return;
+        }
+
+        // Use label as the unique row identifier (sanitized for DOM ID)
+        var rowId = 'geofence-' + label.replace(/[^a-zA-Z0-9]/g, '-');
         var geofencesElement = document.getElementById('geofences');
 
-        if (document.getElementById(rowId)) {
+        // Check if this label already exists - if so, update it
+        var existingRow = document.getElementById(rowId);
+        if (existingRow) {
           if (showAlerts) {
-            return Homey.alert('This location is already added.');
-          }
-          return;
-        }
-        if (Array.from(geofencesElement.rows).find((row) => row.cells[0].innerText === label)) {
-          if (showAlerts) {
-            return Homey.alert('This location label is already used.');
+            // Update existing geofence with same label
+            existingRow.cells[1].innerText = latitude;
+            existingRow.cells[2].innerText = longitude;
+            existingRow.cells[3].innerText = radius;
+            existingRow.cells[4].innerText = address;
+            Homey.alert('Geofence "' + label + '" updated with new location.');
+          } else {
+            // Silent update during initialization
+            existingRow.cells[1].innerText = latitude;
+            existingRow.cells[2].innerText = longitude;
+            existingRow.cells[3].innerText = radius;
+            existingRow.cells[4].innerText = address;
           }
           return;
         }
 
+        // Create new row
         var newRow = geofencesElement.insertRow();
         newRow.id = rowId;
 
