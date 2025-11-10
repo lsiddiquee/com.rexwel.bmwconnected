@@ -48,6 +48,10 @@
         display: none;
       }
 
+      .collapsed .geofence-details {
+        display: none;
+      }
+
       /* Ensure json-display children are hidden when their parent fieldset is collapsed */
       .collapsed .json-display {
         display: none;
@@ -188,19 +192,10 @@
           </div>
 
           <div class="homey-form-group">
-            <table>
-              <thead>
-                <tr>
-                  <th data-i18n="settings.label">label</th>
-                  <th data-i18n="settings.latitude">latitude</th>
-                  <th data-i18n="settings.longitude">longitude</th>
-                  <th data-i18n="settings.radius">radius</th>
-                  <th data-i18n="settings.address">address</th>
-                  <th data-i18n="settings.remove">remove</th>
-                </tr>
-              </thead>
-              <tbody id="geofences" name="geofences"></tbody>
-            </table>
+            <div id="geofences"></div>
+            <p id="noGeofences" style="opacity: 0.7; font-style: italic">
+              No geofences configured yet. Add one above to get started.
+            </p>
           </div>
         </fieldset>
 
@@ -262,7 +257,7 @@
         <p id="error" style="color: red"></p>
         <p id="success" style="color: #5fd225"></p>
 
-        <button id="save" class="homey-button-primary-full">Save changes</button>
+        <button id="save" type="button" class="homey-button-primary-full">Save changes</button>
       </form>
     </div>
     <div id="logs" class="tabcontent">
@@ -390,48 +385,53 @@
         };
 
         Homey.get('com.rexwel.bmwconnected', initializeSettings);
-        Homey.on('settings.set', (key, data) => {
-          if (key == 'com.rexwel.bmwconnected') {
-            Homey.get('com.rexwel.bmwconnected', initializeSettings);
-          }
-        });
+        // Skipping real-time settings update listener for simplicity
+        // as settings are typically saved via the UI only, and this
+        // causes a UI refresh which looks like a glitch.
+        // Homey.on('settings.set', (key, data) => {
+        //   if (key == 'com.rexwel.bmwconnected') {
+        //     Homey.get('com.rexwel.bmwconnected', initializeSettings);
+        //   }
+        // });
 
         var currentConfiguration = null;
 
         var saveElement = document.getElementById('save');
         saveElement.addEventListener('click', function (e) {
+          e.preventDefault(); // Prevent form submission
           successElement.innerHTML = '';
           errorElement.innerHTML = '';
 
-          var geofences =
-            Array.from(document.getElementById('geofences').rows)
-              .map((item) => {
-                var label = (item.cells[0].innerText || '').trim();
-                var latitude = parseFloat(item.cells[1].innerText);
-                var longitude = parseFloat(item.cells[2].innerText);
-                var radius = parseFloat(item.cells[3].innerText);
-                var address = (item.cells[4].innerText || '').trim();
+          var geofencesContainer = document.getElementById('geofences');
+          var geofences = Array.from(geofencesContainer.children)
+            .map((fieldset) => {
+              var label = (fieldset.dataset.label || '').trim();
+              var latitude = parseFloat(fieldset.dataset.latitude);
+              var longitude = parseFloat(fieldset.dataset.longitude);
+              var radius = parseFloat(fieldset.dataset.radius);
+              var address = (fieldset.dataset.address || '').trim();
 
-                // Validate each geofence entry
-                if (!label || isNaN(latitude) || isNaN(longitude) || isNaN(radius)) {
-                  console.warn('Skipping invalid geofence during save:', {
-                    label,
-                    latitude,
-                    longitude,
-                    radius,
-                  });
-                  return null;
-                }
+              // Validate each geofence entry
+              if (!label || isNaN(latitude) || isNaN(longitude) || isNaN(radius) || !address) {
+                console.warn('Skipping invalid geofence during save:', {
+                  label,
+                  latitude,
+                  longitude,
+                  radius,
+                  address,
+                });
+                return null;
+              }
 
-                return {
-                  label: label,
-                  latitude: latitude,
-                  longitude: longitude,
-                  radius: radius,
-                  address: address,
-                };
-              })
-              .filter((item) => item !== null) ?? [];
+              return {
+                label: label,
+                latitude: latitude,
+                longitude: longitude,
+                radius: radius,
+                address: address,
+              };
+            })
+            .filter((item) => item !== null);
 
           // Preserve all existing configuration fields
           var updatedConfig = Object.assign({}, currentConfiguration, {
@@ -691,52 +691,114 @@
           return;
         }
 
-        // Use label as the unique row identifier (sanitized for DOM ID)
-        var rowId = 'geofence-' + label.replace(/[^a-zA-Z0-9]/g, '-');
+        // Use label as the unique identifier (sanitized for DOM ID)
+        var geofenceId = 'geofence-' + label.replace(/[^a-zA-Z0-9]/g, '-');
         var geofencesElement = document.getElementById('geofences');
+        var noGeofencesElement = document.getElementById('noGeofences');
 
         // Check if this label already exists - if so, update it
-        var existingRow = document.getElementById(rowId);
-        if (existingRow) {
+        var existingGeofence = document.getElementById(geofenceId);
+        if (existingGeofence) {
+          // Update existing geofence data attributes
+          existingGeofence.dataset.latitude = latitude;
+          existingGeofence.dataset.longitude = longitude;
+          existingGeofence.dataset.radius = radius;
+          existingGeofence.dataset.address = address;
+
+          // Update the displayed values
+          existingGeofence.querySelector('.geofence-latitude').innerText = latitude.toFixed(6);
+          existingGeofence.querySelector('.geofence-longitude').innerText = longitude.toFixed(6);
+          existingGeofence.querySelector('.geofence-radius').innerText = radius + ' m';
+          existingGeofence.querySelector('.geofence-address').innerText = address || 'N/A';
+
           if (showAlerts) {
-            // Update existing geofence with same label
-            existingRow.cells[1].innerText = latitude;
-            existingRow.cells[2].innerText = longitude;
-            existingRow.cells[3].innerText = radius;
-            existingRow.cells[4].innerText = address;
             Homey.alert('Geofence "' + label + '" updated with new location.');
-          } else {
-            // Silent update during initialization
-            existingRow.cells[1].innerText = latitude;
-            existingRow.cells[2].innerText = longitude;
-            existingRow.cells[3].innerText = radius;
-            existingRow.cells[4].innerText = address;
           }
           return;
         }
 
-        // Create new row
-        var newRow = geofencesElement.insertRow();
-        newRow.id = rowId;
+        // Hide "no geofences" message
+        if (noGeofencesElement) {
+          noGeofencesElement.style.display = 'none';
+        }
 
-        var newCell = newRow.insertCell();
-        newCell.innerText = label;
-        newCell = newRow.insertCell();
-        newCell.innerText = latitude;
-        newCell = newRow.insertCell();
-        newCell.innerText = longitude;
-        newCell = newRow.insertCell();
-        newCell.innerText = radius;
-        newCell = newRow.insertCell();
-        newCell.innerText = address;
-        newCell = newRow.insertCell();
-        var button = document.createElement('button');
-        button.innerHTML = 'Remove';
-        button.onclick = function () {
-          geofencesElement.removeChild(newRow);
-          return false;
+        // Create new geofence fieldset
+        var fieldset = document.createElement('fieldset');
+        fieldset.className = 'homey-form-fieldset';
+        fieldset.id = geofenceId;
+        fieldset.dataset.label = label;
+        fieldset.dataset.latitude = latitude;
+        fieldset.dataset.longitude = longitude;
+        fieldset.dataset.radius = radius;
+        fieldset.dataset.address = address;
+
+        var legend = document.createElement('legend');
+        legend.className = 'homey-form-legend';
+        legend.style.cursor = 'pointer';
+        legend.onclick = function () {
+          toggleVisibility(geofenceId + '-details');
         };
-        newCell.appendChild(button);
+        legend.innerHTML =
+          '<span class="expand-icon">▼</span> ' +
+          label +
+          ' <small style="opacity: 0.7; font-weight: normal;">(' +
+          (address || 'Custom location') +
+          ')</small>';
+
+        var detailsDiv = document.createElement('div');
+        detailsDiv.className = 'geofence-details';
+        detailsDiv.id = geofenceId + '-details';
+        detailsDiv.innerHTML = `
+          <div class="homey-form-group">
+            <label class="homey-form-label">Latitude</label>
+            <div class="json-display geofence-latitude">${latitude.toFixed(6)}</div>
+          </div>
+          <div class="homey-form-group">
+            <label class="homey-form-label">Longitude</label>
+            <div class="json-display geofence-longitude">${longitude.toFixed(6)}</div>
+          </div>
+          <div class="homey-form-group">
+            <label class="homey-form-label">Radius</label>
+            <div class="json-display geofence-radius">${radius} m</div>
+          </div>
+          <div class="homey-form-group">
+            <label class="homey-form-label">Address</label>
+            <div class="json-display geofence-address">${address || 'N/A'}</div>
+          </div>
+          <div class="homey-form-group">
+            <button type="button" class="homey-button-danger" onclick="removeGeofence('${geofenceId}')">
+              Remove Geofence
+            </button>
+          </div>
+        `;
+
+        fieldset.appendChild(legend);
+        fieldset.appendChild(detailsDiv);
+        geofencesElement.appendChild(fieldset);
+      }
+
+      function removeGeofence(geofenceId) {
+        var geofenceElement = document.getElementById(geofenceId);
+        if (geofenceElement) {
+          var label = geofenceElement.dataset.label;
+          Homey.confirm(
+            'Remove geofence "' + label + '"?',
+            'Are you sure you want to remove this geofence?',
+            function (err, confirmed) {
+              if (err) return Homey.alert(err);
+              if (confirmed) {
+                geofenceElement.remove();
+
+                // Show "no geofences" message if list is empty
+                var geofencesElement = document.getElementById('geofences');
+                var noGeofencesElement = document.getElementById('noGeofences');
+                if (geofencesElement.children.length === 0 && noGeofencesElement) {
+                  noGeofencesElement.style.display = 'block';
+                }
+              }
+            }
+          );
+        }
       }
 
       function renderDeviceDetails(deviceDetails, containerElement) {
@@ -801,9 +863,9 @@
 
         var fieldset = element.parentElement;
         if (fieldset) fieldset.classList.toggle('collapsed');
-        console.log(
-          `Element ID: ${elementId}, Display: ${element.style.display}, Computed display: ${window.getComputedStyle(element).display}`
-        );
+        // console.log(
+        //   `Element ID: ${elementId}, Display: ${element.style.display}, Computed display: ${window.getComputedStyle(element).display}`
+        // );
       }
     </script>
   </body>
