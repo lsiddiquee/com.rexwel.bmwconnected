@@ -45,7 +45,7 @@ export async function getLogs({
     getRecentLogs: () => Array<{ timestamp: string; level: string; message: string }>;
   };
   if (loggerWithRecentLogs?.getRecentLogs) {
-    return loggerWithRecentLogs.getRecentLogs();
+    return loggerWithRecentLogs.getRecentLogs().reverse();
   }
   return [];
 }
