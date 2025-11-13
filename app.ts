@@ -2,213 +2,299 @@ import sourceMapSupport from 'source-map-support';
 sourceMapSupport.install();
 
 import Homey from 'homey';
-import { CarBrand, ConnectedDrive, ILogger, Regions } from 'bmw-connected-drive';
-import { HomeyTokenStore } from './utils/HomeyTokenStore';
 import { ConfigurationManager } from './utils/ConfigurationManager';
-import { DeviceData } from './utils/DeviceData';
-import { Logger } from './utils/Logger';
+import { ILogger, LogLevel } from './lib';
 import { Configuration } from './utils/Configuration';
-import { LocationType } from './utils/LocationType';
 import * as semver from 'semver';
-import { ConnectedDriver } from './drivers/ConnectedDriver';
+import { ArgumentAutocompleteResults } from 'homey/lib/FlowCard';
+import { Capabilities } from './utils/Capabilities';
+import { Flows } from './utils/Flows';
+import { LokiLogger } from './utils/LokiLogger';
+import { Logger } from './utils/Logger';
+import { DeviceCodeAuthProvider } from './lib/auth/DeviceCodeAuthProvider';
+import { CarDataClient } from './lib/api/CarDataClient';
+import { HttpClient } from './lib/http/HttpClient';
+import { HomeyTokenStore } from './utils/HomeyTokenStore';
+import { Vehicle } from './drivers/Vehicle';
 
 // TODO:
 // Window states capability
 // Hood state capability
 // Trunk state capability
-// Charging current control capability
-// Charging schedule capability
-// Last status update
 
+/**
+ * BMW Connected Drive app for Homey
+ *
+ * Manages authentication providers and API clients per client ID (GCID).
+ * Multiple vehicles can share the same auth provider and API client if they
+ * use the same client ID.
+ */
 export class BMWConnectedDrive extends Homey.App {
-    tokenStore?: HomeyTokenStore;
-    connectedDriveApi?: ConnectedDrive;
-    logger?: Logger;
-    currentLocation?: LocationType;
+  logger?: ILogger;
 
-    /**
-     * onInit is called when the app is initialized.
-     */
-    async onInit(): Promise<void> {
-        this.logger = new Logger(this.homey, () => ConfigurationManager.getConfiguration(this.homey).logLevel);
-        this.tokenStore = new HomeyTokenStore(this.homey);
-        let configuration = ConfigurationManager.getConfiguration(this.homey);
-        if (!configuration) {
-            configuration = new Configuration();
-            ConfigurationManager.setConfiguration(this.homey, configuration);
-        }
-        else {
-            await this.migrate_configuration();
-        }
+  // Client managers for shared authentication and API clients
+  private authProviders: Map<string, DeviceCodeAuthProvider> = new Map();
+  private apiClients: Map<string, CarDataClient> = new Map();
+  private tokenStore?: HomeyTokenStore;
 
-        // Using dummy credentials to initialize the ConnectedDrive API
-        // The actual credentials are not stored in the app, only the token.
-        // The authentication happens in the login flow, and the token is persisted.
-        this.connectedDriveApi = new ConnectedDrive("dummy_user", "false_password", configuration.region, this.tokenStore, this.logger);
-        this.logger.LogInformation('BMWConnectedDrive app has been initialized');
-
-        this.registerActionCards();
-        this.registerConditionCards();
+  /**
+   * Get or create authentication provider for a client ID
+   *
+   * @param clientId - BMW CarData API client ID (UUID)
+   * @returns DeviceCodeAuthProvider instance
+   */
+  getAuthProvider(clientId: string): DeviceCodeAuthProvider {
+    const existing = this.authProviders.get(clientId);
+    if (existing) {
+      return existing;
     }
 
-    /**
-     * Helper function to handle common flow action logic
-     * @param actionName Name of the action for logging and error messages
-     * @param args Flow action arguments
-     * @param apiAction Function to call on the ConnectedDrive API
-     */
-    private async handleFlowAction(actionName: string, args: any, apiAction: (vin: string, brand: CarBrand) => Promise<void>): Promise<void> {
-        const brand = (args.device?.driver as ConnectedDriver)?.brand ?? CarBrand.Bmw;
-        const vin = (args.device?.deviceData as DeviceData)?.id;
-        if (!vin) {
-            throw new Error(`VIN not found while ${actionName} flow triggered.`);
-        }
-        args.device.log(`Flow triggered ${actionName} for vin ${vin}`);
+    this.logger?.info(`[ClientAuthManager] Creating new auth provider for client ID: ${clientId}`);
 
-        try {
-            await apiAction(vin, brand);
-        } catch (err) {
-            this.logger?.LogError(err);
-        }
+    if (!this.tokenStore) {
+      throw new Error('Token store not initialized');
     }
 
-    private registerActionCards() {
-        this.homey.flow.getActionCard('climate_now').registerRunListener(async (args: any) => {
-            await this.handleFlowAction('climate_now', args, async (vin: string, brand: CarBrand) => {
-                await this.connectedDriveApi?.startClimateControl(vin, brand);
-            });
-        });
+    const authProvider = new DeviceCodeAuthProvider(this.tokenStore, clientId, {
+      logger: this.logger,
+    });
 
-        this.homey.flow.getActionCard('climate_cancel').registerRunListener(async (args: any) => {
-            await this.handleFlowAction('climate_cancel', args, async (vin: string, brand: CarBrand) => {
-                await this.connectedDriveApi?.stopClimateControl(vin, brand);
-            });
-        });
+    this.authProviders.set(clientId, authProvider);
+    return authProvider;
+  }
 
-        this.homey.flow.getActionCard('lock_vehicle').registerRunListener(async (args: any) => {
-            await this.handleFlowAction('lock_vehicle', args, async (vin: string, brand: CarBrand) => {
-                await this.connectedDriveApi?.lockDoors(vin, brand);
-            });
-        });
+  /**
+   * Create HTTP client with standard configuration
+   * Used by both API client and container manager
+   *
+   * @returns HttpClient instance
+   */
+  createHttpClient(): HttpClient {
+    return new HttpClient({
+      timeout: 30000,
+      maxRetries: 3,
+      rateLimit: {
+        maxRequests: 50,
+        windowMs: 24 * 60 * 60 * 1000, // 24 hours
+      },
+      logger: this.logger,
+    });
+  }
 
-        this.homey.flow.getActionCard('unlock_vehicle').registerRunListener(async (args: any) => {
-            await this.handleFlowAction('unlock_vehicle', args, async (vin: string, brand: CarBrand) => {
-                await this.connectedDriveApi?.unlockDoors(vin, brand);
-            });
-        });
-
-        this.homey.flow.getActionCard('blow_horn').registerRunListener(async (args: any) => {
-            await this.handleFlowAction('blow_horn', args, async (vin: string, brand: CarBrand) => {
-                await this.connectedDriveApi?.blowHorn(vin, brand);
-            });
-        });
-
-        this.homey.flow.getActionCard('flash_lights').registerRunListener(async (args: any) => {
-            await this.handleFlowAction('flash_lights', args, async (vin: string, brand: CarBrand) => {
-                await this.connectedDriveApi?.flashLights(vin, brand);
-            });
-        });
-
-        this.homey.flow.getActionCard('send_message').registerRunListener(async (args: any) => {
-            await this.handleFlowAction('send_message', args, async (vin: string, brand: CarBrand) => {
-                await this.connectedDriveApi?.sendMessage(vin, brand, args.subject, args.message);
-            });
-        });
-
-        this.homey.flow.getActionCard('start_charging').registerRunListener(async (args: any) => {
-            await this.handleFlowAction('start_charging', args, async (vin: string, brand: CarBrand) => {
-                await this.connectedDriveApi?.startCharging(vin, brand);
-            });
-        });
-
-        this.homey.flow.getActionCard('stop_charging').registerRunListener(async (args: any) => {
-            await this.handleFlowAction('stop_charging', args, async (vin: string, brand: CarBrand) => {
-                await this.connectedDriveApi?.stopCharging(vin, brand);
-            });
-        });
+  /**
+   * Get or create API client for a client ID
+   *
+   * @param clientId - BMW CarData API client ID (UUID)
+   * @returns CarDataClient instance
+   */
+  getApiClient(clientId: string): CarDataClient {
+    const existing = this.apiClients.get(clientId);
+    if (existing) {
+      return existing;
     }
 
-    private registerConditionCards() {
-        const geofenceCard = this.homey.flow.getConditionCard('geofence');
-        geofenceCard.registerArgumentAutocompleteListener("geo_fence", async (query: any, args: any) => {
-            const configuration = ConfigurationManager.getConfiguration(this.homey);
-            if (configuration?.geofences) {
-                const geofences = configuration.geofences.map(item => ({ name: item.label, id: item.label }));
-                return geofences.filter(result => result.name?.toLowerCase().includes(query.toLowerCase()));
-            }
+    this.logger?.info(`[ClientApiManager] Creating new API client for client ID: ${clientId}`);
 
-            return [];
-        });
-        geofenceCard.registerRunListener(async (args: any, state: any) => {
-            const app = this.homey.app as BMWConnectedDrive
-            return (app.currentLocation && args.geo_fence.id && app.currentLocation.label === args.geo_fence.id);
-        });
+    const authProvider = this.getAuthProvider(clientId);
 
-        this.homey.flow.getConditionCard('battery_percentage').registerRunListener(async (args: any, _: any) => {
-            const battery_percentage = args.device.getCapabilityValue('measure_battery');
-            return (battery_percentage < args.battery_charge_test);
-        });
+    // Create HTTP client with rate limiting (50 requests per 24 hours)
+    const httpClient = this.createHttpClient();
 
-        this.homey.flow.getConditionCard('charging_status').registerRunListener(async (args: any, _: any) => {
-            const charging_state = args.device.getCapabilityValue('charging_status_capability');
-            return (charging_state === args.charging_state);
-        });
+    const apiClient = new CarDataClient({
+      authProvider,
+      httpClient,
+      logger: this.logger,
+    });
+    this.apiClients.set(clientId, apiClient);
+    return apiClient;
+  }
+
+  /**
+   * Remove cached auth provider and API client for a client ID
+   * Used when user changes client ID or logs out
+   *
+   * @param clientId - BMW CarData API client ID (UUID)
+   */
+  clearClientCache(clientId: string): void {
+    this.logger?.info(`[ClientManager] Clearing cache for client ID: ${clientId}`);
+
+    const apiClient = this.apiClients.get(clientId);
+    if (apiClient) {
+      // Disconnect API client (revokes tokens)
+      void apiClient.disconnect();
     }
 
-    /**
-     * Perform migrations to ensure proper functionality after upgrading
-     */
-    private async migrate_configuration() {
+    this.authProviders.delete(clientId);
+    this.apiClients.delete(clientId);
+  }
+
+  /**
+   * onInit is called when the app is initialized.
+   */
+  async onInit(): Promise<void> {
+    await Promise.resolve();
+
+    // Load configuration first to determine logger type
+    let configuration = ConfigurationManager.getConfiguration(this.homey);
+    if (!configuration) {
+      configuration = new Configuration();
+      ConfigurationManager.setConfiguration(this.homey, configuration);
+    } else {
+      this.migrate_configuration();
+    }
+
+    // Initialize logger based on configuration
+    // If Loki URL is provided, use LokiLogger; otherwise use standard Logger
+    if (configuration.lokiUrl && configuration.lokiUrl.trim() !== '') {
+      this.logger = new LokiLogger(this.homey, configuration.lokiUrl, () =>
+        configuration.logEnabled ? configuration.logLevel : LogLevel.ERROR
+      );
+      this.logger.info(`Initialized with Loki logger at ${configuration.lokiUrl}`);
+    } else {
+      this.logger = new Logger(this.homey, () =>
+        configuration.logEnabled ? configuration.logLevel : LogLevel.ERROR
+      );
+      this.logger.info('Initialized with standard logger');
+    }
+
+    // Initialize app-level token store
+    this.tokenStore = new HomeyTokenStore(this.homey, this.logger);
+
+    // Note: Auth providers and API clients are created on-demand per client ID
+    // Devices call getAuthProvider() and getApiClient() to get shared instances
+
+    this.logger.info('BMWConnectedDrive app has been initialized');
+
+    // Register condition cards only (read-only)
+    // All action cards for remote services have been removed due to BMW CarData API limitations
+    this.registerConditionCards();
+  }
+
+  private registerConditionCards() {
+    const geofenceCard = this.homey.flow.getConditionCard(Flows.GEOFENCE_CONDITION);
+    geofenceCard.registerArgumentAutocompleteListener(
+      'geo_fence',
+      async (query: string, _args: any): Promise<ArgumentAutocompleteResults> => {
         const configuration = ConfigurationManager.getConfiguration(this.homey);
-        this.logger?.LogInformation(`Configuration version is ${configuration.currentVersion}.`);
-
-        if (!configuration.currentVersion) {
-            configuration.currentVersion = "0.0.0";
+        if (configuration?.geofences) {
+          const geofences = configuration.geofences.map((item) => ({
+            name: item.label ?? 'Unnamed',
+            id: item.label ?? 'Unnamed',
+          }));
+          return geofences.filter((result) =>
+            result.name?.toLowerCase().includes(query.toLowerCase())
+          );
         }
 
-        await this.migrate_0_6_5(configuration);
-        await this.migrate_0_7_0(configuration);
+        return [];
+      }
+    );
+    geofenceCard.registerRunListener(async (args: any, _state: any) => {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const device = args.device as Vehicle;
+      const currentLocation = device.stateManager.getLastLocation();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
+      return currentLocation && args.geo_fence.id && currentLocation.label === args.geo_fence.id;
+    });
 
-        configuration.currentVersion = this.homey.app.manifest.version;
-        ConfigurationManager.setConfiguration(this.homey, configuration);
+    this.homey.flow
+      .getConditionCard(Flows.BATTERY_PERCENTAGE_CONDITION)
+      .registerRunListener(async (args: any, _: any) => {
+        const battery_percentage = await Capabilities.GetCapabilityValueSafe<number>(
+          args.device,
+          Capabilities.MEASURE_BATTERY
+        );
+        return battery_percentage && battery_percentage < args.battery_charge_test;
+      });
+
+    this.homey.flow
+      .getConditionCard(Flows.CHARGING_STATUS_CONDITION)
+      .registerRunListener(async (args: any, _: any) => {
+        // Get the current Homey charging state (plugged_in_charging, plugged_in, plugged_out)
+        const currentChargingState = await Capabilities.GetCapabilityValueSafe<string>(
+          args.device,
+          Capabilities.EV_CHARGING_STATE
+        );
+
+        // Compare with the Homey-standard charging state from flow card
+        return currentChargingState === args.charging_state;
+      });
+  }
+
+  /**
+   * Perform migrations to ensure proper functionality after upgrading
+   */
+  private migrate_configuration() {
+    const configuration = ConfigurationManager.getConfiguration(this.homey);
+    this.logger?.info(`Configuration version is ${configuration.currentVersion}.`);
+
+    if (!configuration.currentVersion) {
+      configuration.currentVersion = '0.0.0';
     }
 
-    /**
-     * Migrate configuration from earlier version to 0.6.5
-     */
-    private async migrate_0_6_5(configuration: Configuration) {
-        if (semver.lt(configuration.currentVersion, "0.6.5")) {
-            this.logger?.LogInformation("Migrating to version 0.6.5");
+    this.migrate_0_6_5(configuration);
+    this.migrate_0_7_0(configuration);
+    this.migrate_1_0_0(configuration);
 
-            // Migrating geofences properties to the new casing
-            if (configuration.geofences) {
-                configuration.geofences = (configuration.geofences as any[]).map(fence => {
-                    return {
-                        label: fence.Label,
-                        latitude: fence.Latitude,
-                        longitude: fence.Longitude,
-                        address: fence.Address,
-                        radius: fence.Radius
-                    };
-                });
-            }
-        }
+    configuration.currentVersion = this.homey.app.manifest.version;
+    ConfigurationManager.setConfiguration(this.homey, configuration);
+  }
+
+  /**
+   * Migrate configuration from earlier version to 0.6.5
+   */
+  private migrate_0_6_5(configuration: Configuration) {
+    if (semver.lt(configuration.currentVersion, '0.6.5')) {
+      this.logger?.info('Migrating to version 0.6.5');
+
+      // Migrating geofences properties to the new casing
+      if (configuration.geofences) {
+        configuration.geofences = (configuration.geofences as any[]).map((fence) => {
+          return {
+            label: fence.Label,
+            latitude: fence.Latitude,
+            longitude: fence.Longitude,
+            address: fence.Address,
+            radius: fence.Radius,
+          };
+        });
+      }
     }
+  }
 
-    /**
-     * Migrate configuration from earlier version to 0.7.0
-     */
-    private async migrate_0_7_0(configuration: Configuration) {
-        if (semver.lt(configuration.currentVersion, "0.7.0")) {
-            this.logger?.LogInformation("Migrating to version 0.7.0");
+  /**
+   * Migrate configuration from earlier version to 0.7.0
+   */
+  private migrate_0_7_0(configuration: Configuration) {
+    if (semver.lt(configuration.currentVersion, '0.7.0')) {
+      this.logger?.info('Migrating to version 0.7.0');
 
-            // Removing username, password and captcha from the configuration
-            // as they are no longer persisted in the application.
-            delete (configuration as any).username;
-            delete (configuration as any).password;
-            delete (configuration as any).captcha;
-        }
+      // Removing username, password and captcha from the configuration
+      // as they are no longer persisted in the application.
+      delete (configuration as any).username;
+      delete (configuration as any).password;
+      delete (configuration as any).captcha;
     }
+  }
+
+  /**
+   * Migrate configuration from earlier version to 1.0.0 (BMW CarData API migration)
+   */
+  private migrate_1_0_0(configuration: Configuration) {
+    if (semver.lt(configuration.currentVersion, '1.0.0')) {
+      this.logger?.info('Migrating to version 1.0.0 (BMW CarData API)');
+
+      // Remove client ID from app-level configuration
+      // Client ID is now stored per-device in device settings
+      if ((configuration as any).clientId) {
+        this.logger?.info('Removing app-level clientId (now per-device)');
+        delete (configuration as any).clientId;
+      }
+
+      // Note: Existing devices will need repair to populate clientId in device settings
+      // The HomeyTokenStore already migrated to app-level storage with clientId keys
+    }
+  }
 }
 
 module.exports = BMWConnectedDrive;

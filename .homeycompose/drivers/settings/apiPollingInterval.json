@@ -1,0 +1,15 @@
+{
+  "id": "apiPollingInterval",
+  "type": "number",
+  "label": {
+    "en": "API polling interval (minutes)",
+    "nl": "API-polling interval (minuten)"
+  },
+  "value": 30,
+  "min": 30,
+  "max": 1440,
+  "hint": {
+    "en": "Interval for API polling when MQTT is unavailable. Minimum 30 minutes to respect BMW's rate limits (50 requests/24h).",
+    "nl": "Interval voor API-polling wanneer MQTT niet beschikbaar is. Minimaal 30 minuten om BMW's tarieflimieten te respecteren (50 verzoeken/24u)."
+  }
+}

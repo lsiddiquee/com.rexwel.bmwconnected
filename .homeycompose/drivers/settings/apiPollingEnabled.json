@@ -1,0 +1,13 @@
+{
+  "id": "apiPollingEnabled",
+  "type": "checkbox",
+  "label": {
+    "en": "Enable API polling",
+    "nl": "API-polling inschakelen"
+  },
+  "value": true,
+  "hint": {
+    "en": "Enable periodic API polling for vehicle data. Can be used alongside MQTT streaming or independently. Respects BMW's 50 requests/24h limit.",
+    "nl": "Schakel periodieke API-polling in voor voertuiggegevens. Kan naast MQTT-streaming worden gebruikt of onafhankelijk. Respecteert BMW's 50 verzoeken/24u limiet."
+  }
+}

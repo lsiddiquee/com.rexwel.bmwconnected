@@ -13,6 +13,7 @@
     "logLabel": "Log",
     "enabled": "Enabled",
     "logLevel": "Log Level",
+    "lokiUrl": "Grafana Loki URL (Optional)",
     "logRequestCount": "Number of requests to log (most recent)",
     "logs": "Logs",
     "developer": "Developer",
@@ -38,6 +39,50 @@
       "invalidCredentials": "Invalid username or password.",
       "captchaInvalid": "Invalid captcha token.",
       "loginFailed": "Login failed."
+    }
+  },
+  "pair": {
+    "client_id": {
+      "title": "BMW CarData Client ID",
+      "description": "Enter your BMW CarData API Client ID to continue. You must register your own application at the BMW Developer Portal to obtain a Client ID.",
+      "label": "Client ID",
+      "help": "Your Client ID is a UUID in the format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx",
+      "continue": "Continue",
+      "how_to_get": {
+        "title": "How to get a Client ID",
+        "step1": "Go to the BMW Developer Portal (https://customer.bmwgroup.com/cardata)",
+        "step2": "Create an account or log in with your existing BMW credentials",
+        "step3": "Register a new application - choose 'Car Data API'",
+        "step4": "Copy your Client ID from the application details"
+      }
+    },
+    "container_id": {
+      "label": "Container ID (Optional)",
+      "help": "Leave empty to create a new container automatically. If you have multiple vehicles with the same Client ID, they will share the same container. Only provide an existing Container ID if you want to reuse one."
+    },
+    "device_code": {
+      "title": "BMW CarData Authentication",
+      "requesting": "Requesting authorization code...",
+      "instructions": "Follow these steps to authorize access to your BMW:",
+      "step1": "1. Click the button below to open your browser",
+      "step2": "2. Enter this code when prompted:",
+      "step3": "3. Complete the authorization in your browser",
+      "open_browser": "Open Browser",
+      "waiting": "Waiting for authorization...",
+      "success": "Authorization successful!",
+      "expires_in": "Code expires in",
+      "minutes": "minutes",
+      "cancel": "Cancel",
+      "retry": "Try Again",
+      "error": {
+        "title": "Authorization Failed",
+        "request_failed": "Failed to request authorization code. Please try again.",
+        "expired": "Authorization code expired. Please try again.",
+        "auth_failed": "Authorization failed. Please complete the authorization in your browser.",
+        "user_denied": "Authorization was denied. Please try again and complete the authorization.",
+        "network_error": "Network error. Please check your connection and try again.",
+        "timeout": "Authorization timed out. Please try again."
+      }
     }
   }
 }

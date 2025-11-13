@@ -1,0 +1,978 @@
+[
+  {
+    "key": "vehicle.body.chargingPort.dcStatus",
+    "description": "This value indicates whether the vehicle was connected to a DC charging plug at the time of data collection (CONNECTED) or not (DISCONNECTED)."
+  },
+  {
+    "key": "vehicle.body.chargingPort.isHospitalityActive",
+    "description": "This value indicates whether the charging plug is automatically unlocked (HOSPITALITY_ACTIVE) or remains locked (HOSPITALITY_INACTIVE) after charging is completed."
+  },
+  {
+    "key": "vehicle.body.chargingPort.plugEventId",
+    "description": "Unique identifier which increases each time the customer plugs in his electrified vehicle (EXCEPT if the time between unplug and plug-in is less than 90 seconds). This value should be unique for each charging session. See ElectricEngine.Charging.PlugStatus."
+  },
+  {
+    "key": "vehicle.body.chargingPort.status",
+    "description": "This value indicates whether the vehicle was connected to a charging plug at the time of data collection (CONNECTED) or not (DISCONNECTED)."
+  },
+  {
+    "key": "vehicle.body.chargingPort.statusClearText",
+    "description": "Required alongside Vehicle.Body.ChargingPort.Status to ensure correct handling of charging sessions for G08 BEV vehicles (for details, contact DE-3-E; onboard fix expected by 2021-03)"
+  },
+  {
+    "key": "vehicle.body.flap.isLocked",
+    "description": "This value indicates whether the charging flap is locked at the time of data collection."
+  },
+  {
+    "key": "vehicle.body.flap.isPermanentlyUnlocked",
+    "description": "This value indicates whether the charging flap is locked independently of the central locking at the time of data collection."
+  },
+  {
+    "key": "vehicle.body.hood.isOpen",
+    "description": "This value indicates whether the vehicle's hood was closed at the time of data collection (CLOSED) or open (OPEN)."
+  },
+  {
+    "key": "vehicle.body.lights.isRunningOn",
+    "description": "This value indicates whether the vehicle light was on or off at the time of data collection or whether the status is unknown."
+  },
+  {
+    "key": "vehicle.body.trunk.door.isOpen",
+    "description": "Trunk door state."
+  },
+  {
+    "key": "vehicle.body.trunk.isLocked",
+    "description": "Indicated weather the trunk is locked or not."
+  },
+  {
+    "key": "vehicle.body.trunk.isOpen",
+    "description": "This value indicates whether the boot lid was open (OPEN), half-open (INTERMEDIATE) or closed (CLOSED) at the time of data collection."
+  },
+  {
+    "key": "vehicle.body.trunk.left.door.isOpen",
+    "description": "Left door of trunk state."
+  },
+  {
+    "key": "vehicle.body.trunk.lower.door.isOpen",
+    "description": "Lower door of trunk state."
+  },
+  {
+    "key": "vehicle.body.trunk.right.door.isOpen",
+    "description": "Right door of trunk state."
+  },
+  {
+    "key": "vehicle.body.trunk.upper.door.isOpen",
+    "description": "Upper door of trunk state."
+  },
+  {
+    "key": "vehicle.body.trunk.window.isOpen",
+    "description": "This value indicates whether the rear window is unlocked (TRUE) or closed (FALSE)."
+  },
+  {
+    "key": "vehicle.cabin.climate.timers.overwriteTimer.action",
+    "description": "Timer State/Action with states Activate (On), Deactivate (Off) and NoAction (Only used when communicating timer to the vehicle)."
+  },
+  {
+    "key": "vehicle.cabin.climate.timers.overwriteTimer.hour",
+    "description": "Hour setting of climate timer as per vehicle-configured timezone."
+  },
+  {
+    "key": "vehicle.cabin.climate.timers.overwriteTimer.minute",
+    "description": "Minute setting of climate timer as per vehicle-configured timezone."
+  },
+  {
+    "key": "vehicle.cabin.climate.timers.weekdaysTimer1.action",
+    "description": "Timer 1 State/Action with states Activate (On), Deactivate (Off) and NoAction (Only used when communicating timer 1 to the vehicle)."
+  },
+  {
+    "key": "vehicle.cabin.climate.timers.weekdaysTimer1.hour",
+    "description": "Hour setting of climate timer 1 as per vehicle-configured timezone."
+  },
+  {
+    "key": "vehicle.cabin.climate.timers.weekdaysTimer1.minute",
+    "description": "Minute setting of climate timer 1 as per vehicle-configured timezone."
+  },
+  {
+    "key": "vehicle.cabin.climate.timers.weekdaysTimer2.action",
+    "description": "Timer 2 State/Action with states Activate (On), Deactivate (Off) and NoAction (Only used when communicating timer 2 to the vehicle)."
+  },
+  {
+    "key": "vehicle.cabin.climate.timers.weekdaysTimer2.hour",
+    "description": "Hour setting of climate timer 2 as per vehicle-configured timezone."
+  },
+  {
+    "key": "vehicle.cabin.climate.timers.weekdaysTimer2.minute",
+    "description": "Minute setting of climate timer 2 as per vehicle-configured timezone."
+  },
+  {
+    "key": "vehicle.cabin.convertible.roofRetractableStatus",
+    "description": "Convertible Roof Retractable State. BMW Mini vehicles have the additionally option to only open the folding roof. This signal represents the Mini folding roof state. It should be read together with the convertible roof state as well, see Vehicle.Cabin.Convertible.RoofStatus."
+  },
+  {
+    "key": "vehicle.cabin.convertible.roofStatus",
+    "description": "Indicates the current status of the convertible roof at the time of data collection, e.g. whether it was closed (CLOSED), open (OPEN) or – in an emergency – locked (EMERGENCYLOCKED). \nThe following additional status values are possible: \nCLOSEDSECURED = convertible roof closed, vehicle secured \nOPENSECURED = convertible roof open, vehicle secured \nHARDTOPMOUNTED = hard top mounted and closed (removable hard top) \nINTERMEDIATEPOSITION = convertible roof in intermediate position \nLOADINGPOSITION = roof is in a position that allows for easy loading of the boot \nLOADINGPOSITIONIMMEDIATE = roof is in a position that allows for easy loading of the boot"
+  },
+  {
+    "key": "vehicle.cabin.door.row1.driver.isOpen",
+    "description": "This value indicates whether the front left door was closed at the time of data collection (CLOSED) or open (OPEN)."
+  },
+  {
+    "key": "vehicle.cabin.door.row1.driver.position",
+    "description": "Driver-side front door opening position in percent. 0% represents fully closed and 100% represents fully opened."
+  },
+  {
+    "key": "vehicle.cabin.door.row1.passenger.isOpen",
+    "description": "This value indicates whether the front right door was closed at the time of data collection (CLOSED) or open (OPEN)."
+  },
+  {
+    "key": "vehicle.cabin.door.row1.passenger.position",
+    "description": "Passenger-side front door opening position in percent. 0% represents fully closed and 100% represents fully opened."
+  },
+  {
+    "key": "vehicle.cabin.door.row2.driver.isOpen",
+    "description": "This value indicates whether the rear left door was closed at the time of data collection (CLOSED) or open (OPEN)."
+  },
+  {
+    "key": "vehicle.cabin.door.row2.driver.position",
+    "description": "Driver-side rear door opening position in percent. 0% represents fully closed and 100% represents fully opened."
+  },
+  {
+    "key": "vehicle.cabin.door.row2.passenger.isOpen",
+    "description": "This value indicates whether the rear right door was closed at the time of data collection (CLOSED) or open (OPEN)."
+  },
+  {
+    "key": "vehicle.cabin.door.row2.passenger.position",
+    "description": "Passenger-side rear door opening position in percent. 0% represents fully closed and 100% represents fully opened."
+  },
+  {
+    "key": "vehicle.cabin.door.status",
+    "description": "This value indicates the status of the doors, but is only sporadically recorded and transmitted. \nNote: It is recommended to use only the individual door status instead of this value."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row1.driverSide.cooling",
+    "description": "Default settings for front driver seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row1.driverSide.heating",
+    "description": "Default settings for front driver seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row1.passengerSide.cooling",
+    "description": "Default settings for front passenger seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row1.passengerSide.heating",
+    "description": "Default settings for front passenger seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row2.driverSide.cooling",
+    "description": "Default settings for rear driver seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row2.driverSide.heating",
+    "description": "Default settings for rear driver seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row2.passengerSide.cooling",
+    "description": "Default settings for rear passenger seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row2.passengerSide.heating",
+    "description": "Default settings for rear passenger seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row3.driverSide.cooling",
+    "description": "Default settings for third row driver seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row3.driverSide.heating",
+    "description": "Default settings for third row driver seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row3.passengerSide.cooling",
+    "description": "Default settings for third row passenger seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.seat.row3.passengerSide.heating",
+    "description": "Default settings for third row passenger seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.steeringWheel.heating",
+    "description": "Default settings for steering wheel heating for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.defaultSettings.targetTemperature",
+    "description": "Default settings for target temperature for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row1.driverSide.cooling",
+    "description": "DirectStart settings for front driver seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row1.driverSide.heating",
+    "description": "DirectStart settings for front driver seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row1.passengerSide.cooling",
+    "description": "DirectStart settings for front passenger seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row1.passengerSide.heating",
+    "description": "DirectStart settings for front passenger seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row2.driverSide.cooling",
+    "description": "DirectStart settings for rear driver seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row2.driverSide.heating",
+    "description": "DirectStart settings for rear driver seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row2.passengerSide.cooling",
+    "description": "DirectStart settings for rear passenger seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row2.passengerSide.heating",
+    "description": "DirectStart settings for rear passenger seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row3.driverSide.cooling",
+    "description": "DirectStart settings for third row driver seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row3.driverSide.heating",
+    "description": "DirectStart settings for third row driver seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row3.passengerSide.cooling",
+    "description": "DirectStart settings for third row passenger seat cooling/ventilation of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.seat.row3.passengerSide.heating",
+    "description": "DirectStart settings for third row passenger seat heating of the seat for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.steeringWheel.heating",
+    "description": "DirectStart settings for steering wheel heating for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.configuration.directStartSettings.targetTemperature",
+    "description": "DirectStart settings for target temperature for climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.status.comfortState",
+    "description": "Status of the comfort state of the climate preconditioning."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.status.isExteriorMirrorHeatingActive",
+    "description": "Current status of the exterior mirror heating."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.status.progress",
+    "description": "Progress of the currently active climate preconditioning in percent."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.status.rearDefrostActive",
+    "description": "Current status of the rear window heating."
+  },
+  {
+    "key": "vehicle.cabin.hvac.preconditioning.status.remainingRunningTime",
+    "description": "Remaining runtime of climate preconditioning in seconds."
+  },
+  {
+    "key": "vehicle.cabin.hvac.statusAirPurification",
+    "description": "Actual status of the air purification."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.displayUnit.distance",
+    "description": "This value indicates the units (kilometres or miles) in which distances are indicated on the vehicle instrument panel."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.hmi.distanceUnit",
+    "description": "Distance unit used in the current HMI"
+  },
+  {
+    "key": "vehicle.cabin.infotainment.isMobilePhoneConnected",
+    "description": "This value indicates whether a mobile phone was linked to the vehicle at the time of data collection or whether the connection status is unknown."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.currentLocation.altitude",
+    "description": "This value indicates the height of the vehicle above sea-level at the time of data collection. \nThe value range reaches from -100m to 6000m or from -328ft to 19685ft."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.currentLocation.fixStatus",
+    "description": "GPS fix status. \"NO_FIX\" means when less than 3 satellites are found. \"2D_GPS_FIX\" is obtained when at least 3 satellites are found. \"3D_GPS_FIX\" is obtained when at least 4 satellites are found."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.currentLocation.heading",
+    "description": "This value indicates the orientation of the vehicle in degrees at the time of data collection. If the value is 180, the vehicle is pointing directly south. If the value is 0, the vehicle is pointing directly north. The values thus range from 0 to 359. The determined orientation of the vehicle may differ from its actual orientation due to inaccuracies in the GPS positioning."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.currentLocation.latitude",
+    "description": "This value indicates the degree of latitude at which the vehicle was at the time of data collection. \nThe degree of latitude could range from 0 (at the equator) to a maximum of +90 in the northern hemisphere or respectively -90 in the southern hemisphere. The GPS position is transferred independently of whether the GPS positioning has been activated or deactivated in your vehicle via the settings menu."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.currentLocation.longitude",
+    "description": "This value indicates the degree of longitude at which the vehicle was at the time of data collection. \nThe degree of longitude could range from 0 (at the Greenwich meridian / Great Britain) to a maximum of +180 east or respectively -180 west of the meridian. The GPS position is transferred independently of whether the GPS positioning has been activated or deactivated in your vehicle via the settings menu."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.currentLocation.numberOfSatellites",
+    "description": "Number of GPS satellites used for positioning and relates to the reliability of the positioning."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.destinationSet.arrivalTime",
+    "description": "This value indicates the arrival time at the navigation destination and is given in hours and minutes."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.destinationSet.distance",
+    "description": "This value indicates the distance to the active navigation destination in kilometres or miles at the time of data collection. \nThe values range from 0 km to 100000 km or from 0mi to 62137mi."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.pointsOfInterests.available",
+    "description": "This value indicates how many POIs (points of interest) are still open in the navigation system."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.pointsOfInterests.max",
+    "description": "This value indicates how many POIs (points of interest) can be stored in the navigation system."
+  },
+  {
+    "key": "vehicle.cabin.infotainment.navigation.remainingRange",
+    "description": "This value indicates the remaining range of fuel in kilometres or miles at the time of data collection."
+  },
+  {
+    "key": "vehicle.cabin.seat.row1.driverSide.cooling",
+    "description": "Front driver seat Cooling. 0 = off. +100 = max cold."
+  },
+  {
+    "key": "vehicle.cabin.seat.row1.driverSide.heating",
+    "description": "Front driver seat heating. 0 = off. +100 = max heat."
+  },
+  {
+    "key": "vehicle.cabin.seat.row1.passengerSide.cooling",
+    "description": "Front passenger seat Cooling. 0 = off. +100 = max cold."
+  },
+  {
+    "key": "vehicle.cabin.seat.row1.passengerSide.heating",
+    "description": "Front passenger seat heating. 0 = off. +100 = max heat."
+  },
+  {
+    "key": "vehicle.cabin.seat.row2.driverSide.cooling",
+    "description": "Rear driver seat Cooling. 0 = off. +100 = max cold."
+  },
+  {
+    "key": "vehicle.cabin.seat.row2.driverSide.heating",
+    "description": "Rear driver seat heating. 0 = off. +100 = max heat."
+  },
+  {
+    "key": "vehicle.cabin.seat.row2.passengerSide.cooling",
+    "description": "Rear passenger seat Cooling. 0 = off. +100 = max cold."
+  },
+  {
+    "key": "vehicle.cabin.seat.row2.passengerSide.heating",
+    "description": "Rear passenger seat heating. 0 = off. +100 = max heat."
+  },
+  {
+    "key": "vehicle.cabin.seat.row3.driverSide.cooling",
+    "description": "Third row driver seat Cooling. 0 = off. +100 = max cold."
+  },
+  {
+    "key": "vehicle.cabin.seat.row3.driverSide.heating",
+    "description": "Third row driver seat heating. 0 = off. +100 = max heat."
+  },
+  {
+    "key": "vehicle.cabin.seat.row3.passengerSide.cooling",
+    "description": "Third row passenger seat Cooling. 0 = off. +100 = max cold."
+  },
+  {
+    "key": "vehicle.cabin.seat.row3.passengerSide.heating",
+    "description": "Third row passenger seat heating. 0 = off. +100 = max heat."
+  },
+  {
+    "key": "vehicle.cabin.steeringWheel.heating",
+    "description": "Actual value of the steering wheel heating in percent."
+  },
+  {
+    "key": "vehicle.cabin.sunroof.overallStatus",
+    "description": "Overall status of the vehicle's sunroof."
+  },
+  {
+    "key": "vehicle.cabin.sunroof.relativePosition",
+    "description": "Openingt state of the sunroof in percent. -100 means full tilt position. 0% represents fully closed and 100% represents fully opened."
+  },
+  {
+    "key": "vehicle.cabin.sunroof.shade.position",
+    "description": "Item position. 0 = Start position 100 = End position."
+  },
+  {
+    "key": "vehicle.cabin.sunroof.status",
+    "description": "This value indicates whether the sunroof (if the vehicle has one) was open (OPEN), half-open (INTERMEDIATE) or closed (CLOSED) at the time of data collection."
+  },
+  {
+    "key": "vehicle.cabin.sunroof.tiltStatus",
+    "description": "This value indicates whether the sunroof (if the vehicle has one) was tilted (OPEN), half-tilted (INTERMEDIATE) or closed (CLOSED) at the time of data collection."
+  },
+  {
+    "key": "vehicle.cabin.window.row1.driver.status",
+    "description": "This value indicates whether the front left window was open (OPEN), half-open (INTERMEDIATE) or closed (CLOSED) at the time of data collection."
+  },
+  {
+    "key": "vehicle.cabin.window.row1.passenger.status",
+    "description": "This value indicates whether the front right window was open (OPEN), half-open (INTERMEDIATE) or closed (CLOSED) at the time of data collection."
+  },
+  {
+    "key": "vehicle.cabin.window.row2.driver.status",
+    "description": "This value indicates whether the rear left window was open (OPEN), half-open (INTERMEDIATE) or closed (CLOSED) at the time of data collection."
+  },
+  {
+    "key": "vehicle.cabin.window.row2.passenger.status",
+    "description": "This value indicates whether the rear right window was open (OPEN), half-open (INTERMEDIATE) or closed (CLOSED) at the time of data collection."
+  },
+  {
+    "key": "vehicle.channel.ngtp.timeVehicle",
+    "description": "These values indicate the time shown in the vehicle at the time of recording the data."
+  },
+  {
+    "key": "vehicle.channel.teleservice.lastAutomaticServiceCallTime",
+    "description": "This value indicates at what time an Automatic Service Call (ASC) was initiated by the vehicle."
+  },
+  {
+    "key": "vehicle.channel.teleservice.lastTeleserviceReportTime",
+    "description": "This value indicates at what time the teleservice report call was initiated by the vehicle. The vehicle collects measured values or error data for the teleservice report call, and automatically sends them according to defined cycles."
+  },
+  {
+    "key": "vehicle.channel.teleservice.status",
+    "description": "This value indicates whether teleservices are available for this vehicle."
+  },
+  {
+    "key": "vehicle.chassis.axle.row1.wheel.left.tire.pressure",
+    "description": "This value indicates the measured tyre pressure on the front left in kPa"
+  },
+  {
+    "key": "vehicle.chassis.axle.row1.wheel.left.tire.pressureTarget",
+    "description": "This value indicates the target tyre pressure on the front left in kPa."
+  },
+  {
+    "key": "vehicle.chassis.axle.row1.wheel.left.tire.temperature",
+    "description": "Tire temperature in Celsius on the front left."
+  },
+  {
+    "key": "vehicle.chassis.axle.row1.wheel.right.tire.pressure",
+    "description": "This value indicates the measured tyre pressure on the front right in kPa."
+  },
+  {
+    "key": "vehicle.chassis.axle.row1.wheel.right.tire.pressureTarget",
+    "description": "This value indicates the target tyre pressure on the front right in kPa."
+  },
+  {
+    "key": "vehicle.chassis.axle.row1.wheel.right.tire.temperature",
+    "description": "Tire temperature in Celsius on the front right."
+  },
+  {
+    "key": "vehicle.chassis.axle.row2.wheel.left.tire.pressure",
+    "description": "This value indicates the measured tyre pressure on the rear left in kPa."
+  },
+  {
+    "key": "vehicle.chassis.axle.row2.wheel.left.tire.pressureTarget",
+    "description": "This value indicates the target tyre pressure on the rear left in kPa."
+  },
+  {
+    "key": "vehicle.chassis.axle.row2.wheel.left.tire.temperature",
+    "description": "Tire temperature in Celsius on the rear left."
+  },
+  {
+    "key": "vehicle.chassis.axle.row2.wheel.right.tire.pressure",
+    "description": "This value indicates the measured tyre pressure on the rear right in kPa."
+  },
+  {
+    "key": "vehicle.chassis.axle.row2.wheel.right.tire.pressureTarget",
+    "description": "This value indicates the target tyre pressure on the rear right in kPa."
+  },
+  {
+    "key": "vehicle.chassis.axle.row2.wheel.right.tire.temperature",
+    "description": "Tire temperature in Celsius on the rear right."
+  },
+  {
+    "key": "vehicle.drivetrain.avgElectricRangeConsumption",
+    "description": "This value indicates the average electric consumption in [kWh/100 km or mi/kWh] at the time of data collection. \nNote: Not available for the models i3 and i8."
+  },
+  {
+    "key": "vehicle.drivetrain.batteryManagement.batterySizeMax",
+    "description": "This value indicates the size of the installed high-voltage battery."
+  },
+  {
+    "key": "vehicle.drivetrain.batteryManagement.header",
+    "description": "This value indicates the current charging status of the vehicle at the time of data collection."
+  },
+  {
+    "key": "vehicle.drivetrain.batteryManagement.maxEnergy",
+    "description": "This value indicates the current energy content of the high-voltage battery."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.acAmpere",
+    "description": "This value indicates the maximum charging current for the most recent charging process in ampere (A) (only when charging with alternating current). \nValues between 0 and 25 are possible. Both the vehicle and charging station could be individually charged with a certain maximum charging current. The value displayed here is the greater of these two figures."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.acRestriction.factor",
+    "description": "Response of ac restriction."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.acRestriction.isChosen",
+    "description": "The first value indicates whether the charging current used to charge the vehicle is limited. \n\nThe second value describes the type of limit (reduced or minimum)."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.acVoltage",
+    "description": "This value indicates the charging voltage for the most recent charging process (only when charging with alternating current). \nThis value is usually in the region of 230 V. \nHowever, charging voltages may range from 0 to 300."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.authentication.status",
+    "description": "Plug & Charge (Automatic Payment of Charging Services) authorization status of a charging session. \"AUTHORIZATION_SUCCESSFUL\" - Authentication with PlugAndCharge successful, \"TRANSPORT_LAYER_ERROR\" - TLS connection to EVSE not possible, \"HIGH_LEVEL_COMMUNICATION_ERROR\" - High Level communication with ISO15118 error, \"CONTRACT_SERVICE_NOT_SUPPORTED_ERROR\" - EVSE doesn't support Authentication via PlugAndCharge, \"AUTHORIZATION_TIMEOUT\" - Authorization run in an error, \"AUTHORIZATION_TIMEOUT\" - authentication not finished after 120s, \"NVM_READ_CERTIFICATE_ERROR\" - Certificates couldn't be red from Charging Control Unit storrage, \"CERTIFICATE_UPDATE_ERROR\" - update of contract via powerline failed, \"XML_SECURITY_ERROR\" - Schema validation error of transfered data."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.chargingMode",
+    "description": "Current charging mode."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.connectionType",
+    "description": "This value indicates the charging process (CONDUCTIVE/INDUCTIVE) used to charge the vehicle at the time of data collection."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.connectorStatus",
+    "description": "Current condition of charging plug across all types (inductive, conductive), modes (AC, DC) and service packs."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.consumptionOverLifeTime.overall.gridEnergy",
+    "description": "This value indicates the total energy supplied using charging cables."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.hvpmFinishReason",
+    "description": "This value indicates the reason why a charging process was ended."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.hvStatus",
+    "description": "Charging HV Status."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.isImmediateChargingSystemReason",
+    "description": "This parameter contains the information that customer selected charging mode is overwritten due to system reasons."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.isSingleImmediateCharging",
+    "description": "This value indicates whether the “instant charging” function is activated."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.lastChargingReason",
+    "description": "Reason of the last charging process."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.lastChargingResult",
+    "description": "Result of the last charging process."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.method",
+    "description": "This value describes whether the vehicle was charged with direct current (DC) or alternating current (AC) and which charging plug was used for this purpose. \nThe indicated technical value AC_TYPE1PLUG, for example, indicates that the high-voltage battery was charged in alternating current mode, making use of a charging plug of Type 1."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.modeDeviation",
+    "description": "This parameter contains the information of deviation to the customer selected charging mode due to system reasons."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.phaseNumber",
+    "description": "This value indicates the number of phases in which the high-voltage battery will be charged."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.profile.climatizationActive",
+    "description": "Climatization Activation of Vehicle in Charging Profile, vehicle interior gets preconditioned for next departure time."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.profile.isRcpConfigComplete",
+    "description": "Vehicles with a complete RCP (Remote Charging Profile) Configuration explicitly send values for all charging profile attributes. For Vehicles without a complete RCP Configuration, some defaults are applied."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.profile.mode",
+    "description": "The charging profile provides information about the charging mode most recently selected for your vehicle. Where appropriate, CarData element may also be used to display individual attributes in cars without an electric drive, e.g. the preconditioning settings."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.profile.preference",
+    "description": "Charging preference of current charging profile. This value depends on charge mode selection. For Vehicle.ElectricEngine.Charging.Profile.Mode being \"DELAYED_CHARGING\", Vehicle.ElectricEngine.Charging.Profile.Preference is either \"SMART_CHARGING\" or \"CHARGING_WINDOW\". In case Vehicle.ElectricEngine.Charging.Profile.Mode is \"IMMEDIATE_CHARGING\", Vehicle.ElectricEngine.Charging.Profile.Preference is set to \"NO_PRESELECTION\"."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.profile.settings.biDirectionalCharging.departureTimeRelevant",
+    "description": "Information if the upcoming departure time is relevant for the professional mode (bidirectional/unidirectional) and the target state of energy shall be reached at this time."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.profile.settings.biDirectionalCharging.dischargeAllowed",
+    "description": "Allowing discharging in professional mode for the bidirectional power transfer function (BPT) is selected from customer or not (ON/OFF)."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.profile.timerType",
+    "description": "Charging profile timer type (e.g., Weekdays or TwoTimesTimer)"
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.reasonChargingEnd",
+    "description": "Reason for the end of charging, from SP25 on."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.routeOptimizedChargingStatus",
+    "description": "Indicates the charging status in cases where e-route charging is used by the customer for his journey. E-route charging sessions have two distinct phases. Route optimzed charging sessions override the customer target state of charge temporarily."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.smeEnergyDeltaFullyCharged",
+    "description": "This value indicates the amount of energy required to fully charge the battery."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.status",
+    "description": "This value indicates the current charging status of the vehicle at the time of data collection. \nFor example, NOCHARGING means that the vehicle's high-voltage battery is currently not being charged. \nINITIALIZATION means that the charging process is just being prepared, while CHARGINGACTIVE means that the battery is just being charged. \nOther possible values are: \nCHARGINGPAUSED (charging paused), \nCHARGINGENDED (charging ended) and \nCHARGINGERROR (charging error)."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.timeRemaining",
+    "description": "This value indicates the estimated remaining charging time in minutes."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.timeToFullyCharged",
+    "description": "This value indicates the calculated time (in minutes) until the high-voltage battery is fully charged. If a navigation destination has been set, the time remaining until reaching the destination will be displayed."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.charging.windowSelection",
+    "description": "Indicates a pre-defined time window in which the high-voltage battery of the vehicle should be charged. \nThe value could be either NOTCHOSEN or CHOSEN."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.kombiRemainingElectricRange",
+    "description": "This value indicates the remaining electric range at the time of data collection."
+  },
+  {
+    "key": "vehicle.drivetrain.electricEngine.remainingElectricRange",
+    "description": "This value indicates the electric range predicted during charging."
+  },
+  {
+    "key": "vehicle.drivetrain.engine.isActive",
+    "description": "This value indicates whether the ignition was on or off at the time of data collection or whether the status is unknown."
+  },
+  {
+    "key": "vehicle.drivetrain.engine.isIgnitionOn",
+    "description": "This value indicates whether the engine was on or off at the time of data collection or whether the status is unknown."
+  },
+  {
+    "key": "vehicle.drivetrain.fuelSystem.level",
+    "description": "This value indicates the tank level in percent at the time of data collection."
+  },
+  {
+    "key": "vehicle.drivetrain.fuelSystem.remainingFuel",
+    "description": "The value indicates the current fuel tank level in litres or gallons at the time of data collection. Depending on the position of the tank float, the specified value may differ by up to 6 litres or 1.6 gallons."
+  },
+  {
+    "key": "vehicle.drivetrain.internalCombustionEngine.engine.ect",
+    "description": "The value indicates the current coolant temperature in degrees centigrade or Fahrenheit at the time of data collection."
+  },
+  {
+    "key": "vehicle.drivetrain.lastRemainingRange",
+    "description": "Last sent remaining range electric + fuel sent by the vehicle. Range from vehicle Kombi (Queried for PHEV and CE vehicles). Delivers e-range + ce range for PHEV. Ce Range for CE vehicles. Likely 0 for BEV vehicles. This value should only be used for combustion cars. Electric cars should read Vehicle.Drivetrain.ElectricEngine.KombiRemainingElectricRange."
+  },
+  {
+    "key": "vehicle.drivetrain.totalRemainingRange",
+    "description": "This value indicates the total range predicted during charging (total of electric range and combustion engine range)."
+  },
+  {
+    "key": "vehicle.electricalSystem.battery.stateOfCharge",
+    "description": "The value indicates the state of charge of the low-voltage battery in percent measured at the time of data collection."
+  },
+  {
+    "key": "vehicle.electricalSystem.battery.voltage",
+    "description": "The value indicates the current battery voltage in the vehicle's electrical system. \nThis value is always given in voltage, e.g. 14.4 V."
+  },
+  {
+    "key": "vehicle.electricalSystem.battery48V.stateOfHealth.displayed",
+    "description": "SoH (State of Health) of the 48V Battery that is shown to the customer. Created to fulfill EU Battery Regulation."
+  },
+  {
+    "key": "vehicle.electronicControlUnit.diagnosticTroubleCodes.raw",
+    "description": "The fault memory provides information about potential errors or technical faults in the vehicle. This information is intended for workshops. Customer-relevant errors that are displayed to the driver in the vehicle can be found under the CarData Element “Check control messages”. Details about this are documented in the operating manual of the vehicle."
+  },
+  {
+    "key": "vehicle.isMoving",
+    "description": "This value indicates whether the vehicle was in motion at the time of data collection."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.charging.acLimit.isActive",
+    "description": "This value indicates whether a charging current limit was active at the time of data collection."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.charging.acLimit.max",
+    "description": "This value indicates the maximum available charging current, independently of the infrastructure and selected cable."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.charging.acLimit.min",
+    "description": "This value indicates the minimum available charging current, independently of the infrastructure and selected cable."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.charging.acLimit.selected",
+    "description": "This value indicates the set limit of the charging current in amperes (A)."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.charging.acousticLimit",
+    "description": "This value indicates whether charging is limited due to noise emissions."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.charging.power",
+    "description": "The current charging power in Watt. This value should only be considered with respect to the current timestamp."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.charging.preferenceSmartCharging",
+    "description": "This value indicates which “Smart Charging” option is being used to charge with."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.preconditioning.automaticMode.statusFeedback",
+    "description": "Current state of toggle switch for automatic battery preconditioning. ON means automatic mode (navigation based) of the predictive thermal management (vWM) is activated. OFF means automatic mode (navigation based) of the predictive thermal management (vWM) is deactivated. TEMP_OFF stands for temporary deactivation for current trip of the automatic predictive thermal management."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.preconditioning.manualMode.statusFeedback",
+    "description": "Current state of button for manual battery preconditioning. Either for charging or driving."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.preconditioning.state",
+    "description": "Status of battery preconditioning activity. On legacy value only valid for legacy-project SP2021plus."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.stateOfCharge.target",
+    "description": "This value indicates the target charging status of the high-voltage battery in percent. This is displayed in 10% increments."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.stateOfCharge.targetMin",
+    "description": "Min target state of charge requested by customer for smart charging and V2X."
+  },
+  {
+    "key": "vehicle.powertrain.electric.battery.stateOfCharge.targetSoCForProfessionalMode",
+    "description": "Contains the target state of charge that shall be used as target in professional mode. At least this target state of charge will be reached by departure time."
+  },
+  {
+    "key": "vehicle.powertrain.electric.chargingDuration.displayControl",
+    "description": "This value indicates whether the charging time is displayed in the vehicle."
+  },
+  {
+    "key": "vehicle.powertrain.electric.departureTime.displayControl",
+    "description": "This value indicates whether the departure time is displayed in the vehicle."
+  },
+  {
+    "key": "vehicle.powertrain.electric.range.displayControl",
+    "description": "Indicates if and how the electric range shall be displayed in the vehicle."
+  },
+  {
+    "key": "vehicle.powertrain.electric.range.target",
+    "description": "This value indicates the remaining electric range at the time of data collection. This depends on the set target value of the charging status."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.anyPosition.flap.isAutomaticOpenAndCloseActive",
+    "description": "This field indicates if customer setting for opening the flap by myWay function (slider in the mobile app) is active. If true, flap opens automatically when the vehicle is close to a charging station with the digital key in the pocket and closes automatically after unplugging the cable."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.anyPosition.flap.isOpen",
+    "description": "This signal indicates, if charging port is open in the vehicle."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.anyPosition.isPlugged",
+    "description": "This signal indicates, if a charging cable is plugged in the charging port."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.frontLeft.flap.isAutomaticOpenAndCloseActive",
+    "description": "This field indicates if customer setting for opening the front left flap by myWay function (slider in the mobile app) is active. If true, flap opens automatically when the vehicle is close to a charging station with the digital key in the pocket and closes automatically after unplugging the cable."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.frontLeft.flap.isOpen",
+    "description": "This signal indicates, if front left charging port is open in the vehicle."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.frontLeft.isPlugged",
+    "description": "This signal indicates, if a charging cable is plugged in the front left charging port."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.frontMiddle.flap.isAutomaticOpenAndCloseActive",
+    "description": "This field indicates if customer setting for opening the front middle flap by myWay function (slider in the mobile app) is active. If true, flap opens automatically when the vehicle is close to a charging station with the digital key in the pocket and closes automatically after unplugging the cable."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.frontMiddle.flap.isOpen",
+    "description": "This signal indicates, if front middle charging port is open in the vehicle."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.frontMiddle.isPlugged",
+    "description": "This signal indicates, if a charging cable is plugged in the front middle charging port."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.frontRight.flap.isAutomaticOpenAndCloseActive",
+    "description": "This field indicates if customer setting for opening the front right flap by myWay function (slider in the mobile app) is active. If true, flap opens automatically when the vehicle is close to a charging station with the digital key in the pocket and closes automatically after unplugging the cable."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.frontRight.flap.isOpen",
+    "description": "This signal indicates, if front right charging port is open in the vehicle."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.frontRight.isPlugged",
+    "description": "This signal indicates, if a charging cable is plugged in the front right charging port."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.rearLeft.flap.isAutomaticOpenAndCloseActive",
+    "description": "This field indicates if customer setting for opening the rear left flap by myWay function (slider in the mobile app) is active. If true, flap opens automatically when the vehicle is close to a charging station with the digital key in the pocket and closes automatically after unplugging the cable."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.rearLeft.flap.isOpen",
+    "description": "This signal indicates, if rear left charging port is open in the vehicle."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.rearLeft.isPlugged",
+    "description": "This signal indicates, if a charging cable is plugged in the rear left charging port."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.rearMiddle.flap.isAutomaticOpenAndCloseActive",
+    "description": "This field indicates if customer setting for opening the rear middle flap by myWay function (slider in the mobile app) is active. If true, flap opens automatically when the vehicle is close to a charging station with the digital key in the pocket and closes automatically after unplugging the cable."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.rearMiddle.flap.isOpen",
+    "description": "This signal indicates, if rear middle charging port is open in the vehicle."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.rearMiddle.isPlugged",
+    "description": "This signal indicates, if a charging cable is plugged in the rear middle charging port."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.rearRight.flap.isAutomaticOpenAndCloseActive",
+    "description": "This field indicates if customer setting for opening the rear right flap by myWay function (slider in the mobile app) is active. If true, flap opens automatically when the vehicle is close to a charging station with the digital key in the pocket and closes automatically after unplugging the cable."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.rearRight.flap.isOpen",
+    "description": "This signal indicates, if rear right charging port is open in the vehicle."
+  },
+  {
+    "key": "vehicle.powertrain.tractionBattery.charging.port.rearRight.isPlugged",
+    "description": "This signal indicates, if a charging cable is plugged in the rear right charging port."
+  },
+  {
+    "key": "vehicle.status.conditionBasedServicesCount",
+    "description": "The value specifies the maximum number of service notifications transmitted from the vehicle to BMW via telematics. The actual number of service notifications transmitted (see separate CBS key) varies depending on how the vehicle is used and whether relevant thresholds have been reached. Note: Not all Condition Based service messages which occur in the vehicle are also transferred."
+  },
+  {
+    "key": "vehicle.status.serviceDistance.next",
+    "description": "This value indicates how many kilometres or miles remain before the next service at the time of recording the data. \nNote: This value is calculated based on the individual CBS scopes and is not determined with every data transfer.\nFor more details, see \"Condition Based Service\"."
+  },
+  {
+    "key": "vehicle.status.serviceDistance.yellow",
+    "description": "The static value indicated is stored in the vehicle and indicates the first time that the customer receives a mileage-related message to inform him that the vehicle will soon be due for a service. \nIt is given in kilometres or miles (for example 2000 km or 1243 mi)."
+  },
+  {
+    "key": "vehicle.status.serviceTime.hUandAuServiceYellow",
+    "description": "The threshold indicates how many months before the main and exhaust gas inspection is due the service advisor will be notified."
+  },
+  {
+    "key": "vehicle.status.serviceTime.inspectionDateLegal",
+    "description": "This value indicates when the next inspection is due. \nA date will be shown respectively, for example 30.09.2018 23:00 UTC or 09.30.2018 23:00 UTC."
+  },
+  {
+    "key": "vehicle.status.serviceTime.yellow",
+    "description": "The static value indicated is stored in the vehicle and indicates the first time that the customer receives a message to inform them that the vehicle will soon be due for a service. \nThis is given in weeks (for example 4)."
+  },
+  {
+    "key": "vehicle.trip.segment.accumulated.acceleration.starsAverage",
+    "description": "This value indicates the number of stars which the driving style analysis has given to the acceleration behaviour of the driver at the time of data collection. \nThe system allocates 0 to 5 stars."
+  },
+  {
+    "key": "vehicle.trip.segment.accumulated.chassis.brake.starsAverage",
+    "description": "This value indicates the number of stars which the driving style analysis has given to the 'pro-active driving' behaviour of the driver at the time of data collection. \nThe system allocates 0 to 5 stars."
+  },
+  {
+    "key": "vehicle.trip.segment.accumulated.drivetrain.electricEngine.energyConsumptionComfort",
+    "description": "This indicates the electrical energy consumption (kWh) in COMFORT mode, measured at the time of data collection."
+  },
+  {
+    "key": "vehicle.trip.segment.accumulated.drivetrain.electricEngine.recuperationTotal",
+    "description": "This value indicates the average electrical energy in kilowatt hours (kWh/100 km or kWh/62 mi) recuperated during the last logged drive per 100 kilometres or 62 miles. The values range from 0 to 254."
+  },
+  {
+    "key": "vehicle.trip.segment.accumulated.drivetrain.transmission.setting.fractionDriveEcoPro",
+    "description": "Indicates the length of time for which ECO mode was activated during the most recent drive when data were recorded. \nThe values range from 0 to 100."
+  },
+  {
+    "key": "vehicle.trip.segment.accumulated.drivetrain.transmission.setting.fractionDriveEcoProPlus",
+    "description": "Indicates the length of time for which ECO PLUS mode was activated during the most recent drive when data were recorded. \nThe values range from 0 to 100."
+  },
+  {
+    "key": "vehicle.trip.segment.accumulated.drivetrain.transmission.setting.fractionDriveElectric",
+    "description": "This value indicates the distance covered with electrical energy during the most recent drive in percentage."
+  },
+  {
+    "key": "vehicle.trip.segment.end.drivetrain.batteryManagement.hvSoc",
+    "description": "This value indicates the charging status of the high-voltage battery at the end of the most recently logged drive (in percentage)."
+  },
+  {
+    "key": "vehicle.trip.segment.end.time",
+    "description": "The time stamp contains the date and local time of the most recently logged and transmitted drive, for example 15.05.2017 15:51:00 UTC or 05/15/2017 15:51:00 UTC."
+  },
+  {
+    "key": "vehicle.trip.segment.end.travelledDistance",
+    "description": "This value indicates the total mileage after the last drive logged."
+  },
+  {
+    "key": "vehicle.vehicle.antiTheftAlarmSystem.alarm.activationTime",
+    "description": "Timestamp of the last alarm activation time. The value comes without timezone information."
+  },
+  {
+    "key": "vehicle.vehicle.antiTheftAlarmSystem.alarm.armStatus",
+    "description": "Anti theft alarm. Arming status."
+  },
+  {
+    "key": "vehicle.vehicle.antiTheftAlarmSystem.alarm.isOn",
+    "description": "Anti theft alarm is active (car is honking)."
+  },
+  {
+    "key": "vehicle.vehicle.averageWeeklyDistanceLongTerm",
+    "description": "This value indicates the weekly average travelled in kilometres or miles over a period of 2 months."
+  },
+  {
+    "key": "vehicle.vehicle.averageWeeklyDistanceShortTerm",
+    "description": "This indicates the average volume of the distance travelled in kilometres or miles per week."
+  },
+  {
+    "key": "vehicle.vehicle.avgAuxPower",
+    "description": "This value indicates the power of the auxiliary users in kW at the time of data collection. This is the on-board power consumption including the power for the air conditioning."
+  },
+  {
+    "key": "vehicle.vehicle.avgSpeed",
+    "description": "The value indicates the average speed driven by the vehicle in km/h or mph at the time of data collection."
+  },
+  {
+    "key": "vehicle.vehicle.deepSleepModeActive",
+    "description": "This value indicates whether Deep Sleep Mode is activated (“true”) or deactivated (“false”) at the time of the request.\nIf the customer has activated Deep Sleep Mode, the vehicle can be parked for a longer time without charging the battery. In this mode, most consumers are deactivated to save energy. The customer can end Deep Sleep Mode by deactivating it or starting the vehicle."
+  },
+  {
+    "key": "vehicle.vehicle.preConditioning.activity",
+    "description": "Current status of the pre-conditioning of the stationary air conditioning before commencing travel at the time of data collection. The value “Inactive” may be transmitted if the pre-conditioning has not been booked or if the pre-conditioning is not active at the time of data collection."
+  },
+  {
+    "key": "vehicle.vehicle.preConditioning.error",
+    "description": "Reason for not carrying out pre-conditioning of the stationary air conditioning at the time of data collection."
+  },
+  {
+    "key": "vehicle.vehicle.preConditioning.isRemoteEngineRunning",
+    "description": "This value indicates whether the engine was active during pre-conditioning of the stationary air conditioning at the time of data collection. The value “Inactive” may be transmitted if the pre-conditioning has not been booked or if the pre-conditioning is not active at the time of data collection."
+  },
+  {
+    "key": "vehicle.vehicle.preConditioning.isRemoteEngineStartAllowed",
+    "description": "This value indicated whether permission was granted to use the engine for the pre-conditioning of the stationary air conditioning at the time of data collection. This is determined by the customer."
+  },
+  {
+    "key": "vehicle.vehicle.preConditioning.remainingTime",
+    "description": "This value indicates the remaining duration for the pre-conditioning of the stationary air conditioning in minutes at the time of data collection. This value may also be transmitted if the pre-conditioning has not been booked or if the pre-conditioning status of the stationary air conditioning is not active (“inactive”) at the time of data collection."
+  },
+  {
+    "key": "vehicle.vehicle.speedRange.lowerBound",
+    "description": "Lower bound of the speed range in km/h. The Range includes the lower bound. Due to privacy reasons some functions are not allowed to transmit the current driving speed and should use the SpeedRange attribute."
+  },
+  {
+    "key": "vehicle.vehicle.speedRange.upperBound",
+    "description": "Upper bound of the speed range in km/h. The Range excludes the upper bound. Due to privacy reasons some functions are not allowed to transmit the current driving speed and should use the SpeedRange attribute."
+  },
+  {
+    "key": "vehicle.vehicle.timeSetting",
+    "description": "This value indicates the current setting for the time display in the vehicle at the time of data collection. For example, this may be winter time, summer time, UTC or manual."
+  },
+  {
+    "key": "vehicle.vehicle.travelledDistance",
+    "description": "The value indicates the current mileage at the time of data collection."
+  }
+]

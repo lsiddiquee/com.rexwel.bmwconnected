@@ -3,22 +3,48 @@
   "version": "1.0.0",
   "main": "app.ts",
   "scripts": {
-    "build": "tsc"
+    "prebuild": "copyfiles -f -V -E \"./shared/pair_repair/*.*\" ./drivers/bmw/pair && copyfiles -f -V -E \"./shared/pair_repair/*.*\" ./drivers/bmw/repair && copyfiles -f -V -E \"./shared/pair_repair/*.*\" ./drivers/mini/pair && copyfiles -f -V -E \"./shared/pair_repair/*.*\" ./drivers/mini/repair",
+    "build": "tsc",
+    "build:tests": "tsc -p tsconfig.tests.json",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:integration": "npm run build && node --require source-map-support/register build/tests/lib/auth/DeviceCodeAuthProvider.integration.js",
+    "lint": "eslint . --ext .ts --max-warnings 100",
+    "lint:fix": "eslint . --ext .ts --fix",
+    "format": "prettier --write \"**/*.{ts,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,json,md}\"",
+    "lint:md": "markdownlint-cli2 \"**/*.md\" \"!node_modules\" \"!build\" \"!build-tests\" \"!.homeybuild\" \"!.github\"",
+    "lint:md:fix": "markdownlint-cli2 --fix \"**/*.md\" \"!node_modules\" \"!build\" \"!build-tests\" \"!.homeybuild\" \"!.github\"",
+    "validate": "npm run format:check && npm run lint && npm run lint:md",
+    "fix": "npm run format && npm run lint:fix && npm run lint:md:fix"
   },
   "dependencies": {
-    "bmw-connected-drive": "^2.4.1-beta.0",
     "cross-fetch": "^3.1.5",
     "geolocation-utils": "^1.2.6",
+    "mqtt": "^5.14.1",
     "semver": "^7.7.1",
     "source-map-support": "^0.5.19"
   },
   "devDependencies": {
+    "@eslint/js": "^9.37.0",
     "@tsconfig/node12": "^1.0.9",
-    "@types/homey": "npm:homey-apps-sdk-v3-types@^0.1.0",
+    "@types/homey": "npm:homey-apps-sdk-v3-types@^0.3.12",
+    "@types/jest": "^30.0.0",
+    "@types/mqtt": "^0.0.34",
     "@types/node": "^16.0.0",
     "@types/semver": "^7.5.8",
     "@types/source-map-support": "^0.5.3",
-    "typescript": "^4.8.4"
+    "copyfiles": "^2.4.1",
+    "eslint": "^9.37.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.4",
+    "jest": "^30.2.0",
+    "markdownlint-cli2": "^0.18.1",
+    "prettier": "^3.6.2",
+    "ts-jest": "^29.4.5",
+    "typescript": "^4.8.4",
+    "typescript-eslint": "^8.46.1"
   },
   "repository": {
     "type": "git",

@@ -1,0 +1,13 @@
+{
+  "id": "streamingEnabled",
+  "type": "checkbox",
+  "label": {
+    "en": "Enable MQTT streaming",
+    "nl": "MQTT streaming inschakelen"
+  },
+  "value": true,
+  "hint": {
+    "en": "Enable real-time MQTT streaming for instant vehicle updates. Can be used alongside API polling or independently.",
+    "nl": "Schakel realtime MQTT-streaming in voor directe voertuigupdates. Kan naast API-polling worden gebruikt of onafhankelijk."
+  }
+}

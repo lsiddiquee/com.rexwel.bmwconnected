@@ -1,0 +1,155 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>CarData Client ID</title>
+  </head>
+  <body>
+    <div>
+      <img src="logo.png" class="logo" alt="App Logo" />
+      <header class="homey-header">
+        <h1 class="homey-title" data-i18n="pair.client_id.title"></h1>
+      </header>
+
+      <fieldset class="homey-form-fieldset">
+        <legend class="homey-form-legend" data-i18n="pair.client_id.description"></legend>
+
+        <div class="homey-form-group">
+          <label class="homey-form-label" for="client_id">
+            <span data-i18n="pair.client_id.label"></span>
+          </label>
+          <input
+            id="client_id"
+            class="homey-form-input"
+            type="text"
+            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+            required
+          />
+          <p class="homey-form-description" data-i18n="pair.client_id.help"></p>
+        </div>
+
+        <div class="homey-form-group">
+          <label class="homey-form-label" for="container_id">
+            <span data-i18n="pair.container_id.label"></span>
+          </label>
+          <input
+            id="container_id"
+            class="homey-form-input"
+            type="text"
+            placeholder="xxxxxxxxxxxxx (optional)"
+          />
+          <p class="homey-form-description" data-i18n="pair.container_id.help"></p>
+        </div>
+
+        <div class="homey-form-group">
+          <details class="homey-details">
+            <summary class="homey-details-summary">
+              <span data-i18n="pair.client_id.how_to_get.title"></span>
+            </summary>
+            <div class="homey-details-content">
+              <ol class="homey-list">
+                <li data-i18n="pair.client_id.how_to_get.step1"></li>
+                <li data-i18n="pair.client_id.how_to_get.step2"></li>
+                <li data-i18n="pair.client_id.how_to_get.step3"></li>
+                <li data-i18n="pair.client_id.how_to_get.step4"></li>
+              </ol>
+              <p class="homey-text">
+                <strong>URL:</strong>
+                <a href="https://customer.bmwgroup.com/cardata" target="_blank" class="homey-link">
+                  https://customer.bmwgroup.com/cardata
+                </a>
+              </p>
+            </div>
+          </details>
+        </div>
+      </fieldset>
+
+      <button id="continueButton" class="homey-button-primary" disabled>
+        <span data-i18n="pair.client_id.continue"></span>
+      </button>
+    </div>
+
+    <script>
+      const clientIdInput = document.getElementById('client_id');
+      const containerIdInput = document.getElementById('container_id');
+      const continueButton = document.getElementById('continueButton');
+
+      Homey.on('client_id_prefill', (data) => {
+        if (data && data.client_id) {
+          clientIdInput.value = data.client_id;
+          validateClientId();
+        }
+        if (data && data.container_id) {
+          containerIdInput.value = data.container_id;
+        }
+      });
+
+      // UUID validation pattern
+      const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+      // Container ID validation pattern (13 alphanumeric characters)
+      const containerIdPattern = /^[A-Za-z0-9]{13}$/;
+
+      function validateClientId() {
+        const value = clientIdInput.value.trim();
+        const isValid = value.length > 0 && uuidPattern.test(value);
+        continueButton.disabled = !isValid;
+
+        if (value && !isValid) {
+          clientIdInput.classList.add('homey-form-input-error');
+        } else {
+          clientIdInput.classList.remove('homey-form-input-error');
+        }
+
+        return isValid;
+      }
+
+      function validateContainerId() {
+        const value = containerIdInput.value.trim();
+
+        // Container ID is optional, so empty is valid
+        if (!value) {
+          containerIdInput.classList.remove('homey-form-input-error');
+          return true;
+        }
+
+        // If provided, must match 13-character alphanumeric format
+        const isValid = containerIdPattern.test(value);
+
+        if (!isValid) {
+          containerIdInput.classList.add('homey-form-input-error');
+        } else {
+          containerIdInput.classList.remove('homey-form-input-error');
+        }
+
+        return isValid;
+      }
+
+      clientIdInput.addEventListener('input', validateClientId);
+      clientIdInput.addEventListener('blur', validateClientId);
+      containerIdInput.addEventListener('input', validateContainerId);
+      containerIdInput.addEventListener('blur', validateContainerId);
+
+      continueButton.addEventListener('click', () => {
+        if (validateClientId() && validateContainerId()) {
+          const clientId = clientIdInput.value.trim();
+          const containerId = containerIdInput.value.trim() || undefined;
+          Homey.emit('client_id_entered', {
+            client_id: clientId,
+            container_id: containerId,
+          });
+        }
+      });
+
+      // Allow enter key to continue
+      clientIdInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && validateClientId() && validateContainerId()) {
+          continueButton.click();
+        }
+      });
+
+      // Set initial state
+      validateClientId();
+    </script>
+  </body>
+</html>

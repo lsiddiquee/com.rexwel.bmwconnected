@@ -20,5 +20,5 @@
         "type": "device",
         "filter": "driver_id=bmw|mini"
     }],
-    "$filter": "capabilities=charging_status_capability"
+    "$filter": "capabilities=ev_charging_state"
 }
