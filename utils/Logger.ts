@@ -30,11 +30,19 @@ export class Logger implements ILogger {
   warn(message: string, context?: LogContext): void {
     this.log(LogLevel.WARN, message, context);
   }
-  error(message: string, _error?: Error, context?: LogContext): void {
-    this.log(LogLevel.ERROR, message, context);
+  error(message: string, error?: Error, context?: LogContext): void {
+    this.log(LogLevel.ERROR, message, {
+      ...context,
+      error: error ? error.message : undefined,
+      stack: error ? error.stack : undefined,
+    });
   }
-  fatal(message: string, _error?: Error, context?: LogContext): void {
-    this.log(LogLevel.FATAL, message, context);
+  fatal(message: string, error?: Error, context?: LogContext): void {
+    this.log(LogLevel.FATAL, message, {
+      ...context,
+      error: error ? error.message : undefined,
+      stack: error ? error.stack : undefined,
+    });
   }
   setLevel(_level: LogLevel): void {
     throw new Error('Method not implemented.');

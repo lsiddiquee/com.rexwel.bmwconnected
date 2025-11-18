@@ -27,6 +27,14 @@ import { RetryConfig } from '../types/common';
 import { RateLimiter } from './RateLimiter';
 import { ILogger } from '../types';
 
+// Polyfill fetch for Node.js < 18 (Homey Pro 2016-2019, Homey Bridge)
+// Node.js 18+ (Homey Pro 2023) has native fetch
+/* eslint-disable @typescript-eslint/no-require-imports */
+if (typeof fetch === 'undefined') {
+  require('cross-fetch/polyfill');
+}
+/* eslint-enable @typescript-eslint/no-require-imports */
+
 export type RequestInterceptor = (request: HttpRequest) => HttpRequest | Promise<HttpRequest>;
 export type ResponseInterceptor = <T>(
   response: HttpResponse<T>

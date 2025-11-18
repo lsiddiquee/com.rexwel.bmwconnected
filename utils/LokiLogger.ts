@@ -112,19 +112,19 @@ export class LokiLogger extends SimpleClass implements ILogger {
   }
 
   error(message: string, error?: Error, context?: LogContext): void {
-    let finalMessage = message;
-    if (error) {
-      finalMessage = `${message} - Error: ${error.message}`;
-    }
-    this.logWithContext(LogLevel.ERROR, finalMessage, context);
+    this.logWithContext(LogLevel.ERROR, message, {
+      ...context,
+      error: error ? error.message : undefined,
+      stack: error ? error.stack : undefined,
+    });
   }
 
   fatal(message: string, error?: Error, context?: LogContext): void {
-    let finalMessage = message;
-    if (error) {
-      finalMessage = `${message} - Error: ${error.message}`;
-    }
-    this.logWithContext(LogLevel.FATAL, finalMessage, context);
+    this.logWithContext(LogLevel.FATAL, message, {
+      ...context,
+      error: error ? error.message : undefined,
+      stack: error ? error.stack : undefined,
+    });
   }
 
   setLevel(level: LogLevel): void {

@@ -12,6 +12,14 @@ import { ILogger } from '../types/ILogger';
 import { ITokenStore } from '../types/ITokenStore';
 import { AuthenticationError, RateLimitError, NetworkError, TimeoutError } from '../types/errors';
 
+// Polyfill fetch for Node.js < 18 (Homey Pro 2016-2019, Homey Bridge)
+// Node.js 18+ (Homey Pro 2023) has native fetch
+/* eslint-disable @typescript-eslint/no-require-imports */
+if (typeof fetch === 'undefined') {
+  require('cross-fetch/polyfill');
+}
+/* eslint-enable @typescript-eslint/no-require-imports */
+
 /**
  * Configuration options for DeviceCodeAuthProvider
  */
@@ -139,10 +147,12 @@ export class DeviceCodeAuthProvider implements IAuthProvider {
       const response = await fetch(this.deviceCodeUrl, {
         method: 'POST',
         headers: {
+          Accept: 'application/json',
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         body: new URLSearchParams({
           client_id: this.clientId,
+          response_type: 'device_code',
           scope: requestScopes,
           code_challenge: this.pkceChallenge.codeChallenge,
           code_challenge_method: this.pkceChallenge.codeChallengeMethod,
@@ -181,8 +191,14 @@ export class DeviceCodeAuthProvider implements IAuthProvider {
         throw error;
       }
 
-      this.logger?.error('Network error requesting device code', error as Error);
-      throw new NetworkError('Failed to connect to OAuth server', error as Error);
+      // Enhanced error logging with more detail
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      this.logger?.error('Network error requesting device code', error as Error, {
+        errorType: error?.constructor?.name,
+      });
+
+      throw new NetworkError(`Failed to connect to OAuth server: ${errorMessage}`, error as Error);
     }
   }
 
