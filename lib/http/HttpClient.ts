@@ -27,6 +27,7 @@ import { RetryConfig } from '../types/common';
 import { RateLimiter } from './RateLimiter';
 import { ILogger } from '../types';
 
+// TODO: Remove when Node.js 16 support is dropped (Homey Pro 2016-2019 EOL)
 // Polyfill fetch for Node.js < 18 (Homey Pro 2016-2019, Homey Bridge)
 // Node.js 18+ (Homey Pro 2023) has native fetch
 /* eslint-disable @typescript-eslint/no-require-imports */
