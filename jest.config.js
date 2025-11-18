@@ -2,21 +2,18 @@ module.exports = {
   preset: 'ts-jest',
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.ts'],
-  testPathIgnorePatterns: [
-    '/node_modules/',
-    '/.homeybuild/',
-  ],
+  testPathIgnorePatterns: ['/node_modules/', '/.homeybuild/'],
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/$1',
     '^homey$': '<rootDir>/tests/__mocks__/homey.ts',
   },
   transform: {
-    '^.+\\.tsx?$': 'ts-jest',
-  },
-  globals: {
-    'ts-jest': {
-      tsconfig: 'tsconfig.json',
-    },
+    '^.+\\.tsx?$': [
+      'ts-jest',
+      {
+        tsconfig: 'tsconfig.json',
+      },
+    ],
   },
   modulePathIgnorePatterns: ['<rootDir>/.homeybuild'],
   // Force exit confirmed necessary for Jest worker pool management

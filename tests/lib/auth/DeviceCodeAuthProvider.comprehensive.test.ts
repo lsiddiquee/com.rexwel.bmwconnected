@@ -133,7 +133,7 @@ describe('DeviceCodeAuthProvider - Comprehensive Tests', () => {
         expect.objectContaining({
           method: 'POST',
           headers: {
-            'Accept': 'application/json',
+            Accept: 'application/json',
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: expect.any(URLSearchParams),
