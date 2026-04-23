@@ -9,7 +9,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:integration": "npm run build && node --require source-map-support/register build/tests/lib/auth/DeviceCodeAuthProvider.integration.js",
+    "test:integration": "npm run build && node --require source-map-support/register .homeybuild/tests/lib/auth/DeviceCodeAuthProvider.integration.js",
     "lint": "eslint . --ext .ts --max-warnings 100",
     "lint:fix": "eslint . --ext .ts --fix",
     "format": "prettier --write \"**/*.{ts,json,md}\"",
