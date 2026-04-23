@@ -1,0 +1,10 @@
+{
+  "type": "boolean",
+  "title": {
+    "en": "Climate now",
+    "nl": "Nu klimatiseren"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor"
+}
