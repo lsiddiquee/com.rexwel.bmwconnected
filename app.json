@@ -1133,6 +1133,39 @@
       "setable": false,
       "uiComponent": "sensor"
     },
+    "door_state_capability": {
+      "type": "enum",
+      "title": {
+        "en": "Doors",
+        "nl": "Deuren"
+      },
+      "values": [
+        {
+          "id": "OPEN",
+          "title": {
+            "en": "Open",
+            "nl": "Open"
+          }
+        },
+        {
+          "id": "CLOSED",
+          "title": {
+            "en": "Closed",
+            "nl": "Gesloten"
+          }
+        },
+        {
+          "id": "UNKNOWN",
+          "title": {
+            "en": "Unknown",
+            "nl": "Onbekend"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
     "mileage_capability": {
       "type": "number",
       "title": {
@@ -1171,39 +1204,6 @@
       "icon": "/assets/gas-station.svg",
       "units": "l",
       "insights": true
-    },
-    "door_state_capability": {
-      "type": "enum",
-      "title": {
-        "en": "Doors",
-        "nl": "Deuren"
-      },
-      "values": [
-        {
-          "id": "OPEN",
-          "title": {
-            "en": "Open",
-            "nl": "Open"
-          }
-        },
-        {
-          "id": "CLOSED",
-          "title": {
-            "en": "Closed",
-            "nl": "Gesloten"
-          }
-        },
-        {
-          "id": "UNKNOWN",
-          "title": {
-            "en": "Unknown",
-            "nl": "Onbekend"
-          }
-        }
-      ],
-      "getable": true,
-      "setable": false,
-      "uiComponent": "sensor"
     },
     "window_state_capability": {
       "type": "enum",
