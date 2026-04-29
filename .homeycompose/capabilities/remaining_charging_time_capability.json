@@ -1,0 +1,13 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Remaining charging time",
+    "nl": "Resterende laadtijd"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/evcharging.svg",
+  "units": "min",
+  "insights": true
+}
