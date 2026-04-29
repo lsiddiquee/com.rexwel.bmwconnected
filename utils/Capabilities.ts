@@ -44,6 +44,7 @@ export class Capabilities {
 
   // Climate capabilities
   public static readonly CLIMATE_NOW = 'climate_now_capability';
+  public static readonly CLIMATE_STATUS = 'climate_status_capability';
 
   public static readonly ALL_CAPABILITIES: string[] = [
     Capabilities.LOCKED,
@@ -69,6 +70,7 @@ export class Capabilities {
     Capabilities.DOOR_STATE,
     Capabilities.WINDOW_STATE,
     Capabilities.CLIMATE_NOW,
+    Capabilities.CLIMATE_STATUS,
   ];
 
   public static async GetCapabilityValueSafe<T>(

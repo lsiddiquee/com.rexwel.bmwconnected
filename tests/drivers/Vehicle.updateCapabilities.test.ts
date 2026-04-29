@@ -157,6 +157,36 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
     });
   });
 
+  describe('Climate Status', () => {
+    it('should_updateClimateStatus_when_climatePresent', async () => {
+      const status: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.ELECTRIC,
+        lastUpdatedAt: new Date(),
+        climate: { activity: 'HEATING' },
+      };
+
+      await (vehicle as any).updateCapabilitiesFromStatus(status);
+
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.CLIMATE_STATUS, 'HEATING');
+    });
+
+    it('should_notUpdateClimateStatus_when_climateAbsent', async () => {
+      const status: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.ELECTRIC,
+        lastUpdatedAt: new Date(),
+      };
+
+      await (vehicle as any).updateCapabilitiesFromStatus(status);
+
+      expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
+        Capabilities.CLIMATE_STATUS,
+        expect.anything()
+      );
+    });
+  });
+
   describe('P0: Undefined Handling', () => {
     it('should_updateAllCapabilities_when_validStatusProvided', async () => {
       // Arrange
