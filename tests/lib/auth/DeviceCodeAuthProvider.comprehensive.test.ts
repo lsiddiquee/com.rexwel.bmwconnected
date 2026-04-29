@@ -132,9 +132,21 @@ describe('DeviceCodeAuthProvider - Comprehensive Tests', () => {
         'https://test.auth.com/device',
         expect.objectContaining({
           method: 'POST',
-          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: expect.any(URLSearchParams),
         })
       );
+
+      // Verify body parameters include response_type
+      const callArgs = mockFetch.mock.calls[0];
+      const requestInit = callArgs[1];
+      expect(requestInit).toBeDefined();
+      const bodyParams = requestInit?.body as URLSearchParams;
+      expect(bodyParams.get('response_type')).toBe('device_code');
+      expect(bodyParams.get('client_id')).toBe('test-client-id-gcid');
     });
 
     it('should_throwAuthenticationError_when_400Response', async () => {

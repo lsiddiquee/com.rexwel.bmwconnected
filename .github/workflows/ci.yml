@@ -17,8 +17,9 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [20.x]
+        node-version: [16.x, 18.x, 22.x]
 
     steps:
       - name: Checkout code
@@ -33,6 +34,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # TODO: Remove when Node.js 16 support is dropped (Homey Pro 2016-2019 EOL)
+      # Workaround for ts-jest peer dependency resolution issue on Node.js 16 in CI
+      - name: Workaround for ts-jest peer deps on Node 16
+        if: matrix.node-version == '16.x'
+        run: npm install --save-dev jest-util@^29.0.0
+
       - name: Build project
         run: npm run build
 
@@ -40,7 +47,7 @@ jobs:
         run: npm run test:coverage
 
       - name: Upload coverage to Codecov
-        if: matrix.node-version == '20.x'
+        if: matrix.node-version == '22.x'
         uses: codecov/codecov-action@v4
         with:
           file: ./coverage/lcov.info
@@ -59,7 +66,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '22.x'
           cache: 'npm'
 
       - name: Install dependencies
@@ -76,10 +83,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node.js 18 (for Homey CLI)
         uses: actions/setup-node@v4
         with:
-          node-version: '20.x'
+          node-version: '18.x'
           cache: 'npm'
 
       - name: Install dependencies
