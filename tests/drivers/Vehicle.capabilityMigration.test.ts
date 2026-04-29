@@ -101,6 +101,8 @@ describe('Vehicle Capability Migration Tests', () => {
       // Assert
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.MEASURE_BATTERY);
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.EV_CHARGING_STATE);
+      expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.CHARGER_CONNECTED);
+      expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.REMAINING_CHARGING_TIME);
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE);
       // RANGE_BATTERY is only for PHEV (electric + combustion), not pure BEV
       expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE_BATTERY);
@@ -120,6 +122,8 @@ describe('Vehicle Capability Migration Tests', () => {
       expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.MEASURE_BATTERY);
       expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE_BATTERY);
       expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.EV_CHARGING_STATE);
+      expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.CHARGER_CONNECTED);
+      expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.REMAINING_CHARGING_TIME);
     });
   });
 
