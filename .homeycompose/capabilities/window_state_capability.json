@@ -1,0 +1,16 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Windows",
+    "nl": "Ramen"
+  },
+  "values": [
+    { "id": "OPEN", "title": { "en": "Open", "nl": "Open" } },
+    { "id": "CLOSED", "title": { "en": "Closed", "nl": "Gesloten" } },
+    { "id": "INTERMEDIATE", "title": { "en": "Intermediate", "nl": "Tussenstand" } },
+    { "id": "UNKNOWN", "title": { "en": "Unknown", "nl": "Onbekend" } }
+  ],
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor"
+}
