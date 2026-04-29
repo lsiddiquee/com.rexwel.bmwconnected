@@ -100,7 +100,8 @@ describe('Vehicle Capability Migration Tests', () => {
 
       // Assert
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.MEASURE_BATTERY);
-      expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE_BATTERY);
+      // Pure BEV: RANGE_BATTERY is removed (only PHEVs/range-extenders need it alongside combustion range)
+      expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE_BATTERY);
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.EV_CHARGING_STATE);
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE);
     });
@@ -213,6 +214,19 @@ describe('Vehicle Capability Migration Tests', () => {
       );
       // No capability changes should be made (beyond removing remote service capabilities)
     });
+
+    it('should_migrateDeviceClass_when_drivetrainUnknown', async () => {
+      // Arrange — drivetrain unknown (e.g. API unreachable on first boot)
+      const mockStateManager = vehicle['stateManager'] as any;
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.UNKNOWN);
+
+      // Act
+      await vehicle['migrate_device_capabilities']();
+
+      // Assert — setClass must run before the UNKNOWN early-return so devices
+      // stuck as 'other' get promoted to 'car' even when drivetrain is missing
+      expect(vehicle.setClass).toHaveBeenCalledWith('car');
+    });
   });
 
   describe('Device Class Migration', () => {
@@ -230,6 +244,34 @@ describe('Vehicle Capability Migration Tests', () => {
       expect(mockLogger.info).toHaveBeenCalledWith(
         expect.stringContaining('Migrating device class')
       );
+    });
+  });
+
+  describe('RANGE_BATTERY capability', () => {
+    it('should_not_addRangeBattery_for_pureElectric', async () => {
+      // Arrange — pure BEV already has range via range_capability; separate
+      // RANGE_BATTERY tile would always stay empty and confuse users
+      const mockStateManager = vehicle['stateManager'] as any;
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.ELECTRIC);
+
+      // Act
+      await vehicle['migrate_device_capabilities']();
+
+      // Assert
+      expect(addCapabilitySafeSpy).not.toHaveBeenCalledWith(Capabilities.RANGE_BATTERY);
+      expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE_BATTERY);
+    });
+
+    it('should_addRangeBattery_for_phev', async () => {
+      // Arrange — PHEV has both combustion and electric ranges; both tiles are meaningful
+      const mockStateManager = vehicle['stateManager'] as any;
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.PLUGIN_HYBRID);
+
+      // Act
+      await vehicle['migrate_device_capabilities']();
+
+      // Assert
+      expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE_BATTERY);
     });
   });
 
