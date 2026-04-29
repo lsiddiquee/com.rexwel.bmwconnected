@@ -196,10 +196,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
 
       await (vehicle as any).updateCapabilitiesFromStatus(status);
 
-      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
-        Capabilities.CHARGER_CONNECTED,
-        false
-      );
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.CHARGER_CONNECTED, false);
       expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
         Capabilities.REMAINING_CHARGING_TIME,
         expect.anything()
