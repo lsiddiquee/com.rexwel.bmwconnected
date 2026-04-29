@@ -1,0 +1,15 @@
+{
+  "type": "number",
+  "title": {
+    "en": "Fuel level",
+    "nl": "Brandstofniveau"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/gas-station.svg",
+  "units": "%",
+  "min": 0,
+  "max": 100,
+  "insights": true
+}
