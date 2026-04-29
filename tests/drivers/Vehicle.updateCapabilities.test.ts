@@ -168,7 +168,10 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
 
       await (vehicle as any).updateCapabilitiesFromStatus(status);
 
-      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.CLIMATE_STATUS, 'HEATING');
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
+        Capabilities.CLIMATE_STATUS,
+        'HEATING'
+      );
     });
 
     it('should_notUpdateClimateStatus_when_climateAbsent', async () => {

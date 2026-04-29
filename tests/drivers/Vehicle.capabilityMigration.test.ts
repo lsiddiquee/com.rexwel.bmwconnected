@@ -179,7 +179,11 @@ describe('Vehicle Capability Migration Tests', () => {
 
   describe('Climate Status Capability', () => {
     it('should_addClimateStatusCapability_for_all_drivetrains', async () => {
-      for (const driveTrain of [DriveTrainType.ELECTRIC, DriveTrainType.COMBUSTION, DriveTrainType.PLUGIN_HYBRID]) {
+      for (const driveTrain of [
+        DriveTrainType.ELECTRIC,
+        DriveTrainType.COMBUSTION,
+        DriveTrainType.PLUGIN_HYBRID,
+      ]) {
         const mockStateManager = vehicle['stateManager'] as any;
         mockStateManager.getDriveTrain.mockReturnValue(driveTrain);
         addCapabilitySafeSpy.mockClear();
