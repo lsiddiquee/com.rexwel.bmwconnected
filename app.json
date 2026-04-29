@@ -1244,6 +1244,30 @@
       "getable": true,
       "setable": false,
       "uiComponent": "sensor"
+    },
+    "charger_connected_capability": {
+      "type": "boolean",
+      "title": {
+        "en": "Charger connected",
+        "nl": "Oplader verbonden"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/evcharging.svg"
+    },
+    "remaining_charging_time_capability": {
+      "type": "number",
+      "title": {
+        "en": "Remaining charging time",
+        "nl": "Resterende laadtijd"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/evcharging.svg",
+      "units": "min",
+      "insights": true
     }
   }
 }
