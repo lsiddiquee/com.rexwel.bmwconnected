@@ -651,12 +651,7 @@
       "capabilities": [
         "alarm_generic",
         "mileage_capability",
-        "range_capability",
-        "measure_battery",
-        "range_capability.battery",
-        "range_capability.fuel",
-        "charging_status_capability",
-        "remaining_fuel_capability"
+        "range_capability"
       ],
       "capabilitiesOptions": {
         "alarm_generic": {
@@ -843,12 +838,7 @@
       "capabilities": [
         "alarm_generic",
         "mileage_capability",
-        "range_capability",
-        "measure_battery",
-        "range_capability.battery",
-        "range_capability.fuel",
-        "charging_status_capability",
-        "remaining_fuel_capability"
+        "range_capability"
       ],
       "capabilitiesOptions": {
         "alarm_generic": {
