@@ -168,12 +168,16 @@ describe('CarDataClient - Comprehensive Tests', () => {
       expect(mockLogger.error).toHaveBeenCalledWith('Authentication failed', authError);
     });
 
-    it('should_returnTrue_when_isAuthenticated', () => {
-      // Act
-      const result = carDataClient.isAuthenticated();
+    it('should_returnTrue_when_accessTokenNotExpired', () => {
+      mockAuthProvider.isAccessTokenExpired.mockReturnValue(false);
 
-      // Assert
-      expect(result).toBe(true); // Current implementation always returns true
+      expect(carDataClient.isAuthenticated()).toBe(true);
+    });
+
+    it('should_returnFalse_when_accessTokenExpiredOrMissing', () => {
+      mockAuthProvider.isAccessTokenExpired.mockReturnValue(true);
+
+      expect(carDataClient.isAuthenticated()).toBe(false);
     });
 
     it('should_refreshTokens_when_refreshAuthenticationCalled', async () => {

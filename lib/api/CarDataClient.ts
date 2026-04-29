@@ -186,10 +186,9 @@ export class CarDataClient implements IVehicleClient {
    * @returns True if authenticated with valid tokens
    */
   isAuthenticated(): boolean {
-    // Note: IVehicleClient requires synchronous check
-    // We assume authenticated if auth provider exists
-    // Actual token validity checked during API calls
-    return true; // TODO: Improve synchronous auth check
+    // Returns true only when a non-expired access token is cached in memory.
+    // An expired access token is refreshed lazily on the next API call.
+    return !this.authProvider.isAccessTokenExpired();
   }
 
   /**
