@@ -30,6 +30,7 @@ export class Capabilities {
   public static readonly REMAINING_FUEL = 'remaining_fuel_capability';
   // Note: This constant includes the typo from the original code for backward compatibility
   public static readonly REMAINING_FUEL_LITERS_TYPO = 'remanining_fuel_liters_capability';
+  public static readonly FUEL_LEVEL_PERCENT = 'fuel_level_percent_capability';
 
   // Location capabilities
   public static readonly LOCATION = 'location_capability';
@@ -63,6 +64,7 @@ export class Capabilities {
     Capabilities.REMAINING_FUEL_LITERS,
     Capabilities.REMAINING_FUEL,
     Capabilities.REMAINING_FUEL_LITERS_TYPO,
+    Capabilities.FUEL_LEVEL_PERCENT,
     Capabilities.LOCATION,
     Capabilities.ADDRESS,
     Capabilities.MILEAGE,

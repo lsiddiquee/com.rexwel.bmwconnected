@@ -557,10 +557,12 @@ export class Vehicle extends Device {
 
     // Update combustion vehicle data
     if (status.combustion) {
-      // TODO: Add fuel level percentage capability if needed
-      // if (status.combustion.fuelLevelPercent !== undefined) {
-      //   await this.updateCapabilityValue('fuel_level_percentage', status.combustion.fuelLevelPercent);
-      // }
+      if (status.combustion.fuelLevelPercent !== undefined) {
+        await this.setCapabilityValueSafe(
+          Capabilities.FUEL_LEVEL_PERCENT,
+          status.combustion.fuelLevelPercent
+        );
+      }
 
       const newFuelValue = status.combustion.fuelLevelLiters;
       if (newFuelValue !== undefined) {
@@ -676,8 +678,10 @@ export class Vehicle extends Device {
     if (hasCombustionDriveTrain) {
       this.logger?.info(`Vehicle '${this.getName()}' has combustion drive train.`);
       await this.addCapabilitySafe(Capabilities.REMAINING_FUEL);
+      await this.addCapabilitySafe(Capabilities.FUEL_LEVEL_PERCENT);
     } else {
       await this.removeCapabilitySafe(Capabilities.REMAINING_FUEL);
+      await this.removeCapabilitySafe(Capabilities.FUEL_LEVEL_PERCENT);
     }
 
     if (hasElectricDriveTrain || hasCombustionDriveTrain) {
