@@ -541,18 +541,17 @@ export class Vehicle extends Device {
         }
       }
 
-      // TODO: Add these capabilities if needed
-      // if (status.electric.chargingTarget !== undefined) {
-      //   await this.updateCapabilityValue('charging_target', status.electric.chargingTarget);
-      // }
+      await this.setCapabilityValueSafe(
+        Capabilities.CHARGER_CONNECTED,
+        status.electric.isChargerConnected
+      );
 
-      // if (status.electric.remainingChargingMinutes !== undefined) {
-      //   await this.updateCapabilityValue('remaining_charging_time', status.electric.remainingChargingMinutes);
-      // }
-
-      // if (status.electric.isChargerConnected !== undefined) {
-      //   await this.updateCapabilityValue('charger_connected', status.electric.isChargerConnected);
-      // }
+      if (status.electric.remainingChargingMinutes !== undefined) {
+        await this.setCapabilityValueSafe(
+          Capabilities.REMAINING_CHARGING_TIME,
+          status.electric.remainingChargingMinutes
+        );
+      }
     }
 
     // Update combustion vehicle data
@@ -655,10 +654,14 @@ export class Vehicle extends Device {
       this.logger?.info(`Vehicle '${this.getName()}' has electric drive train.`);
       await this.addCapabilitySafe(Capabilities.MEASURE_BATTERY);
       await this.addCapabilitySafe(Capabilities.EV_CHARGING_STATE);
+      await this.addCapabilitySafe(Capabilities.CHARGER_CONNECTED);
+      await this.addCapabilitySafe(Capabilities.REMAINING_CHARGING_TIME);
     } else {
       await this.removeCapabilitySafe(Capabilities.MEASURE_BATTERY);
       await this.removeCapabilitySafe(Capabilities.RANGE_BATTERY);
       await this.removeCapabilitySafe(Capabilities.EV_CHARGING_STATE);
+      await this.removeCapabilitySafe(Capabilities.CHARGER_CONNECTED);
+      await this.removeCapabilitySafe(Capabilities.REMAINING_CHARGING_TIME);
     }
 
     // RANGE_BATTERY (electric range) is only meaningful alongside a combustion range.
