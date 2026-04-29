@@ -1123,6 +1123,16 @@
       "uiComponent": "sensor",
       "icon": "/assets/evcharging.svg"
     },
+    "climate_now_capability": {
+      "type": "boolean",
+      "title": {
+        "en": "Climate now",
+        "nl": "Nu klimatiseren"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor"
+    },
     "mileage_capability": {
       "type": "number",
       "title": {
