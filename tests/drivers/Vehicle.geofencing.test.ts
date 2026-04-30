@@ -221,6 +221,36 @@ describe('Vehicle Geofencing and Location', () => {
       expect(mockLogger.info).toHaveBeenCalledWith('Checking geofences.');
     });
 
+    it('should_skipGeofence_when_latitudeMissing', async () => {
+      // Arrange — geofence has longitude but no latitude; previously the guard
+      // checked longitude twice (copy-paste typo) so this fence would reach
+      // insideCircle() with undefined latitude, producing wrong results
+      mockConfiguration.geofences = [
+        {
+          label: 'BrokenFence',
+          longitude: -0.1278,
+          // latitude intentionally absent
+          address: 'Test',
+          radius: 50,
+        } as any,
+      ];
+      const location: LocationType = {
+        label: '',
+        latitude: 51.5074,
+        longitude: -0.1278,
+        address: 'Test',
+      };
+      (geo.insideCircle as jest.Mock).mockClear();
+      (geo.insideCircle as jest.Mock).mockReturnValue(true);
+
+      // Act
+      await vehicle['checkGeofence'](location);
+
+      // Assert — insideCircle must not be called for a fence with no latitude
+      expect(geo.insideCircle).not.toHaveBeenCalled();
+      expect(location.label).toBe('');
+    });
+
     it('should_doNothing_when_configurationNull', async () => {
       // Arrange
       jest.spyOn(ConfigurationManager, 'getConfiguration').mockReturnValue(null as any);

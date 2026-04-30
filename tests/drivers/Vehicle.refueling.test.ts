@@ -221,6 +221,48 @@ describe('Vehicle Refueling Flow', () => {
       expect(mockRefuelledFlowCard.trigger).not.toHaveBeenCalled();
     });
 
+    it('should_triggerRefuelledFlow_when_refueledFromEmptyTank', async () => {
+      // Arrange — oldFuelValue is 0 (completely empty); `oldFuelValue &&` would be
+      // falsy and suppress the trigger, but `oldFuelValue !== undefined` correctly fires it
+      vehicle.currentVehicleState = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.COMBUSTION,
+        lastUpdatedAt: new Date('2025-11-04T10:00:00Z'),
+        combustion: {
+          fuelLevelLiters: 0, // completely empty
+          fuelLevelPercent: 0,
+        },
+        range: 0,
+      } as VehicleStatus;
+
+      const newStatus: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.COMBUSTION,
+        lastUpdatedAt: new Date('2025-11-04T10:10:00Z'),
+        combustion: {
+          fuelLevelLiters: 40, // refueled 40 liters (>5 threshold)
+          fuelLevelPercent: 60,
+        },
+        range: 400,
+      };
+
+      // Act
+      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+
+      // Assert — flow must fire even though oldFuelValue was 0
+      expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledTimes(1);
+      expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledWith(
+        vehicle,
+        {
+          FuelBeforeRefuelling: 0,
+          FuelAfterRefuelling: 40,
+          RefuelledLiters: 40,
+          Location: '',
+        },
+        {}
+      );
+    });
+
     it('should_notTriggerRefuelledFlow_when_noPreviousFuelValue', async () => {
       // Arrange - No previous state (first update after pairing)
       vehicle.currentVehicleState = null;

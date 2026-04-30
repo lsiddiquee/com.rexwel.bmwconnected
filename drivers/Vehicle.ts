@@ -573,7 +573,7 @@ export class Vehicle extends Device {
         const oldFuelValue = this.currentVehicleState?.combustion?.fuelLevelLiters;
         // Trigger refuelled flow if fuel level increased beyond threshold
         if (
-          oldFuelValue &&
+          oldFuelValue !== undefined &&
           newFuelValue - oldFuelValue >= this.settings.refuellingTriggerThreshold
         ) {
           const refuelledFlowCard = this.homey.flow.getDeviceTriggerCard(Flows.REFUELLED);
@@ -626,6 +626,14 @@ export class Vehicle extends Device {
     await this.removeCapabilitySafe(Capabilities.AC_CHARGING_LIMIT); // AC limit control
     await this.removeCapabilitySafe(Capabilities.CHARGING_TARGET_SOC); // Target charge control
 
+    // Migrate device class to 'car' for Homey v12+ regardless of drivetrain state
+    if (semver.gte(this.homey.version, '12.0.0')) {
+      if (this.getClass() === 'other') {
+        this.logger?.info(`Migrating device class for '${this.getName()}' to 'car'.`);
+        await this.setClass('car');
+      }
+    }
+
     // Get drive train type from persisted store (set during initialization)
     const driveTrain = this.stateManager.getDriveTrain();
     if (driveTrain == DriveTrainType.UNKNOWN) {
@@ -647,12 +655,19 @@ export class Vehicle extends Device {
     if (hasElectricDriveTrain) {
       this.logger?.info(`Vehicle '${this.getName()}' has electric drive train.`);
       await this.addCapabilitySafe(Capabilities.MEASURE_BATTERY);
-      await this.addCapabilitySafe(Capabilities.RANGE_BATTERY);
       await this.addCapabilitySafe(Capabilities.EV_CHARGING_STATE);
     } else {
       await this.removeCapabilitySafe(Capabilities.MEASURE_BATTERY);
       await this.removeCapabilitySafe(Capabilities.RANGE_BATTERY);
       await this.removeCapabilitySafe(Capabilities.EV_CHARGING_STATE);
+    }
+
+    // RANGE_BATTERY (electric range) is only meaningful alongside a combustion range.
+    // Pure BEVs use range_capability directly; PHEVs/range-extenders need both.
+    if (hasElectricDriveTrain && hasCombustionDriveTrain) {
+      await this.addCapabilitySafe(Capabilities.RANGE_BATTERY);
+    } else {
+      await this.removeCapabilitySafe(Capabilities.RANGE_BATTERY);
     }
 
     // Remove legacy CHARGING_STATUS capability
@@ -670,14 +685,6 @@ export class Vehicle extends Device {
       await this.addCapabilitySafe(Capabilities.RANGE);
     } else {
       await this.removeCapabilitySafe(Capabilities.RANGE);
-    }
-
-    // Migrate device class to 'car' for Homey v12+
-    if (semver.gte(this.homey.version, '12.0.0')) {
-      if (this.getClass() === 'other') {
-        this.logger?.info(`Migrating device class for '${this.getName()}' to 'car'.`);
-        await this.setClass('car');
-      }
     }
 
     // Add EV charging state capability for Homey v12.4.5+
@@ -1043,7 +1050,7 @@ export class Vehicle extends Device {
       const position = configuration.geofences.find(
         (fence) =>
           fence?.longitude &&
-          fence?.longitude &&
+          fence?.latitude &&
           geo.insideCircle(location, fence, fence.radius ?? 20)
       );
       if (position) {
