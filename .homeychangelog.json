@@ -112,5 +112,8 @@
   },
   "1.0.13": {
     "en": "Fixed issue with running on Homey with Node v16."
+  },
+  "1.0.14": {
+    "en": "Bug fixes"
   }
 }
