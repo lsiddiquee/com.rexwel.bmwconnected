@@ -485,16 +485,15 @@ export class Vehicle extends Device {
       }
     }
 
-    // TODO: Add door and window capabilities to Capabilities.ts and app.json
     // Update doors
-    // if (status.doors) {
-    //   await this.updateCapabilityValue('door_state_capability', status.doors.combinedState);
-    // }
+    if (status.doors) {
+      await this.setCapabilityValueSafe(Capabilities.DOOR_STATE, status.doors.combinedState);
+    }
 
     // Update windows
-    // if (status.windows) {
-    //   await this.updateCapabilityValue('window_state_capability', status.windows.combinedState);
-    // }
+    if (status.windows) {
+      await this.setCapabilityValueSafe(Capabilities.WINDOW_STATE, status.windows.combinedState);
+    }
 
     // Update lock state (read-only status, not control)
     if (status.lockState) {
@@ -686,6 +685,10 @@ export class Vehicle extends Device {
     } else {
       await this.removeCapabilitySafe(Capabilities.RANGE);
     }
+
+    // Door and window state capabilities are available for all vehicles
+    await this.addCapabilitySafe(Capabilities.DOOR_STATE);
+    await this.addCapabilitySafe(Capabilities.WINDOW_STATE);
 
     // Add EV charging state capability for Homey v12.4.5+
     if (semver.gte(this.homey.version, '12.4.5') && hasElectricDriveTrain) {

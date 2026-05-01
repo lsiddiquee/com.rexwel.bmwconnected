@@ -38,6 +38,10 @@ export class Capabilities {
   // Vehicle information capabilities
   public static readonly MILEAGE = 'mileage_capability';
 
+  // Door and window state capabilities
+  public static readonly DOOR_STATE = 'door_state_capability';
+  public static readonly WINDOW_STATE = 'window_state_capability';
+
   // Climate capabilities
   public static readonly CLIMATE_NOW = 'climate_now_capability';
 
@@ -62,6 +66,8 @@ export class Capabilities {
     Capabilities.LOCATION,
     Capabilities.ADDRESS,
     Capabilities.MILEAGE,
+    Capabilities.DOOR_STATE,
+    Capabilities.WINDOW_STATE,
     Capabilities.CLIMATE_NOW,
   ];
 

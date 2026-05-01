@@ -1,0 +1,15 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Doors",
+    "nl": "Deuren"
+  },
+  "values": [
+    { "id": "OPEN", "title": { "en": "Open", "nl": "Open" } },
+    { "id": "CLOSED", "title": { "en": "Closed", "nl": "Gesloten" } },
+    { "id": "UNKNOWN", "title": { "en": "Unknown", "nl": "Onbekend" } }
+  ],
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor"
+}

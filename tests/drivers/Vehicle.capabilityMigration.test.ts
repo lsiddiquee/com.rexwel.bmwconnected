@@ -275,6 +275,28 @@ describe('Vehicle Capability Migration Tests', () => {
     });
   });
 
+  describe('Door and Window Capabilities', () => {
+    it('should_addDoorAndWindowCapabilities_when_electricDrivetrain', async () => {
+      const mockStateManager = vehicle['stateManager'] as any;
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.ELECTRIC);
+
+      await vehicle['migrate_device_capabilities']();
+
+      expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.DOOR_STATE);
+      expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.WINDOW_STATE);
+    });
+
+    it('should_addDoorAndWindowCapabilities_when_combustionDrivetrain', async () => {
+      const mockStateManager = vehicle['stateManager'] as any;
+      mockStateManager.getDriveTrain.mockReturnValue(DriveTrainType.COMBUSTION);
+
+      await vehicle['migrate_device_capabilities']();
+
+      expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.DOOR_STATE);
+      expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.WINDOW_STATE);
+    });
+  });
+
   describe('Energy Capabilities for Electric Vehicles', () => {
     it('should_setEnergyCapabilities_when_electricVehicle', async () => {
       // Arrange

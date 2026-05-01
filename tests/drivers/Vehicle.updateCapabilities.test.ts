@@ -93,6 +93,70 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
     jest.restoreAllMocks();
   });
 
+  describe('Door and Window State', () => {
+    it('should_updateDoorState_when_doorsPresent', async () => {
+      const status: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.ELECTRIC,
+        lastUpdatedAt: new Date(),
+        doors: {
+          combinedState: 'OPEN',
+          leftFront: 'OPEN',
+          rightFront: 'CLOSED',
+          leftRear: 'CLOSED',
+          rightRear: 'CLOSED',
+          hood: 'CLOSED',
+          trunk: 'CLOSED',
+        },
+      };
+
+      await (vehicle as any).updateCapabilitiesFromStatus(status);
+
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.DOOR_STATE, 'OPEN');
+    });
+
+    it('should_updateWindowState_when_windowsPresent', async () => {
+      const status: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.ELECTRIC,
+        lastUpdatedAt: new Date(),
+        windows: {
+          combinedState: 'INTERMEDIATE',
+          leftFront: 'INTERMEDIATE',
+          rightFront: 'CLOSED',
+          leftRear: 'CLOSED',
+          rightRear: 'CLOSED',
+        },
+      };
+
+      await (vehicle as any).updateCapabilitiesFromStatus(status);
+
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
+        Capabilities.WINDOW_STATE,
+        'INTERMEDIATE'
+      );
+    });
+
+    it('should_notUpdateDoorOrWindowState_when_bothAbsent', async () => {
+      const status: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.ELECTRIC,
+        lastUpdatedAt: new Date(),
+      };
+
+      await (vehicle as any).updateCapabilitiesFromStatus(status);
+
+      expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
+        Capabilities.DOOR_STATE,
+        expect.anything()
+      );
+      expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
+        Capabilities.WINDOW_STATE,
+        expect.anything()
+      );
+    });
+  });
+
   describe('P0: Undefined Handling', () => {
     it('should_updateAllCapabilities_when_validStatusProvided', async () => {
       // Arrange
