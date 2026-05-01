@@ -19,6 +19,8 @@ export class Capabilities {
   public static readonly EV_CHARGING_STATE = 'ev_charging_state';
   public static readonly AC_CHARGING_LIMIT = 'ac_charging_limit_capability';
   public static readonly CHARGING_TARGET_SOC = 'charging_target_soc_capability';
+  public static readonly CHARGER_CONNECTED = 'charger_connected_capability';
+  public static readonly REMAINING_CHARGING_TIME = 'remaining_charging_time_capability';
 
   // Range capabilities
   public static readonly RANGE = 'range_capability';
@@ -57,6 +59,8 @@ export class Capabilities {
     Capabilities.EV_CHARGING_STATE,
     Capabilities.AC_CHARGING_LIMIT,
     Capabilities.CHARGING_TARGET_SOC,
+    Capabilities.CHARGER_CONNECTED,
+    Capabilities.REMAINING_CHARGING_TIME,
     Capabilities.RANGE,
     Capabilities.RANGE_BATTERY,
     Capabilities.RANGE_FUEL,

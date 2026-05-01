@@ -157,6 +157,53 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
     });
   });
 
+  describe('EV Charging Details', () => {
+    it('should_updateChargerConnected_and_remainingTime_when_present', async () => {
+      const status: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.ELECTRIC,
+        lastUpdatedAt: new Date(),
+        electric: {
+          chargeLevelPercent: 60,
+          range: 200,
+          isChargerConnected: true,
+          chargingStatus: 'CHARGING',
+          remainingChargingMinutes: 90,
+        },
+      };
+
+      await (vehicle as any).updateCapabilitiesFromStatus(status);
+
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.CHARGER_CONNECTED, true);
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
+        Capabilities.REMAINING_CHARGING_TIME,
+        90
+      );
+    });
+
+    it('should_notUpdateRemainingTime_when_remainingChargingMinutesUndefined', async () => {
+      const status: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.ELECTRIC,
+        lastUpdatedAt: new Date(),
+        electric: {
+          chargeLevelPercent: 100,
+          range: 350,
+          isChargerConnected: false,
+          chargingStatus: 'COMPLETE',
+        },
+      };
+
+      await (vehicle as any).updateCapabilitiesFromStatus(status);
+
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.CHARGER_CONNECTED, false);
+      expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
+        Capabilities.REMAINING_CHARGING_TIME,
+        expect.anything()
+      );
+    });
+  });
+
   describe('P0: Undefined Handling', () => {
     it('should_updateAllCapabilities_when_validStatusProvided', async () => {
       // Arrange
