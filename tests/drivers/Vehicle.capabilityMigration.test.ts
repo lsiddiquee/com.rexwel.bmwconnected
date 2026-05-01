@@ -100,10 +100,10 @@ describe('Vehicle Capability Migration Tests', () => {
 
       // Assert
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.MEASURE_BATTERY);
-      // Pure BEV: RANGE_BATTERY is removed (only PHEVs/range-extenders need it alongside combustion range)
-      expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE_BATTERY);
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.EV_CHARGING_STATE);
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE);
+      // RANGE_BATTERY is only for PHEV (electric + combustion), not pure BEV
+      expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE_BATTERY);
     });
 
     it('should_removeElectricCapabilities_when_combustionDrivetrain', async () => {
