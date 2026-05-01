@@ -1,0 +1,18 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Climate status",
+    "nl": "Klimaatstatus"
+  },
+  "values": [
+    { "id": "HEATING", "title": { "en": "Heating", "nl": "Verwarming" } },
+    { "id": "COOLING", "title": { "en": "Cooling", "nl": "Koeling" } },
+    { "id": "VENTILATION", "title": { "en": "Ventilation", "nl": "Ventilatie" } },
+    { "id": "INACTIVE", "title": { "en": "Inactive", "nl": "Inactief" } },
+    { "id": "UNKNOWN", "title": { "en": "Unknown", "nl": "Onbekend" } }
+  ],
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/airco.svg"
+}

@@ -595,11 +595,10 @@ export class Vehicle extends Device {
       }
     }
 
-    // TODO: Add climate status capability if needed
-    // Update climate state
-    // if (status.climate) {
-    //   await this.updateCapabilityValue('climate_status', status.climate.activity);
-    // }
+    // Update climate preconditioning state
+    if (status.climate) {
+      await this.setCapabilityValueSafe(Capabilities.CLIMATE_STATUS, status.climate.activity);
+    }
 
     this.currentVehicleState = status;
 
@@ -689,6 +688,9 @@ export class Vehicle extends Device {
     // Door and window state capabilities are available for all vehicles
     await this.addCapabilitySafe(Capabilities.DOOR_STATE);
     await this.addCapabilitySafe(Capabilities.WINDOW_STATE);
+
+    // Climate preconditioning status is available for all vehicles
+    await this.addCapabilitySafe(Capabilities.CLIMATE_STATUS);
 
     // Add EV charging state capability for Homey v12.4.5+
     if (semver.gte(this.homey.version, '12.4.5') && hasElectricDriveTrain) {
