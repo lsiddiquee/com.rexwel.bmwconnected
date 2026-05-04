@@ -136,10 +136,11 @@ describe('Vehicle Capability Migration Tests', () => {
 
       // Assert
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.REMAINING_FUEL);
+      expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.FUEL_LEVEL_PERCENT);
       expect(addCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.RANGE);
     });
 
-    it('should_removeFuelCapability_when_electricDrivetrain', async () => {
+    it('should_removeFuelCapabilities_when_electricDrivetrain', async () => {
       // Arrange
       const electricStatus = createMockVehicleStatus(DriveTrainType.ELECTRIC);
       const mockStateManager = vehicle['stateManager'] as any;
@@ -151,6 +152,7 @@ describe('Vehicle Capability Migration Tests', () => {
 
       // Assert
       expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.REMAINING_FUEL);
+      expect(removeCapabilitySafeSpy).toHaveBeenCalledWith(Capabilities.FUEL_LEVEL_PERCENT);
     });
   });
 

@@ -157,6 +157,42 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
     });
   });
 
+  describe('Fuel Level Percent', () => {
+    it('should_updateFuelLevelPercent_when_fuelLevelPercentPresent', async () => {
+      const status: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.COMBUSTION,
+        lastUpdatedAt: new Date(),
+        combustion: {
+          fuelLevelPercent: 72,
+          fuelLevelLiters: 36,
+        },
+      };
+
+      await (vehicle as any).updateCapabilitiesFromStatus(status);
+
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.FUEL_LEVEL_PERCENT, 72);
+    });
+
+    it('should_notUpdateFuelLevelPercent_when_fuelLevelPercentUndefined', async () => {
+      const status: VehicleStatus = {
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.COMBUSTION,
+        lastUpdatedAt: new Date(),
+        combustion: {
+          fuelLevelLiters: 36,
+        },
+      };
+
+      await (vehicle as any).updateCapabilitiesFromStatus(status);
+
+      expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
+        Capabilities.FUEL_LEVEL_PERCENT,
+        expect.anything()
+      );
+    });
+  });
+
   describe('P0: Undefined Handling', () => {
     it('should_updateAllCapabilities_when_validStatusProvided', async () => {
       // Arrange
