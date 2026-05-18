@@ -135,6 +135,18 @@ class TestableConnectedDriver extends ConnectedDriver {
     return this.updateDeviceStore(device);
   }
 
+  public async testPollForAuthorizationAsync(session: unknown, device?: unknown): Promise<void> {
+    return (
+      this as unknown as {
+        pollForAuthorizationAsync: (s: unknown, d?: unknown) => Promise<void>;
+      }
+    ).pollForAuthorizationAsync(session, device);
+  }
+
+  public setCurrentDeviceCodeResponseForTest(resp: { deviceCode: string } | undefined): void {
+    (this as unknown as { currentDeviceCodeResponse: unknown }).currentDeviceCodeResponse = resp;
+  }
+
   public getLoggerForTest() {
     return this.logger;
   }
@@ -431,6 +443,131 @@ describe('ConnectedDriver - Comprehensive', () => {
       await expect((listHandler as () => Promise<unknown>)()).rejects.toThrow(
         'Authentication not completed - please authenticate first'
       );
+    });
+
+    // Regression: issues #103 and #105 - BMW CarData returns BMW sub-brand identifiers
+    // such as `BMW_I` for electric vehicles (iX, i3, i4, i5, i7, iX1, iX3). A strict
+    // equality compare against the driver brand `BMW` silently drops these vehicles,
+    // so the user sees "vehicle found in log" followed by "no new devices found".
+    it('should_includeBmwSubBrandVehicles_when_brandIsBmwI', async () => {
+      // Arrange - CarData returns BMW_I for an iX
+      driver.mockCarDataClient.getVehicles.mockResolvedValue([
+        {
+          vin: 'VINIX01',
+          model: 'iX xDrive50',
+          brand: 'BMW_I',
+          driveTrain: DriveTrainType.ELECTRIC,
+        },
+      ]);
+
+      // Act
+      await driver.onPair(mockSession as unknown as any);
+      const listHandler = mockSession.setHandler.mock.calls.find(
+        (call) => call[0] === 'list_devices'
+      )?.[1];
+      const devices = await (listHandler as () => Promise<Array<{ data: { id: string } }>>)();
+
+      // Assert - the BMW_I vehicle must be paired by the BMW driver
+      expect(devices).toHaveLength(1);
+      expect(devices[0].data.id).toBe('VINIX01');
+    });
+
+    it('should_excludeMiniVehicles_when_driverIsBmw', async () => {
+      // Arrange - mixed list, MINI must not pair under BMW driver
+      driver.mockCarDataClient.getVehicles.mockResolvedValue([
+        {
+          vin: 'VINBMW',
+          model: 'X5',
+          brand: 'BMW',
+          driveTrain: DriveTrainType.COMBUSTION,
+        },
+        {
+          vin: 'VINMINI',
+          model: 'Cooper SE',
+          brand: 'MINI',
+          driveTrain: DriveTrainType.ELECTRIC,
+        },
+      ]);
+
+      // Act
+      await driver.onPair(mockSession as unknown as any);
+      const listHandler = mockSession.setHandler.mock.calls.find(
+        (call) => call[0] === 'list_devices'
+      )?.[1];
+      const devices = await (listHandler as () => Promise<Array<{ data: { id: string } }>>)();
+
+      // Assert - only the BMW remains
+      expect(devices.map((d) => d.data.id)).toEqual(['VINBMW']);
+    });
+  });
+
+  describe('Post-auth failure handling', () => {
+    beforeEach(async () => {
+      await driver.onInit();
+      driver.setCurrentClientIdForTest('post-auth-client');
+      driver.setCurrentDeviceCodeResponseForTest({ deviceCode: 'dc-active' });
+      driver.setPollingCancelledForTest(false);
+    });
+
+    // Fix C: when authentication succeeds but container setup fails, the user should
+    // see a message that makes the container failure obvious rather than the misleading
+    // "Authorization Failed". Auth genuinely succeeded; the post-auth step failed.
+    // Reporters of #108 see "Authorization Failed" when CU-105 or similar container
+    // errors occur, leading to wasted re-auth attempts.
+    it('should_emitContainerErrorMessage_when_containerSetupFailsAfterAuthSuccess', async () => {
+      // Arrange - pollForTokens succeeds, but container creation throws with a
+      // BMW container error message that does NOT itself mention "container".
+      driver.mockAuthProvider.pollForTokens.mockResolvedValue(undefined as never);
+      driver.setCurrentContainerIdForTest(undefined);
+      driver.mockContainerManager.getOrCreateContainer.mockRejectedValue(
+        new Error('HTTP 403: CU-105')
+      );
+
+      // Act
+      await driver.testPollForAuthorizationAsync(mockSession);
+
+      // Assert - emitted message must explicitly label this as a container setup
+      // failure so the user does not waste time re-authenticating.
+      const errorEmits = mockSession.emit.mock.calls.filter((c) => c[0] === 'authentication_error');
+      expect(errorEmits.length).toBeGreaterThan(0);
+      const errorMessage = errorEmits[0][1] as string;
+      expect(errorMessage).toMatch(/container setup failed/i);
+      expect(errorMessage).toContain('CU-105');
+      // Auth success should NOT be emitted
+      const successEmits = mockSession.emit.mock.calls.filter(
+        (c) => c[0] === 'authentication_success'
+      );
+      expect(successEmits).toHaveLength(0);
+    });
+
+    // Fix D: when request_device_code is invoked again (user clicks retry/back),
+    // the previous in-flight poll loop must not race with the new one and emit a
+    // misleading authentication_success/authentication_error from its stale state.
+    // A simple device-code identity check before emitting prevents the race.
+    it('should_notEmitSuccess_when_pollResolvesAfterDeviceCodeChanged', async () => {
+      // Arrange - poll loop captures device code 'dc-active'
+      driver.setCurrentContainerIdForTest('existing-container');
+      driver.mockContainerManager.validateContainer.mockResolvedValue({
+        isValid: true,
+        missingKeys: [],
+      });
+
+      // The contract: the poll loop captures its starting device code and bails
+      // out before emitting if it no longer matches. Mid-poll, simulate the user
+      // restarting the flow (new request_device_code → new device code stored).
+      driver.mockAuthProvider.pollForTokens.mockImplementation(async () => {
+        driver.setCurrentDeviceCodeResponseForTest({ deviceCode: 'dc-newer' });
+        return undefined as never;
+      });
+
+      // Act
+      await driver.testPollForAuthorizationAsync(mockSession);
+
+      // Assert - this stale poll must not emit success (the new poll will)
+      const successEmits = mockSession.emit.mock.calls.filter(
+        (c) => c[0] === 'authentication_success'
+      );
+      expect(successEmits).toHaveLength(0);
     });
   });
 });

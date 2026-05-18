@@ -1,7 +1,7 @@
 {
   "id": "com.rexwel.bmwconnected",
-  "version": "1.0.14",
-  "compatibility": ">=5.0.0",
+  "version": "1.0.16",
+  "compatibility": ">=12.9.0",
   "sdk": 3,
   "name": {
     "en": "BMW / Mini Connected"

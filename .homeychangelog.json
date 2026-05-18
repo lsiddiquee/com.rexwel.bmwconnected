@@ -115,5 +115,11 @@
   },
   "1.0.14": {
     "en": "Bug fixes"
+  },
+  "1.0.15": {
+    "en": "Fix pairing for BMW sub-brand vehicles (e.g. BMW_I/iX), prevent token-polling crash on malformed auth responses, and preserve BMW error codes (CU-105) and messages from API responses."
+  },
+  "1.0.16": {
+    "en": "Hardened OAuth device-code pairing: slow_down now extends polling interval per RFC 8628 instead of aborting; transient network errors during polling are retried instead of failing the whole auth window; container setup errors after successful auth are now clearly labelled; stale poll loops from earlier pairing attempts no longer race with new ones; requestDeviceCode retries once on transient network failure."
   }
 }

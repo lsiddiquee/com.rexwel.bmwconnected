@@ -612,6 +612,33 @@ describe('HttpClient - Comprehensive Tests', () => {
       await expect(httpClient.get('/test')).rejects.toThrow('Custom error message');
     });
 
+    // Regression: issue #108 - BMW CarData returns structured errors like
+    // `{ code: 'CU-105', message: 'No permission for container' }` on 403 responses.
+    // Previously the HttpClient dropped the BMW `code` field and surfaced
+    // "HTTP error 403: Unknown error", making CarDataClient's CU-105 branch unreachable.
+    it('should_preserveBmwErrorCode_when_403WithCodeField', async () => {
+      // Arrange - simulate a BMW CU-105 (no container permission) response
+      mockFetch.mockResolvedValue(
+        createMockResponse(
+          {
+            code: 'CU-105',
+            message: 'No permission for specified containerId',
+          },
+          403
+        )
+      );
+
+      // Act
+      const error = await httpClient.get('/test').catch((e: unknown) => e);
+
+      // Assert - error must expose the BMW code and message, not "Unknown error"
+      expect(error).toBeInstanceOf(ApiError);
+      expect((error as ApiError).statusCode).toBe(403);
+      expect((error as ApiError).code).toBe('CU-105');
+      expect((error as Error).message).toContain('No permission for specified containerId');
+      expect((error as Error).message).not.toContain('Unknown error');
+    });
+
     it('should_handleStringErrorResponse_gracefully', async () => {
       // Arrange
       mockFetch.mockResolvedValue(createMockResponse('String error message', 400));
