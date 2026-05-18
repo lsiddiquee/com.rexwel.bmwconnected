@@ -144,63 +144,85 @@ export class DeviceCodeAuthProvider implements IAuthProvider {
     // Generate PKCE challenge
     this.pkceChallenge = PkceGenerator.generate();
 
-    try {
-      const response = await fetch(this.deviceCodeUrl, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          client_id: this.clientId,
-          response_type: 'device_code',
-          scope: requestScopes,
-          code_challenge: this.pkceChallenge.codeChallenge,
-          code_challenge_method: this.pkceChallenge.codeChallengeMethod,
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        this.logger?.error('Device code request failed', undefined, {
-          status: response.status,
-          statusText: response.statusText,
-          error: errorText,
+    // Retry once on transient network errors (issue #99: "Failed to connect to OAuth
+    // server" on first try, succeeds on retry). AuthenticationError (4xx with body)
+    // is NOT a transient failure and is rethrown immediately.
+    const maxAttempts = 2;
+    let lastError: unknown;
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        const response = await fetch(this.deviceCodeUrl, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            client_id: this.clientId,
+            response_type: 'device_code',
+            scope: requestScopes,
+            code_challenge: this.pkceChallenge.codeChallenge,
+            code_challenge_method: this.pkceChallenge.codeChallengeMethod,
+          }),
         });
 
-        throw new AuthenticationError(
-          `Failed to request device code: ${response.statusText}`,
-          'DEVICE_CODE_REQUEST_FAILED',
-          { error: errorText, statusCode: response.status }
-        );
+        if (!response.ok) {
+          const errorText = await response.text();
+          this.logger?.error('Device code request failed', undefined, {
+            status: response.status,
+            statusText: response.statusText,
+            error: errorText,
+          });
+
+          throw new AuthenticationError(
+            `Failed to request device code: ${response.statusText}`,
+            'DEVICE_CODE_REQUEST_FAILED',
+            { error: errorText, statusCode: response.status }
+          );
+        }
+
+        const responseData: unknown = await response.json();
+        // Validate device code response and transform to camelCase
+        const data = this.validateDeviceCodeResponse(responseData);
+
+        this.logger?.info('Device code received', {
+          deviceCode: data.deviceCode.substring(0, 10) + '...',
+          userCode: data.userCode,
+          verificationUrl: data.verificationUrl,
+          expiresIn: data.expiresIn,
+        });
+
+        return data;
+      } catch (error) {
+        if (error instanceof AuthenticationError) {
+          throw error;
+        }
+
+        lastError = error;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        this.logger?.warn('Network error requesting device code', {
+          attempt,
+          maxAttempts,
+          errorType: error?.constructor?.name,
+          errorMessage,
+        });
+
+        if (attempt < maxAttempts) {
+          // brief backoff before retrying
+          await this.sleep(Math.min(this.pollInterval, 1000));
+          continue;
+        }
       }
-
-      const responseData: unknown = await response.json();
-      // Validate device code response and transform to camelCase
-      const data = this.validateDeviceCodeResponse(responseData);
-
-      this.logger?.info('Device code received', {
-        deviceCode: data.deviceCode.substring(0, 10) + '...',
-        userCode: data.userCode,
-        verificationUrl: data.verificationUrl,
-        expiresIn: data.expiresIn,
-      });
-
-      return data;
-    } catch (error) {
-      if (error instanceof AuthenticationError) {
-        throw error;
-      }
-
-      // Enhanced error logging with more detail
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      this.logger?.error('Network error requesting device code', error as Error, {
-        errorType: error?.constructor?.name,
-      });
-
-      throw new NetworkError(`Failed to connect to OAuth server: ${errorMessage}`, error as Error);
     }
+
+    const finalMessage = lastError instanceof Error ? lastError.message : String(lastError);
+    this.logger?.error('Network error requesting device code', lastError as Error, {
+      errorType: (lastError as Error)?.constructor?.name,
+    });
+    throw new NetworkError(
+      `Failed to connect to OAuth server: ${finalMessage}`,
+      lastError as Error
+    );
   }
 
   /**
@@ -232,6 +254,8 @@ export class DeviceCodeAuthProvider implements IAuthProvider {
 
     const startTime = Date.now();
     const expirationTime = startTime + this.timeout;
+    // Per RFC 8628 §3.5, `slow_down` mandates increasing the poll interval by 5s.
+    let currentInterval = this.pollInterval;
 
     while (Date.now() < expirationTime) {
       try {
@@ -272,18 +296,19 @@ export class DeviceCodeAuthProvider implements IAuthProvider {
 
         // Handle expected errors during polling
         const data = responseData as Record<string, unknown>;
-        const errorCode = data.error as string;
+        const errorCode = typeof data.error === 'string' ? data.error : undefined;
 
         if (errorCode === 'authorization_pending') {
           // User hasn't authorized yet, continue polling
           this.logger?.debug('Authorization pending, continuing to poll');
         } else if (errorCode === 'slow_down') {
-          // Server wants us to slow down
-          this.logger?.warn('Slow down requested by server');
-          throw new RateLimitError(
-            'Polling too quickly. Please slow down.',
-            this.pollInterval + 1000
-          );
+          // RFC 8628 §3.5: increase interval by 5s and continue polling (do NOT throw).
+          // Previously we threw RateLimitError which aborted the entire auth window
+          // on a single slow_down response.
+          currentInterval += 5000;
+          this.logger?.warn('Slow down requested by server; increasing poll interval', {
+            newIntervalMs: currentInterval,
+          });
         } else if (errorCode === 'expired_token') {
           // Device code expired
           throw new TimeoutError(
@@ -294,16 +319,23 @@ export class DeviceCodeAuthProvider implements IAuthProvider {
           // User denied authorization
           throw new AuthenticationError('User denied authorization', 'ACCESS_DENIED');
         } else {
-          // Unknown error
-          const errorDesc = (data.error_description as string) ?? errorCode;
-          throw new AuthenticationError(
-            `Token polling failed: ${errorDesc}`,
-            errorCode.toUpperCase()
-          );
+          // Unknown / malformed error response. Guard against missing `error` field
+          // (issue #106) so we surface a real AuthenticationError instead of crashing
+          // with a TypeError that gets re-wrapped as a generic NetworkError.
+          const desc =
+            typeof data.error_description === 'string' ? data.error_description : undefined;
+          const msg = typeof data.message === 'string' ? data.message : undefined;
+          const errorDesc = desc ?? msg ?? errorCode ?? 'Unknown error from token endpoint';
+          const code = (errorCode ?? 'UNKNOWN_ERROR').toUpperCase();
+          this.logger?.error('Unexpected token poll response', {
+            code,
+            payload: data,
+          } as unknown as Error);
+          throw new AuthenticationError(`Token polling failed: ${errorDesc}`, code);
         }
 
-        // Wait before next poll
-        await this.sleep(this.pollInterval);
+        // Wait before next poll (interval may have grown due to slow_down)
+        await this.sleep(currentInterval);
       } catch (error) {
         if (
           error instanceof AuthenticationError ||
@@ -313,8 +345,14 @@ export class DeviceCodeAuthProvider implements IAuthProvider {
           throw error;
         }
 
-        this.logger?.error('Network error during token polling', error as Error);
-        throw new NetworkError('Failed to poll for tokens', error as Error);
+        // Transient failure (network blip, JSON parse error, 5xx with no JSON body).
+        // Per RFC 8628 the client should keep polling; previously a single transient
+        // error killed the entire 15-minute auth window. Log and continue.
+        this.logger?.warn('Transient error during token polling; continuing', {
+          errorType: error?.constructor?.name,
+          errorMessage: error instanceof Error ? error.message : String(error),
+        });
+        await this.sleep(currentInterval);
       }
     }
 

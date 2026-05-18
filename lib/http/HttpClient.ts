@@ -328,12 +328,15 @@ export class HttpClient implements IHttpClient {
    */
   private mapHttpError(status: number, data: unknown, url: string): VehicleClientError {
     const message = this.extractErrorMessage(data);
+    // Preserve BMW-specific error codes (e.g. CU-105) from the response body so
+    // downstream handlers (CarDataClient container errors) can react. Issue #108.
+    const bmwCode = this.extractErrorCode(data);
 
     switch (status) {
       case 401:
-        return new ApiError(`Authentication failed: ${message}`, status, 'AUTH_ERROR');
+        return new ApiError(`Authentication failed: ${message}`, status, bmwCode ?? 'AUTH_ERROR');
       case 404:
-        return new ApiError(`Resource not found: ${url}`, status, 'NOT_FOUND');
+        return new ApiError(`Resource not found: ${url}`, status, bmwCode ?? 'NOT_FOUND');
       case 429: {
         const retryAfter = this.extractRetryAfter(data);
         return new RateLimitError(`Rate limit exceeded: ${message}`, retryAfter);
@@ -342,9 +345,9 @@ export class HttpClient implements IHttpClient {
       case 502:
       case 503:
       case 504:
-        return new ApiError(`Server error: ${message}`, status, 'SERVER_ERROR');
+        return new ApiError(`Server error: ${message}`, status, bmwCode ?? 'SERVER_ERROR');
       default:
-        return new ApiError(`HTTP error ${status}: ${message}`, status, 'HTTP_ERROR');
+        return new ApiError(`HTTP error ${status}: ${message}`, status, bmwCode ?? 'HTTP_ERROR');
     }
   }
 
@@ -358,10 +361,36 @@ export class HttpClient implements IHttpClient {
 
     if (data && typeof data === 'object') {
       const obj = data as Record<string, unknown>;
-      return (obj.message ?? obj.error ?? obj.error_description ?? 'Unknown error') as string;
+      // BMW CarData returns `{ code, message }` (issue #108). Fall through several
+      // common shapes so we never lose the server-provided detail.
+      const candidate =
+        obj.message ??
+        obj.error_description ??
+        obj.detail ??
+        obj.title ??
+        (typeof obj.error === 'string' ? obj.error : undefined) ??
+        (typeof obj.code === 'string' ? obj.code : undefined);
+      if (typeof candidate === 'string' && candidate.length > 0) {
+        return candidate;
+      }
     }
 
     return 'Unknown error';
+  }
+
+  /**
+   * Extract a BMW-specific error code from the response body, when present.
+   * Returns undefined for unstructured bodies so callers can fall back to
+   * their own default codes. Issue #108.
+   */
+  private extractErrorCode(data: unknown): string | undefined {
+    if (data && typeof data === 'object') {
+      const obj = data as Record<string, unknown>;
+      if (typeof obj.code === 'string' && obj.code.length > 0) {
+        return obj.code;
+      }
+    }
+    return undefined;
   }
 
   /**

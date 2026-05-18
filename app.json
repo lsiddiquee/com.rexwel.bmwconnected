@@ -1,7 +1,7 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "com.rexwel.bmwconnected",
-  "version": "1.0.14",
+  "version": "1.0.16",
   "compatibility": ">=5.0.0",
   "sdk": 3,
   "name": {
@@ -1133,6 +1133,54 @@
       "setable": false,
       "uiComponent": "sensor"
     },
+    "climate_status_capability": {
+      "type": "enum",
+      "title": {
+        "en": "Climate status",
+        "nl": "Klimaatstatus"
+      },
+      "values": [
+        {
+          "id": "HEATING",
+          "title": {
+            "en": "Heating",
+            "nl": "Verwarming"
+          }
+        },
+        {
+          "id": "COOLING",
+          "title": {
+            "en": "Cooling",
+            "nl": "Koeling"
+          }
+        },
+        {
+          "id": "VENTILATION",
+          "title": {
+            "en": "Ventilation",
+            "nl": "Ventilatie"
+          }
+        },
+        {
+          "id": "INACTIVE",
+          "title": {
+            "en": "Inactive",
+            "nl": "Inactief"
+          }
+        },
+        {
+          "id": "UNKNOWN",
+          "title": {
+            "en": "Unknown",
+            "nl": "Onbekend"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/airco.svg"
+    },
     "door_state_capability": {
       "type": "enum",
       "title": {
@@ -1165,6 +1213,21 @@
       "getable": true,
       "setable": false,
       "uiComponent": "sensor"
+    },
+    "fuel_level_percent_capability": {
+      "type": "number",
+      "title": {
+        "en": "Fuel level",
+        "nl": "Brandstofniveau"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/gas-station.svg",
+      "units": "%",
+      "min": 0,
+      "max": 100,
+      "insights": true
     },
     "mileage_capability": {
       "type": "number",
@@ -1244,54 +1307,6 @@
       "getable": true,
       "setable": false,
       "uiComponent": "sensor"
-    },
-    "climate_status_capability": {
-      "type": "enum",
-      "title": {
-        "en": "Climate status",
-        "nl": "Klimaatstatus"
-      },
-      "values": [
-        {
-          "id": "HEATING",
-          "title": {
-            "en": "Heating",
-            "nl": "Verwarming"
-          }
-        },
-        {
-          "id": "COOLING",
-          "title": {
-            "en": "Cooling",
-            "nl": "Koeling"
-          }
-        },
-        {
-          "id": "VENTILATION",
-          "title": {
-            "en": "Ventilation",
-            "nl": "Ventilatie"
-          }
-        },
-        {
-          "id": "INACTIVE",
-          "title": {
-            "en": "Inactive",
-            "nl": "Inactief"
-          }
-        },
-        {
-          "id": "UNKNOWN",
-          "title": {
-            "en": "Unknown",
-            "nl": "Onbekend"
-          }
-        }
-      ],
-      "getable": true,
-      "setable": false,
-      "uiComponent": "sensor",
-      "icon": "/assets/airco.svg"
     }
   }
 }

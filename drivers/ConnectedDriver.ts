@@ -126,7 +126,13 @@ export abstract class ConnectedDriver extends Driver {
       const vehicles = await api.getVehicles();
 
       return vehicles
-        .filter((vehicle) => vehicle.brand.toLowerCase() == this.brand.toLowerCase())
+        .filter((vehicle) => {
+          // BMW CarData returns sub-brand identifiers like `BMW_I` (for electric iX/i3/i4
+          // etc.) and may use similar prefixes for MINI. Match on the brand family prefix
+          // so sub-brand vehicles are not silently dropped during pairing (issues #103, #105).
+          const brand = (vehicle.brand ?? '').toLowerCase();
+          return brand.startsWith(this.brand.toLowerCase());
+        })
         .map((vehicle) => {
           this.logger?.info(
             `Vehicle found: ${vehicle.brand}: ${vehicle.vin}, ${vehicle.model ?? 'Unknown Model'}`
@@ -296,12 +302,17 @@ export abstract class ConnectedDriver extends Driver {
       return;
     }
 
+    // Capture the device code this poll loop started with (issue: stale poll
+    // loops can otherwise emit success/error against a newer pairing attempt
+    // when the user retries the request_device_code step).
+    const ownDeviceCode = this.currentDeviceCodeResponse.deviceCode;
+
     try {
       // Get shared auth provider from app
       const authProvider = this.getAuthProvider();
 
       // Start the polling process
-      const pollingPromise = authProvider.pollForTokens(this.currentDeviceCodeResponse.deviceCode);
+      const pollingPromise = authProvider.pollForTokens(ownDeviceCode);
 
       // Check cancellation status periodically
       const checkCancellation = async (): Promise<void> => {
@@ -320,8 +331,41 @@ export abstract class ConnectedDriver extends Driver {
         return;
       }
 
-      // Container validation/creation now happens in client_id_entered handler
-      await this.validateOrCreateContainer();
+      // Bail out silently if a newer pairing attempt has superseded this poll
+      if (this.currentDeviceCodeResponse?.deviceCode !== ownDeviceCode) {
+        this.logger?.info('Stale poll loop completed - newer device code is active, abandoning');
+        return;
+      }
+
+      // Container validation/creation now happens in client_id_entered handler.
+      // Wrap this in its own catch so we can give the user a clearly-labelled
+      // error message: auth genuinely succeeded; only the post-auth container
+      // step failed. Previously these surfaced as generic "Authorization Failed"
+      // which led reporters of #108 to assume their auth credentials were wrong.
+      try {
+        await this.validateOrCreateContainer();
+      } catch (containerError) {
+        if (this.currentDeviceCodeResponse?.deviceCode !== ownDeviceCode) {
+          // superseded mid-container-setup
+          return;
+        }
+        const detail =
+          containerError instanceof Error ? containerError.message : String(containerError);
+        this.homey.error('Container setup failed after successful auth:', containerError);
+        await session
+          .emit('authentication_error', `Container setup failed: ${detail}`)
+          .catch((emitError) => {
+            if (
+              emitError instanceof Error &&
+              emitError.message.includes('Not Found: PairSession')
+            ) {
+              this.logger?.info('Session closed - cannot report container error to user');
+            } else {
+              this.homey.error('Failed to emit container error:', emitError);
+            }
+          });
+        return;
+      }
 
       // Update device store for repair flow
       if (device) {

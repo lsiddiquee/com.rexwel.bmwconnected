@@ -247,6 +247,151 @@ describe('DeviceCodeAuthProvider - Comprehensive Tests', () => {
       // Act & Assert
       await expect(authProvider.pollForTokens(deviceCode)).rejects.toThrow(AuthenticationError);
     });
+
+    // Regression: issue #106 - if the token endpoint returns a non-2xx response without
+    // an `error` field (e.g. unexpected HTML or generic 5xx JSON body), the previous
+    // implementation called `errorCode.toUpperCase()` on `undefined` and threw a
+    // TypeError, which was then surfaced as "Failed to poll for tokens" with no detail.
+    it('should_throwAuthenticationError_when_pollResponseHasNoErrorField', async () => {
+      // Arrange - set up PKCE via successful device code request
+      const deviceCode = 'device_12345';
+      mockFetch.mockResolvedValueOnce(
+        createFetchResponse({
+          device_code: deviceCode,
+          user_code: 'ABCD-1234',
+          verification_uri: 'https://auth.bmwgroup.com/device',
+          expires_in: 900,
+          interval: 5,
+        })
+      );
+      await authProvider.requestDeviceCode();
+
+      // Poll response missing `error` field (malformed BMW error body)
+      mockFetch.mockResolvedValue(createFetchResponse({ message: 'something broke' }, 400));
+
+      // Act & Assert - should be a proper AuthenticationError, not a TypeError
+      await expect(authProvider.pollForTokens(deviceCode)).rejects.toThrow(AuthenticationError);
+      await expect(authProvider.pollForTokens(deviceCode)).rejects.not.toThrow(TypeError);
+    });
+
+    // RFC 8628 §3.5: the client MUST continue polling on `slow_down`, only
+    // increasing the interval by 5 seconds. Previously we threw RateLimitError
+    // which aborted the entire 15-minute auth flow on a single slow_down.
+    it('should_continuePolling_when_serverReturnsSlowDown', async () => {
+      // Arrange - fresh provider with tiny intervals
+      const fastProvider = new DeviceCodeAuthProvider(mockTokenStore, clientId, {
+        ...options,
+        pollInterval: 1,
+      });
+      const deviceCode = 'device_12345';
+
+      mockFetch.mockResolvedValueOnce(
+        createFetchResponse({
+          device_code: deviceCode,
+          user_code: 'ABCD-1234',
+          verification_uri: 'https://auth.bmwgroup.com/device',
+          expires_in: 900,
+          interval: 5,
+        })
+      );
+      await fastProvider.requestDeviceCode();
+
+      // First poll: slow_down; second poll: tokens
+      mockFetch
+        .mockResolvedValueOnce(
+          createFetchResponse({ error: 'slow_down', error_description: 'too fast' }, 400)
+        )
+        .mockResolvedValueOnce(
+          createFetchResponse({
+            gcid: 'gcid',
+            access_token: 'at',
+            refresh_token: 'rt',
+            id_token: 'idt',
+            token_type: 'Bearer',
+            expires_in: 3600,
+            scope: 'vehicle:read',
+          })
+        );
+
+      // Act
+      const result = await fastProvider.pollForTokens(deviceCode);
+
+      // Assert - slow_down was handled gracefully, polling continued, tokens received
+      expect(result.accessToken).toBe('at');
+      expect(mockFetch).toHaveBeenCalledTimes(3); // 1 device code + 2 polls
+    }, 10000);
+
+    // Transient backend issues (5xx with no body, JSON parse failures, network blips)
+    // should not abort the entire 15-minute auth flow. RFC 8628 expects clients to
+    // keep polling. Previously a single network/parse error wrapped as NetworkError
+    // killed the flow and the user saw "Failed to poll for tokens".
+    it('should_continuePolling_when_transientNetworkErrorOccurs', async () => {
+      // Arrange
+      const fastProvider = new DeviceCodeAuthProvider(mockTokenStore, clientId, {
+        ...options,
+        pollInterval: 1,
+      });
+      const deviceCode = 'device_12345';
+
+      mockFetch.mockResolvedValueOnce(
+        createFetchResponse({
+          device_code: deviceCode,
+          user_code: 'ABCD-1234',
+          verification_uri: 'https://auth.bmwgroup.com/device',
+          expires_in: 900,
+          interval: 5,
+        })
+      );
+      await fastProvider.requestDeviceCode();
+
+      // First poll: network error (socket reset); second poll: tokens
+      mockFetch.mockRejectedValueOnce(new Error('socket hang up')).mockResolvedValueOnce(
+        createFetchResponse({
+          gcid: 'gcid',
+          access_token: 'at_after_retry',
+          refresh_token: 'rt',
+          id_token: 'idt',
+          token_type: 'Bearer',
+          expires_in: 3600,
+          scope: 'vehicle:read',
+        })
+      );
+
+      // Act
+      const result = await fastProvider.pollForTokens(deviceCode);
+
+      // Assert - transient error was tolerated, polling continued
+      expect(result.accessToken).toBe('at_after_retry');
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    // requestDeviceCode should tolerate a single transient network failure by
+    // retrying once with backoff (issue #99 - "Failed to connect to OAuth server"
+    // on first attempt, succeeds on retry).
+    it('should_retryOnce_when_requestDeviceCodeHitsTransientNetworkError', async () => {
+      // Arrange
+      const fastProvider = new DeviceCodeAuthProvider(mockTokenStore, clientId, {
+        ...options,
+        pollInterval: 1,
+      });
+
+      mockFetch.mockRejectedValueOnce(new Error('ENOTFOUND')).mockResolvedValueOnce(
+        createFetchResponse({
+          device_code: 'dc',
+          user_code: 'UC-1',
+          verification_uri: 'https://auth.bmwgroup.com/device',
+          expires_in: 900,
+          interval: 5,
+        })
+      );
+
+      // Act
+      const result = await fastProvider.requestDeviceCode();
+
+      // Assert - retried successfully
+      expect(result.deviceCode).toBe('dc');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('Token Management', () => {
