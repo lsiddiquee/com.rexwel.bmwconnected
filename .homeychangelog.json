@@ -130,5 +130,8 @@
   },
   "1.0.19": {
     "en": "The 'How to get a Client ID' link in the pairing screen now points to the MyBMW vehicle overview (the previous URL had moved and showed a 404). When BMW blocks a request because the daily limit of 50 requests per 24 hours has been reached, the app now clearly says so and asks you to wait, instead of incorrectly suggesting that the Streaming API option might be turned off. Pairing also stops immediately when the daily limit is reached instead of burning more of your remaining requests on retries."
+  },
+  "1.0.20": {
+    "en": "If a previous failed pairing left old entries behind in your BMW CarData account, the app now cleans them up automatically the next time you pair, so 'maximum number of containers reached' errors fix themselves. Error messages no longer point you to BMW support — this is a community app and BMW cannot help with it; instead you'll be asked to open a GitHub issue and attach a copy of the log from the Homey app's log view. When pairing fails at the very last step, the sign-in is now kept so retrying doesn't ask you for the device code again."
   }
 }

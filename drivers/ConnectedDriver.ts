@@ -346,11 +346,15 @@ export abstract class ConnectedDriver extends Driver {
         return;
       }
 
-      // Container validation/creation now happens in client_id_entered handler.
-      // Wrap this in its own catch so we can give the user a clearly-labelled
-      // error message: auth genuinely succeeded; only the post-auth container
-      // step failed. Previously these surfaced as generic "Authorization Failed"
-      // which led reporters of #108 to assume their auth credentials were wrong.
+      // Container validation/creation now happens in pollForAuthorizationAsync
+      // for both pairing and repair flows.
+      //
+      // Token persistence: DeviceCodeAuthProvider.pollForTokens has already
+      // written the tokens to the token store at this point, so even if the
+      // container step below fails the user can retry pairing without going
+      // through the device-code flow again — client_id_entered will find the
+      // stored tokens via getValidAccessToken() and skip straight to the
+      // container step (issue #108).
       try {
         await this.validateOrCreateContainer();
       } catch (containerError) {

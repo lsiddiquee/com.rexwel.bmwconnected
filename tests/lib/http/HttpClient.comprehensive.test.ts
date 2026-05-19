@@ -860,10 +860,15 @@ describe('HttpClient - Comprehensive Tests', () => {
       // the most common cause) but with softer phrasing that allows for the
       // toggle already being enabled, and must reference the correlation ID.
       expect(error.message).toContain('Streaming API');
-      // Old wording asserted the option was missing ("check that ... is enabled").
-      // New wording must use a verb like 'verify' that doesn't presume fault.
-      expect(error.message.toLowerCase()).toMatch(/verify|confirm/);
+      // Wording must not presume fault: it must acknowledge the toggle may
+      // already be enabled.
+      expect(error.message.toLowerCase()).toMatch(/already enabled/);
       expect(error.message.toLowerCase()).toContain('correlation');
+      // v1.0.20: must not direct users to BMW support (this is a community
+      // app); must point them at the app's GitHub issue tracker and the
+      // Homey log view instead.
+      expect(error.message.toLowerCase()).not.toContain('bmw support');
+      expect(error.message.toLowerCase()).toMatch(/github|log/);
     });
   });
 

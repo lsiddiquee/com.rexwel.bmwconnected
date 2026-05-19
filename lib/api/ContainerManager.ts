@@ -232,7 +232,25 @@ export class ContainerManager {
     // attempt to create instead and let that error surface if it also fails.
     try {
       const existing = await this.listContainers();
+      // Log every container the user has on BMW's side so that user-submitted
+      // diagnostic logs include the full inventory — useful for triaging
+      // container-quota issues without needing another API round-trip.
+      this.logger?.info('Container inventory', {
+        identifier,
+        expectedName,
+        total: existing.length,
+        containers: existing.map((c) => ({ containerId: c.containerId, name: c.name })),
+      });
       const match = existing.find((c) => c.name === expectedName);
+      // Identify every container that looks like one of ours so we can clean
+      // up duplicates/orphans left behind by older versions (pre-1.0.18 created
+      // an unsuffixed container on every pair attempt — see issue #108).
+      const oursToDelete = existing.filter(
+        (c) => this.isOurContainer(c.name) && c.containerId !== match?.containerId
+      );
+      if (oursToDelete.length > 0) {
+        await this.cleanupOurContainers(oursToDelete);
+      }
       if (match) {
         this.logger?.info('Reusing existing container', {
           identifier,
@@ -278,6 +296,48 @@ export class ContainerManager {
    */
   private buildContainerName(identifier: string): string {
     return `${this.containerName} (${identifier})`;
+  }
+
+  /**
+   * Whether a container was created by this app. Matches both the legacy
+   * pre-1.0.18 naming (exact `containerName`, no suffix) and the current
+   * `containerName (identifier)` scheme. Used to decide what's safe to delete
+   * during proactive cleanup (issue #108).
+   */
+  private isOurContainer(name: string | undefined): boolean {
+    if (!name) return false;
+    return name === this.containerName || name.startsWith(`${this.containerName} (`);
+  }
+
+  /**
+   * Best-effort deletion of orphaned/duplicate containers we created on
+   * previous pair attempts. Each delete burns 1 of the user's 50-per-24h
+   * quota, so failures are logged but never rethrown — we still want the
+   * caller to proceed with the active container.
+   */
+  private async cleanupOurContainers(toDelete: ApiContainerResponse[]): Promise<void> {
+    this.logger?.info('Cleaning up orphan/duplicate Homey containers', {
+      count: toDelete.length,
+      containers: toDelete.map((c) => ({ containerId: c.containerId, name: c.name })),
+    });
+    for (const container of toDelete) {
+      try {
+        await this.deleteContainer(container.containerId);
+      } catch (error) {
+        if (error instanceof RateLimitError) {
+          // Stop cleanup on rate limit — we've burned what we can; preserve
+          // remaining quota for the actual create/reuse path.
+          this.logger?.warn('Cleanup hit BMW rate limit - stopping early', {
+            remainingToDelete: toDelete.length,
+          });
+          return;
+        }
+        this.logger?.warn('Failed to delete orphan container - continuing', {
+          containerId: container.containerId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
   }
 
   /**

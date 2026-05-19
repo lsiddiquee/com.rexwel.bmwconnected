@@ -304,8 +304,9 @@ export class HttpClient implements IHttpClient {
       // Check for HTTP errors
       if (!response.ok) {
         const responseHeaders = this.parseHeaders(response.headers);
-        // Log full diagnostic detail (headers + raw body) so user-submitted logs
-        // contain enough information to escalate to BMW support. Issue #108.
+        // Log full diagnostic detail (headers + raw body) so users can copy the
+        // log entry from the Homey app's log view into a GitHub issue — logs
+        // are local-only and never sent to a central service. Issue #108.
         // The diagnostics MUST be passed as the 3rd `context` argument - the
         // Logger only extracts `.message`/`.stack` from the 2nd Error arg, so
         // earlier versions of this call site (v1.0.17) silently dropped them.
@@ -395,13 +396,14 @@ export class HttpClient implements IHttpClient {
     }
 
     // For the container 403 case (issue #108), append a next-step hint. The
-    // most common cause is the BMW CarData client missing the "Streaming API"
-    // scope, but silvinnio's report shows the toggle can already be enabled
-    // and a 403 still occurs — so the wording must not presume fault. Skip
-    // the hint entirely when we already know it's a CU-429 (handled above).
+    // most common cause is the BMW CarData client missing the 'Streaming API'
+    // scope, but the toggle can already be enabled and a 403 still occurs —
+    // so the wording must not presume fault and must point the user at this
+    // app's repo (BMW support cannot help with a third-party Homey app).
+    // Skip the hint entirely when we already know it's a CU-429 (handled above).
     const containerHint =
       status === 403 && url.includes('/customers/containers')
-        ? " - verify the 'Streaming API' option is enabled on your BMW CarData client; if it's already enabled, share the correlation ID above with BMW support"
+        ? " - if the 'Streaming API' option on your BMW CarData client is already enabled, open a GitHub issue on the Homey app's repository and include the log entry from the Homey app's log view"
         : '';
     const message = `${rawMessage}${correlationSuffix}${containerHint}`;
 
