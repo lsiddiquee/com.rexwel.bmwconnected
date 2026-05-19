@@ -327,11 +327,22 @@ export class DeviceCodeAuthProvider implements IAuthProvider {
           const msg = typeof data.message === 'string' ? data.message : undefined;
           const errorDesc = desc ?? msg ?? errorCode ?? 'Unknown error from token endpoint';
           const code = (errorCode ?? 'UNKNOWN_ERROR').toUpperCase();
+          // Include HTTP status in the surfaced message so users / maintainers can
+          // distinguish e.g. 401 (bad client / scope) from 5xx (server hiccup) when
+          // the body itself contains nothing actionable. Issue #108.
+          const correlationId =
+            response.headers.get('x-correlation-id') ?? response.headers.get('x-request-id');
+          const correlationSuffix = correlationId ? ` (correlation: ${correlationId})` : '';
           this.logger?.error('Unexpected token poll response', {
             code,
+            status: response.status,
+            correlationId,
             payload: data,
           } as unknown as Error);
-          throw new AuthenticationError(`Token polling failed: ${errorDesc}`, code);
+          throw new AuthenticationError(
+            `Token polling failed (HTTP ${response.status}): ${errorDesc}${correlationSuffix}`,
+            code
+          );
         }
 
         // Wait before next poll (interval may have grown due to slow_down)

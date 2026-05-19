@@ -272,9 +272,25 @@ export class HttpClient implements IHttpClient {
 
       // Parse response body
       let data: T | undefined;
+      let rawBody: string | undefined;
       const contentType = response.headers.get('Content-Type') ?? '';
 
-      if (contentType.includes('application/json')) {
+      if (!response.ok) {
+        // For errors, always read raw text first so we can include the actual body
+        // in logs even when the server omits/lies about Content-Type. Issue #108.
+        rawBody = await response.text();
+        if (rawBody && contentType.includes('application/json')) {
+          try {
+            data = JSON.parse(rawBody) as T;
+          } catch {
+            // Body claimed to be JSON but isn't parseable; fall back to raw text
+            // so the error mapper still has *something* to surface. Issue #108.
+            data = rawBody as unknown as T;
+          }
+        } else if (rawBody) {
+          data = rawBody as unknown as T;
+        }
+      } else if (contentType.includes('application/json')) {
         data = (await response.json()) as T;
       } else if (contentType.includes('text/')) {
         data = (await response.text()) as unknown as T;
@@ -289,7 +305,18 @@ export class HttpClient implements IHttpClient {
 
       // Check for HTTP errors
       if (!response.ok) {
-        throw this.mapHttpError(response.status, data, url);
+        const responseHeaders = this.parseHeaders(response.headers);
+        // Log full diagnostic detail (headers + raw body) so user-submitted logs
+        // contain enough information to escalate to BMW support. Issue #108.
+        this.logger?.error('HTTP request failed', {
+          method: request.method,
+          url,
+          status: response.status,
+          statusText: response.statusText,
+          headers: responseHeaders,
+          body: rawBody,
+        } as unknown as Error);
+        throw this.mapHttpError(response.status, data, url, responseHeaders);
       }
 
       // Build response object
@@ -326,11 +353,29 @@ export class HttpClient implements IHttpClient {
   /**
    * Map HTTP status codes to custom errors
    */
-  private mapHttpError(status: number, data: unknown, url: string): VehicleClientError {
-    const message = this.extractErrorMessage(data);
+  private mapHttpError(
+    status: number,
+    data: unknown,
+    url: string,
+    headers?: HttpHeaders
+  ): VehicleClientError {
+    const rawMessage = this.extractErrorMessage(data);
     // Preserve BMW-specific error codes (e.g. CU-105) from the response body so
     // downstream handlers (CarDataClient container errors) can react. Issue #108.
     const bmwCode = this.extractErrorCode(data);
+    // BMW responses include a correlation/request ID header that's required for
+    // their support team to investigate. Surface it in the message when the body
+    // gives us nothing actionable. Issue #108.
+    const correlationId = this.extractCorrelationId(headers);
+    const correlationSuffix = correlationId ? ` (correlation: ${correlationId})` : '';
+    // For the container 403 case (issue #108), append a concrete next-step hint:
+    // by far the most common cause is the user's BMW CarData client missing the
+    // "Streaming API" scope, which produces a 403 with an empty body.
+    const containerHint =
+      status === 403 && url.includes('/customers/containers')
+        ? " - check that the BMW CarData client has the 'Streaming API' option enabled"
+        : '';
+    const message = `${rawMessage}${correlationSuffix}${containerHint}`;
 
     switch (status) {
       case 401:
@@ -349,6 +394,21 @@ export class HttpClient implements IHttpClient {
       default:
         return new ApiError(`HTTP error ${status}: ${message}`, status, bmwCode ?? 'HTTP_ERROR');
     }
+  }
+
+  /**
+   * Extract a correlation / request ID from response headers. BMW CarData uses
+   * `x-correlation-id`; other gateways may use `x-request-id`. Issue #108.
+   */
+  private extractCorrelationId(headers?: HttpHeaders): string | undefined {
+    if (!headers) return undefined;
+    const candidates = ['x-correlation-id', 'x-request-id', 'request-id', 'correlation-id'];
+    for (const [key, value] of Object.entries(headers)) {
+      if (candidates.includes(key.toLowerCase()) && typeof value === 'string' && value.length > 0) {
+        return value;
+      }
+    }
+    return undefined;
   }
 
   /**

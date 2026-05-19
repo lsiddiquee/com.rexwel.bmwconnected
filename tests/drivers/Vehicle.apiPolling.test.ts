@@ -368,7 +368,7 @@ describe('Vehicle API Polling', () => {
 
     it('should_clearTimer_when_timerExists', () => {
       // Arrange
-      vehicle['_apiPollingTimer'] = setInterval(() => {}, 1000) as NodeJS.Timeout;
+      vehicle['_apiPollingTimer'] = setInterval(() => {}, 1000);
 
       // Act
       vehicle['stopApiPolling']();
