@@ -17,13 +17,7 @@
     "noImplicitReturns": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "app.ts",
-    "api.ts",
-    "drivers/**/*.ts",
-    "utils/**/*.ts",
-    "lib/**/*.ts"
-  ],
+  "include": ["app.ts", "api.ts", "drivers/**/*.ts", "utils/**/*.ts", "lib/**/*.ts"],
   "exclude": [
     "node_modules",
     "build",
