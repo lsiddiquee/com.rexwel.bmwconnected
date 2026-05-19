@@ -56,7 +56,10 @@ This is a Homey smart home application for BMW and Mini vehicles. The app integr
 
 ### Generated / Do-Not-Edit Files
 
-- `app.json` — generated from `.homeycompose/` by `homey app build`
+- `app.json` — generated from `.homeycompose/` by `homey app build`. Kept in
+  git for at-a-glance review of capabilities / flows. The Homey CLI writes it
+  **without** a trailing newline; `.editorconfig` has an `[app.json]` override
+  to match, so don't "fix" the missing newline.
 - `build/`, `.homeybuild/`, `coverage/` — build artifacts
 - `drivers/{bmw,mini}/{pair,repair}/*` — copied from `shared/pair_repair/` by `prebuild`
 
