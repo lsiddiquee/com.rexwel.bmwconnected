@@ -140,6 +140,12 @@ export class ContainerManager {
   private readonly containerPurpose: string;
   private readonly telematicKeys: readonly string[];
   private readonly containerCache = new Map<string, string>();
+  /**
+   * In-flight `getOrCreateContainer` promises, keyed by identifier. Used to
+   * de-duplicate concurrent pair sessions for the same client so BMW only ever
+   * sees a single list+create round-trip per identifier. Issue #108.
+   */
+  private readonly inFlightLookups = new Map<string, Promise<string>>();
 
   /**
    * Creates a new ContainerManager instance
@@ -171,8 +177,13 @@ export class ContainerManager {
    *
    * Flow:
    * 1. Check in-memory cache
-   * 2. Create new container if not found
-   * 3. Cache container ID
+   * 2. List containers on BMW and reuse one whose name embeds the identifier
+   *    (so we don't pile up duplicate containers across pairings — issue #108)
+   * 3. Create new container only if no match found
+   * 4. Cache container ID
+   *
+   * Concurrent calls for the same identifier share the same in-flight promise
+   * so we never issue duplicate list/create round-trips.
    *
    * @param identifier - Unique identifier (VIN, client ID prefix, or custom key)
    * @returns Container ID
@@ -181,11 +192,60 @@ export class ContainerManager {
   async getOrCreateContainer(identifier: string): Promise<string> {
     this.logger?.debug('Getting or creating container', { identifier });
 
-    // Check in-memory cache first
+    // Check in-memory cache first - fast path, no de-duplication needed.
     const cachedId = this.containerCache.get(identifier);
     if (cachedId) {
       this.logger?.debug('Using cached container ID', { identifier, containerId: cachedId });
       return cachedId;
+    }
+
+    // De-duplicate concurrent calls (e.g. quick double-click during pairing).
+    const inFlight = this.inFlightLookups.get(identifier);
+    if (inFlight) {
+      this.logger?.debug('Reusing in-flight container lookup', { identifier });
+      return inFlight;
+    }
+
+    const lookup = this.resolveContainer(identifier).finally(() => {
+      this.inFlightLookups.delete(identifier);
+    });
+    this.inFlightLookups.set(identifier, lookup);
+    return lookup;
+  }
+
+  /**
+   * Resolves a container for the given identifier by:
+   * 1. Listing existing containers and matching on name (so duplicates aren't
+   *    created on each pairing attempt — issue #108).
+   * 2. Falling back to creating a fresh container with an identifier-embedded
+   *    name so the next pairing finds it via step 1.
+   *
+   * @param identifier - Unique identifier (VIN, client ID prefix, custom key)
+   * @returns Container ID
+   * @private
+   */
+  private async resolveContainer(identifier: string): Promise<string> {
+    const expectedName = this.buildContainerName(identifier);
+
+    // Try to reuse a previously-created container. We swallow listing failures
+    // here so a transient list-endpoint hiccup doesn't block pairing — we'll
+    // attempt to create instead and let that error surface if it also fails.
+    try {
+      const existing = await this.listContainers();
+      const match = existing.find((c) => c.name === expectedName);
+      if (match) {
+        this.logger?.info('Reusing existing container', {
+          identifier,
+          containerId: match.containerId,
+        });
+        this.containerCache.set(identifier, match.containerId);
+        return match.containerId;
+      }
+    } catch (error) {
+      this.logger?.warn('Container list lookup failed - falling back to create', {
+        identifier,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     // Create new container
@@ -200,6 +260,15 @@ export class ContainerManager {
   }
 
   /**
+   * Builds the BMW-visible container name for an identifier, embedding the
+   * identifier so the container is discoverable via listContainers() on
+   * subsequent pair attempts.
+   */
+  private buildContainerName(identifier: string): string {
+    return `${this.containerName} (${identifier})`;
+  }
+
+  /**
    * Creates a new container via BMW CarData API
    *
    * @param identifier - Unique identifier (for logging/tracking only)
@@ -211,7 +280,7 @@ export class ContainerManager {
     const accessToken = await this.getAccessToken();
 
     const request: ApiContainerRequest = {
-      name: this.containerName,
+      name: this.buildContainerName(identifier),
       purpose: this.containerPurpose,
       technicalDescriptors: [...this.telematicKeys],
     };

@@ -27,15 +27,6 @@ import { RetryConfig } from '../types/common';
 import { RateLimiter } from './RateLimiter';
 import { ILogger } from '../types';
 
-// TODO: Remove when Node.js 16 support is dropped (Homey Pro 2016-2019 EOL)
-// Polyfill fetch for Node.js < 18 (Homey Pro 2016-2019, Homey Bridge)
-// Node.js 18+ (Homey Pro 2023) has native fetch
-/* eslint-disable @typescript-eslint/no-require-imports */
-if (typeof fetch === 'undefined') {
-  require('cross-fetch/polyfill');
-}
-/* eslint-enable @typescript-eslint/no-require-imports */
-
 export type RequestInterceptor = (request: HttpRequest) => HttpRequest | Promise<HttpRequest>;
 export type ResponseInterceptor = <T>(
   response: HttpResponse<T>
@@ -235,10 +226,17 @@ export class HttpClient implements IHttpClient {
       ? request.url
       : `${this.options.baseUrl}${request.url}`;
 
+    // Generate a client-side correlation ID for this request so user-submitted
+    // logs can be matched across the HTTP layer and the error surfaced to the
+    // UI, even when the upstream gateway omits its own correlation header.
+    // Issue #108.
+    const clientCorrelationId = this.generateCorrelationId();
+
     // Merge headers
     const headers: HttpHeaders = {
       ...this.options.defaultHeaders,
       ...request.headers,
+      'x-correlation-id': clientCorrelationId,
     };
 
     // Add Content-Type for requests with body
@@ -249,7 +247,7 @@ export class HttpClient implements IHttpClient {
     // Build fetch options
     const fetchOptions: RequestInit = {
       method: request.method,
-      headers: headers as HeadersInit,
+      headers,
     };
 
     // Add body for POST/PUT/PATCH
@@ -308,15 +306,19 @@ export class HttpClient implements IHttpClient {
         const responseHeaders = this.parseHeaders(response.headers);
         // Log full diagnostic detail (headers + raw body) so user-submitted logs
         // contain enough information to escalate to BMW support. Issue #108.
-        this.logger?.error('HTTP request failed', {
+        // The diagnostics MUST be passed as the 3rd `context` argument - the
+        // Logger only extracts `.message`/`.stack` from the 2nd Error arg, so
+        // earlier versions of this call site (v1.0.17) silently dropped them.
+        this.logger?.error('HTTP request failed', undefined, {
           method: request.method,
           url,
           status: response.status,
           statusText: response.statusText,
           headers: responseHeaders,
           body: rawBody,
-        } as unknown as Error);
-        throw this.mapHttpError(response.status, data, url, responseHeaders);
+          clientCorrelationId,
+        });
+        throw this.mapHttpError(response.status, data, url, responseHeaders, clientCorrelationId);
       }
 
       // Build response object
@@ -357,7 +359,8 @@ export class HttpClient implements IHttpClient {
     status: number,
     data: unknown,
     url: string,
-    headers?: HttpHeaders
+    headers?: HttpHeaders,
+    clientCorrelationId?: string
   ): VehicleClientError {
     const rawMessage = this.extractErrorMessage(data);
     // Preserve BMW-specific error codes (e.g. CU-105) from the response body so
@@ -366,14 +369,20 @@ export class HttpClient implements IHttpClient {
     // BMW responses include a correlation/request ID header that's required for
     // their support team to investigate. Surface it in the message when the body
     // gives us nothing actionable. Issue #108.
-    const correlationId = this.extractCorrelationId(headers);
-    const correlationSuffix = correlationId ? ` (correlation: ${correlationId})` : '';
-    // For the container 403 case (issue #108), append a concrete next-step hint:
-    // by far the most common cause is the user's BMW CarData client missing the
-    // "Streaming API" scope, which produces a 403 with an empty body.
+    const serverCorrelationId = this.extractCorrelationId(headers);
+    // Always include *some* correlation ID in the surfaced error: prefer the
+    // upstream one when present, otherwise the client-generated ID we put on
+    // the request. This lets users grep the same identifier from the surfaced
+    // Homey error back into the diagnostic log entry. Issue #108.
+    const correlationToken = serverCorrelationId ?? clientCorrelationId;
+    const correlationSuffix = correlationToken ? ` (correlation: ${correlationToken})` : '';
+    // For the container 403 case (issue #108), append a next-step hint. The
+    // most common cause is the BMW CarData client missing the "Streaming API"
+    // scope, but silvinnio's report shows the toggle can already be enabled
+    // and a 403 still occurs — so the wording must not presume fault.
     const containerHint =
       status === 403 && url.includes('/customers/containers')
-        ? " - check that the BMW CarData client has the 'Streaming API' option enabled"
+        ? " - verify the 'Streaming API' option is enabled on your BMW CarData client; if it's already enabled, share the correlation ID above with BMW support"
         : '';
     const message = `${rawMessage}${correlationSuffix}${containerHint}`;
 
@@ -394,6 +403,19 @@ export class HttpClient implements IHttpClient {
       default:
         return new ApiError(`HTTP error ${status}: ${message}`, status, bmwCode ?? 'HTTP_ERROR');
     }
+  }
+
+  /**
+   * Generate a client-side correlation ID for outbound requests. Format is a
+   * short, log-friendly random token (not a full UUID) so it's easy to copy
+   * from Homey error toasts and grep in the diagnostic logs. Issue #108.
+   */
+  private generateCorrelationId(): string {
+    // 12 hex chars + 4-char timestamp suffix is plenty to disambiguate within
+    // a single user's session while staying readable.
+    const rand = Math.random().toString(16).slice(2, 14).padEnd(12, '0');
+    const ts = (Date.now() & 0xffff).toString(16).padStart(4, '0');
+    return `cli-${rand}-${ts}`;
   }
 
   /**

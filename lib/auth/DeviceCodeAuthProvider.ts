@@ -12,15 +12,6 @@ import { ILogger } from '../types/ILogger';
 import { ITokenStore } from '../types/ITokenStore';
 import { AuthenticationError, RateLimitError, NetworkError, TimeoutError } from '../types/errors';
 
-// TODO: Remove when Node.js 16 support is dropped (Homey Pro 2016-2019 EOL)
-// Polyfill fetch for Node.js < 18 (Homey Pro 2016-2019, Homey Bridge)
-// Node.js 18+ (Homey Pro 2023) has native fetch
-/* eslint-disable @typescript-eslint/no-require-imports */
-if (typeof fetch === 'undefined') {
-  require('cross-fetch/polyfill');
-}
-/* eslint-enable @typescript-eslint/no-require-imports */
-
 /**
  * Configuration options for DeviceCodeAuthProvider
  */

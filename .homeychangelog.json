@@ -124,5 +124,8 @@
   },
   "1.0.17": {
     "en": "Pairing errors now show the real reason instead of \"Unknown error\" — including a hint to enable the \"Streaming API\" option on your BMW client when that's the cause"
+  },
+  "1.0.18": {
+    "en": "Re-pairing your car now reuses its existing BMW connection instead of creating a new one each time, and an interrupted pairing no longer leaves behind a car with no data. When something goes wrong, the error message now explains what actually happened instead of showing a generic failure."
   }
 }

@@ -756,4 +756,112 @@ describe('HttpClient - Comprehensive Tests', () => {
       // Should not throw and complete successfully without logger
     });
   });
+
+  // Regression: issue #108 (v1.0.17 -> v1.0.18).
+  // The diagnostic detail (method/url/status/headers/body) was being passed as
+  // the *Error* argument to Logger.error, which only extracts `.message`/`.stack`.
+  // The user-submitted logs therefore showed bare `[ERROR] HTTP request failed {}`.
+  // The fix moves the diagnostics to the 3rd `context` argument so they survive
+  // serialization.
+  describe('Diagnostic logging (issue #108)', () => {
+    beforeEach(() => {
+      httpClient = new HttpClient(clientOptions);
+    });
+
+    it('should_passDiagnosticsAsContextArg_when_requestFails', async () => {
+      // Arrange
+      mockFetch.mockResolvedValue(
+        createMockResponse({ message: 'Forbidden' }, 403, { 'x-correlation-id': 'srv-corr-1' })
+      );
+
+      // Act
+      await httpClient.get('/customers/containers').catch(() => undefined);
+
+      // Assert - third argument must contain the full diagnostic envelope
+      expect(mockLogger.error).toHaveBeenCalled();
+      const call = mockLogger.error.mock.calls.find((args) => args[0] === 'HTTP request failed') as
+        | unknown[]
+        | undefined;
+      expect(call).toBeDefined();
+      const context = call![2] as Record<string, unknown>;
+      expect(context).toMatchObject({
+        method: 'GET',
+        status: 403,
+        statusText: expect.any(String),
+      });
+      expect(String(context.url)).toContain('/customers/containers');
+      expect(context.headers).toBeDefined();
+      // The second (Error) arg must be undefined - we don't have a real Error here.
+      expect(call![1]).toBeUndefined();
+    });
+  });
+
+  // Issue #108 follow-up: include a client-generated correlation ID on every
+  // request so user-submitted logs can be matched across the HTTP layer and the
+  // BMW gateway even when BMW omits its own correlation header.
+  describe('Client correlation ID (issue #108)', () => {
+    beforeEach(() => {
+      httpClient = new HttpClient(clientOptions);
+    });
+
+    it('should_sendClientCorrelationIdHeader_when_makingRequest', async () => {
+      // Arrange
+      mockFetch.mockResolvedValue(createMockResponse({ ok: true }));
+
+      // Act
+      await httpClient.get('/test');
+
+      // Assert
+      const [, init] = mockFetch.mock.calls[0] as [string, RequestInit];
+      const headers = init.headers as Record<string, string>;
+      const correlationHeader =
+        headers['x-correlation-id'] ?? headers['X-Correlation-Id'] ?? headers['X-Correlation-ID'];
+      expect(correlationHeader).toBeDefined();
+      expect(typeof correlationHeader).toBe('string');
+      expect(correlationHeader.length).toBeGreaterThan(0);
+    });
+
+    it('should_includeClientCorrelationIdInError_when_serverOmitsHeader', async () => {
+      // Arrange - server response WITHOUT x-correlation-id header
+      mockFetch.mockResolvedValue(createMockResponse({ message: 'Bad request' }, 400));
+
+      // Act
+      const error = (await httpClient.get('/test').catch((e: unknown) => e)) as Error;
+
+      // Assert - error message must surface a correlation marker so the user
+      // can correlate the log entry with the surfaced UI/Homey error.
+      expect(error.message.toLowerCase()).toContain('correlation');
+    });
+  });
+
+  // Issue #108: silvinnio reported the existing 403-container hint ("check
+  // that the Streaming API option is enabled") was misleading because their
+  // BMW client already had both API toggles enabled. v1.0.18 softens the
+  // phrasing so it acknowledges the option might already be on and points
+  // the user at the correlation ID for support escalation instead of stating
+  // the toggle is definitely missing.
+  describe('Container 403 hint phrasing (issue #108)', () => {
+    beforeEach(() => {
+      httpClient = new HttpClient(clientOptions);
+    });
+
+    it('should_useNonAccusatoryStreamingHint_when_403OnContainersEndpoint', async () => {
+      // Arrange
+      mockFetch.mockResolvedValue(createMockResponse({ message: 'Forbidden' }, 403));
+
+      // Act
+      const error = (await httpClient
+        .get('/customers/containers')
+        .catch((e: unknown) => e)) as Error;
+
+      // Assert - message must still mention the Streaming API option (it IS
+      // the most common cause) but with softer phrasing that allows for the
+      // toggle already being enabled, and must reference the correlation ID.
+      expect(error.message).toContain('Streaming API');
+      // Old wording asserted the option was missing ("check that ... is enabled").
+      // New wording must use a verb like 'verify' that doesn't presume fault.
+      expect(error.message.toLowerCase()).toMatch(/verify|confirm/);
+      expect(error.message.toLowerCase()).toContain('correlation');
+    });
+  });
 });

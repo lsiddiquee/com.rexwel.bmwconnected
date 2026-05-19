@@ -118,6 +118,15 @@ export abstract class ConnectedDriver extends Driver {
         throw new Error('Authentication not completed - please authenticate first');
       }
 
+      // Issue #108 (aagehellem): rapid double-click on "Get Code" could land
+      // the user on list_devices before container creation had finished, which
+      // persisted a half-formed device with `containerId: undefined`. Refuse
+      // to enumerate vehicles until the container step has completed so the
+      // user is forced to retry rather than ending up with a broken device.
+      if (!this.currentContainerId) {
+        throw new Error('Container setup is not yet complete - please cancel and retry pairing');
+      }
+
       const api = this.getCarDataClient();
 
       // Note: Container management now happens in pollForAuthorizationAsync

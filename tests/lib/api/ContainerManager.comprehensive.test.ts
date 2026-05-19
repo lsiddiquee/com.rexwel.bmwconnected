@@ -158,10 +158,12 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
 
       // Assert
       expect(containerId).toBe('container_123');
+      // Name embeds the identifier (issue #108) so subsequent pairings can
+      // discover and reuse this container via listContainers().
       expect(mockHttpClient.post).toHaveBeenCalledWith(
         'https://api-cardata.bmwgroup.com/customers/containers',
         {
-          name: 'Test Container',
+          name: 'Test Container (VIN123)',
           purpose: 'Testing telematic data',
           technicalDescriptors: [
             'vehicle.fuel_level',
@@ -211,7 +213,7 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       expect(mockHttpClient.post).toHaveBeenCalledWith(
         'https://api-cardata.bmwgroup.com/customers/containers',
         expect.objectContaining({
-          name: 'Test Container',
+          name: 'Test Container (VIN456)',
           purpose: 'Testing telematic data',
         }),
         expect.any(Object)
@@ -283,6 +285,121 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       await expect(containerManager.getOrCreateContainer('VIN_ERROR')).rejects.toThrow(
         'API failure'
       );
+    });
+  });
+
+  describe('Container Reuse via List Lookup (issue #108)', () => {
+    // Bug: Every pairing attempt called POST /customers/containers, producing
+    // duplicate containers on BMW's side and never reusing the one we'd already
+    // created for that client. v1.0.18 must list first, match by stable name,
+    // and only POST when no match exists.
+    beforeEach(() => {
+      containerManager = new ContainerManager(managerOptions);
+      mockGetAccessToken.mockResolvedValue('valid_access_token');
+    });
+
+    it('should_includeIdentifier_when_creatingContainerName', async () => {
+      // Arrange - no existing containers, no cache
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([]));
+      mockHttpClient.post.mockResolvedValue(
+        createHttpResponse({ containerId: 'new_container_xyz' })
+      );
+
+      // Act
+      await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert - POSTed request body must embed the identifier in the name so
+      // we can find it again on the next pairing.
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+      const [, body] = mockHttpClient.post.mock.calls[0] as [string, { name: string }, unknown];
+      expect(body.name).toContain('HOMEY-6f3c3e2a');
+    });
+
+    it('should_reuseExistingContainer_when_listContainsMatchingName', async () => {
+      // Arrange - BMW already has a Homey container for this client
+      const existing = {
+        containerId: 'existing_container_abc',
+        name: 'Test Container (HOMEY-6f3c3e2a)',
+        purpose: 'Testing telematic data',
+        technicalDescriptors: managerOptions.telematicKeys as string[],
+      };
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([existing]));
+
+      // Act
+      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert
+      expect(containerId).toBe('existing_container_abc');
+      // Must NOT POST a duplicate container.
+      expect(mockHttpClient.post).not.toHaveBeenCalled();
+      // Must cache the reused container so subsequent calls skip the list too.
+      expect(containerManager.getCachedContainerId('HOMEY-6f3c3e2a')).toBe(
+        'existing_container_abc'
+      );
+    });
+
+    it('should_createNewContainer_when_listHasNoMatchingName', async () => {
+      // Arrange - BMW has containers, but none match our identifier
+      const otherContainer = {
+        containerId: 'someone_elses_container',
+        name: 'Test Container (HOMEY-aaaaaaaa)',
+        purpose: 'Testing telematic data',
+        technicalDescriptors: ['vehicle.fuel_level'],
+      };
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([otherContainer]));
+      mockHttpClient.post.mockResolvedValue(
+        createHttpResponse({ containerId: 'freshly_created_container' })
+      );
+
+      // Act
+      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert
+      expect(containerId).toBe('freshly_created_container');
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_createContainer_when_listEndpointFails', async () => {
+      // Arrange - listing failed (e.g. transient API hiccup); we should still
+      // be able to fall through to creation rather than block pairing entirely.
+      mockHttpClient.get.mockRejectedValue(new Error('Network glitch'));
+      mockHttpClient.post.mockResolvedValue(
+        createHttpResponse({ containerId: 'created_despite_list_failure' })
+      );
+
+      // Act
+      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert
+      expect(containerId).toBe('created_despite_list_failure');
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_listOnlyOnce_when_calledConcurrentlyForSameIdentifier', async () => {
+      // Arrange - two pair sessions for the same client race against each other.
+      // They must share a single in-flight lookup+create promise so BMW sees
+      // at most one POST per client per app lifetime.
+      let resolveList: (value: HttpResponse<unknown>) => void = () => {};
+      mockHttpClient.get.mockReturnValue(
+        new Promise((resolve) => {
+          resolveList = resolve as (value: HttpResponse<unknown>) => void;
+        })
+      );
+      mockHttpClient.post.mockResolvedValue(
+        createHttpResponse({ containerId: 'race_winner_container' })
+      );
+
+      // Act - kick off two concurrent calls
+      const p1 = containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+      const p2 = containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+      resolveList(createHttpResponse([]));
+      const [id1, id2] = await Promise.all([p1, p2]);
+
+      // Assert
+      expect(id1).toBe('race_winner_container');
+      expect(id2).toBe('race_winner_container');
+      expect(mockHttpClient.get).toHaveBeenCalledTimes(1);
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
     });
   });
 

@@ -499,6 +499,27 @@ describe('ConnectedDriver - Comprehensive', () => {
       // Assert - only the BMW remains
       expect(devices.map((d) => d.data.id)).toEqual(['VINBMW']);
     });
+
+    // Regression: issue #108 (aagehellem) - rapid double-click on "Get Code"
+    // could land the user on list_devices while `currentContainerId` was still
+    // undefined (container creation hadn't finished yet). The resulting device
+    // was persisted with `containerId: undefined` and produced no data. v1.0.18
+    // must refuse to persist such half-formed devices.
+    it('should_throwClearError_when_listDevicesRunsWithoutContainerId', async () => {
+      // Arrange - simulate the race: client_id present but container creation
+      // hasn't completed (currentContainerId still undefined)
+      driver.setCurrentContainerIdForTest(undefined);
+
+      // Act
+      await driver.onPair(mockSession as unknown as any);
+      const listHandler = mockSession.setHandler.mock.calls.find(
+        (call) => call[0] === 'list_devices'
+      )?.[1];
+
+      // Assert - must reject with a user-actionable message, NOT silently return
+      // a device with containerId: undefined.
+      await expect((listHandler as () => Promise<unknown>)()).rejects.toThrow(/container/i);
+    });
   });
 
   describe('Post-auth failure handling', () => {
