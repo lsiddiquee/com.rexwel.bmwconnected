@@ -363,8 +363,9 @@ export class HttpClient implements IHttpClient {
     clientCorrelationId?: string
   ): VehicleClientError {
     const rawMessage = this.extractErrorMessage(data);
-    // Preserve BMW-specific error codes (e.g. CU-105) from the response body so
-    // downstream handlers (CarDataClient container errors) can react. Issue #108.
+    // Preserve BMW-specific error codes (e.g. CU-105, CU-429) from the response
+    // body so downstream handlers (CarDataClient container errors, rate-limit
+    // classification below) can react. Issue #108.
     const bmwCode = this.extractErrorCode(data);
     // BMW responses include a correlation/request ID header that's required for
     // their support team to investigate. Surface it in the message when the body
@@ -376,10 +377,28 @@ export class HttpClient implements IHttpClient {
     // Homey error back into the diagnostic log entry. Issue #108.
     const correlationToken = serverCorrelationId ?? clientCorrelationId;
     const correlationSuffix = correlationToken ? ` (correlation: ${correlationToken})` : '';
+
+    // BMW maps the daily 50-request quota to HTTP 403 with `exveErrorCode`
+    // "CU-429" — NOT to HTTP 429. Detect this *before* falling through to the
+    // generic 403/Streaming-API branch so users get an actionable message
+    // instead of being sent to check a permission toggle. Issue #108.
+    if (bmwCode === 'CU-429' || status === 429) {
+      const retryAfter = this.extractRetryAfter(data, headers);
+      const detail = rawMessage && rawMessage !== 'Unknown error' ? `: ${rawMessage}` : '';
+      return new RateLimitError(
+        `BMW CarData daily rate limit reached (50 requests / 24h per user)${detail}. ` +
+          `Wait for the rolling 24-hour window to free up before retrying. Each pairing ` +
+          `attempt and background poll counts toward the limit.${correlationSuffix}`,
+        retryAfter,
+        { bmwCode, httpStatus: status, url }
+      );
+    }
+
     // For the container 403 case (issue #108), append a next-step hint. The
     // most common cause is the BMW CarData client missing the "Streaming API"
     // scope, but silvinnio's report shows the toggle can already be enabled
-    // and a 403 still occurs — so the wording must not presume fault.
+    // and a 403 still occurs — so the wording must not presume fault. Skip
+    // the hint entirely when we already know it's a CU-429 (handled above).
     const containerHint =
       status === 403 && url.includes('/customers/containers')
         ? " - verify the 'Streaming API' option is enabled on your BMW CarData client; if it's already enabled, share the correlation ID above with BMW support"
@@ -391,10 +410,6 @@ export class HttpClient implements IHttpClient {
         return new ApiError(`Authentication failed: ${message}`, status, bmwCode ?? 'AUTH_ERROR');
       case 404:
         return new ApiError(`Resource not found: ${url}`, status, bmwCode ?? 'NOT_FOUND');
-      case 429: {
-        const retryAfter = this.extractRetryAfter(data);
-        return new RateLimitError(`Rate limit exceeded: ${message}`, retryAfter);
-      }
       case 500:
       case 502:
       case 503:
@@ -443,15 +458,24 @@ export class HttpClient implements IHttpClient {
 
     if (data && typeof data === 'object') {
       const obj = data as Record<string, unknown>;
-      // BMW CarData returns `{ code, message }` (issue #108). Fall through several
-      // common shapes so we never lose the server-provided detail.
+      // BMW CarData returns `{ code, message }` for application errors and
+      // `{ exveErrorCode, exveErrorMsg }` for gateway errors (issue #108).
+      // Gateway values are sometimes doubly-string-encoded (e.g. `'"CU-429"'`),
+      // so strip wrapping quotes when present. Fall through several common
+      // shapes so we never lose the server-provided detail.
       const candidate =
         obj.message ??
         obj.error_description ??
         obj.detail ??
         obj.title ??
         (typeof obj.error === 'string' ? obj.error : undefined) ??
-        (typeof obj.code === 'string' ? obj.code : undefined);
+        (typeof obj.exveErrorMsg === 'string'
+          ? this.stripWrappingQuotes(obj.exveErrorMsg)
+          : undefined) ??
+        (typeof obj.code === 'string' ? obj.code : undefined) ??
+        (typeof obj.exveErrorCode === 'string'
+          ? this.stripWrappingQuotes(obj.exveErrorCode)
+          : undefined);
       if (typeof candidate === 'string' && candidate.length > 0) {
         return candidate;
       }
@@ -462,6 +486,8 @@ export class HttpClient implements IHttpClient {
 
   /**
    * Extract a BMW-specific error code from the response body, when present.
+   * Handles both the application-level `code` field and the gateway's
+   * `exveErrorCode` field (which is sometimes wrapped in literal quotes).
    * Returns undefined for unstructured bodies so callers can fall back to
    * their own default codes. Issue #108.
    */
@@ -471,14 +497,33 @@ export class HttpClient implements IHttpClient {
       if (typeof obj.code === 'string' && obj.code.length > 0) {
         return obj.code;
       }
+      if (typeof obj.exveErrorCode === 'string' && obj.exveErrorCode.length > 0) {
+        const stripped = this.stripWrappingQuotes(obj.exveErrorCode);
+        if (stripped.length > 0) {
+          return stripped;
+        }
+      }
     }
     return undefined;
   }
 
   /**
-   * Extract retry-after value from response data or headers
+   * Strip a single pair of wrapping ASCII double-quotes from a string. BMW's
+   * API gateway double-encodes some string values (`'"CU-429"'`) which would
+   * otherwise leak literal quote characters into surfaced messages. Issue #108.
    */
-  private extractRetryAfter(data: unknown): number {
+  private stripWrappingQuotes(value: string): string {
+    if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+      return value.slice(1, -1);
+    }
+    return value;
+  }
+
+  /**
+   * Extract retry-after value from response data or headers. Falls back to
+   * a long default for BMW's daily quota so callers don't retry aggressively.
+   */
+  private extractRetryAfter(data: unknown, headers?: HttpHeaders): number {
     if (data && typeof data === 'object') {
       const obj = data as Record<string, unknown>;
       if (typeof obj.retry_after === 'number') {
@@ -486,6 +531,16 @@ export class HttpClient implements IHttpClient {
       }
       if (typeof obj.retryAfter === 'number') {
         return obj.retryAfter;
+      }
+    }
+    if (headers) {
+      for (const [key, value] of Object.entries(headers)) {
+        if (key.toLowerCase() === 'retry-after' && typeof value === 'string') {
+          const parsed = parseInt(value, 10);
+          if (Number.isFinite(parsed) && parsed > 0) {
+            return parsed;
+          }
+        }
       }
     }
 

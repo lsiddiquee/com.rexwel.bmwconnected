@@ -129,6 +129,6 @@
     "en": "Re-pairing your car now reuses its existing BMW connection instead of creating a new one each time, and an interrupted pairing no longer leaves behind a car with no data. When something goes wrong, the error message now explains what actually happened instead of showing a generic failure."
   },
   "1.0.19": {
-    "en": "The 'How to get a Client ID' link in the pairing screen now points to the MyBMW vehicle overview (the previous URL had moved and showed a 404)."
+    "en": "The 'How to get a Client ID' link in the pairing screen now points to the MyBMW vehicle overview (the previous URL had moved and showed a 404). When BMW blocks a request because the daily limit of 50 requests per 24 hours has been reached, the app now clearly says so and asks you to wait, instead of incorrectly suggesting that the Streaming API option might be turned off."
   }
 }

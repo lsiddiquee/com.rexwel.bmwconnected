@@ -591,7 +591,9 @@ describe('HttpClient - Comprehensive Tests', () => {
 
       // Act & Assert
       await expect(httpClient.get('/test')).rejects.toThrow(RateLimitError);
-      await expect(httpClient.get('/test')).rejects.toThrow('Rate limit exceeded');
+      // Issue #108: message wording updated to reference BMW's daily quota,
+      // since this client only talks to BMW CarData.
+      await expect(httpClient.get('/test')).rejects.toThrow(/rate limit/i);
     });
 
     it('should_throwApiError_when_5xxResponse', async () => {
@@ -862,6 +864,86 @@ describe('HttpClient - Comprehensive Tests', () => {
       // New wording must use a verb like 'verify' that doesn't presume fault.
       expect(error.message.toLowerCase()).toMatch(/verify|confirm/);
       expect(error.message.toLowerCase()).toContain('correlation');
+    });
+  });
+
+  // Issue #108 (v1.0.18 follow-up): BMW maps the daily 50-request quota to
+  // HTTP 403 with body `{ exveErrorCode: '"CU-429"', exveErrorMsg: '"API rate
+  // limit reached."' }` (values are doubly-string-encoded by the gateway).
+  // Previously this surfaced as a generic 403 with the "verify Streaming API"
+  // hint, which sent users chasing a non-existent permission problem when the
+  // real cause was that their rolling 24h window was exhausted.
+  describe('BMW rate-limit detection (issue #108)', () => {
+    beforeEach(() => {
+      httpClient = new HttpClient(clientOptions);
+    });
+
+    it('should_returnRateLimitError_when_403WithExveErrorCodeCU429', async () => {
+      // Arrange - BMW gateway shape with doubly-quoted string values
+      mockFetch.mockResolvedValue(
+        createMockResponse(
+          {
+            AccessDeniedException: 'User is not authorized to access this resource',
+            'x-amzn-errortype': 'AccessDeniedException',
+            exveErrorCode: '"CU-429"',
+            exveErrorMsg: '"API rate limit reached."',
+          },
+          403
+        )
+      );
+
+      // Act
+      const error = await httpClient.get('/customers/containers').catch((e: unknown) => e);
+
+      // Assert - must be classified as RateLimitError, not a generic ApiError.
+      // The BMW code is stashed in context (the public `code` field on
+      // RateLimitError is the taxonomy code 'RATE_LIMIT_EXCEEDED').
+      expect(error).toBeInstanceOf(RateLimitError);
+      expect((error as RateLimitError).context).toMatchObject({ bmwCode: 'CU-429' });
+    });
+
+    it('should_notIncludeStreamingApiHint_when_403IsActuallyCu429RateLimit', async () => {
+      // Arrange - same CU-429 shape on the container endpoint
+      mockFetch.mockResolvedValue(
+        createMockResponse(
+          {
+            exveErrorCode: '"CU-429"',
+            exveErrorMsg: '"API rate limit reached."',
+          },
+          403
+        )
+      );
+
+      // Act
+      const error = (await httpClient
+        .get('/customers/containers')
+        .catch((e: unknown) => e)) as Error;
+
+      // Assert - must NOT chase the user toward the Streaming API toggle.
+      // Must reference the daily 50-request limit so the user knows to wait.
+      expect(error.message).not.toContain('Streaming API');
+      expect(error.message).toMatch(/rate limit|50 requests|24h|24 hours/i);
+    });
+
+    it('should_extractExveErrorMessage_when_bodyUsesBmwGatewayShape', async () => {
+      // Arrange - quote-stripping must work so the surfaced message reads
+      // "API rate limit reached." not '"API rate limit reached."'.
+      mockFetch.mockResolvedValue(
+        createMockResponse(
+          {
+            exveErrorCode: '"CU-429"',
+            exveErrorMsg: '"API rate limit reached."',
+          },
+          403
+        )
+      );
+
+      // Act
+      const error = (await httpClient.get('/test').catch((e: unknown) => e)) as Error;
+
+      // Assert - message includes the BMW phrasing without the wrapping quotes
+      expect(error.message).toContain('API rate limit reached.');
+      expect(error.message).not.toContain('""');
     });
   });
 });
