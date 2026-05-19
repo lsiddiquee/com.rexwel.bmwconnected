@@ -50,7 +50,7 @@
       "continue": "Continue",
       "how_to_get": {
         "title": "How to get a Client ID",
-        "step1": "Go to the BMW Developer Portal (https://customer.bmwgroup.com/cardata)",
+        "step1": "Go to the MyBMW vehicle overview (https://www.bmw.co.uk/en-gb/mybmw/vehicle-overview)",
         "step2": "Create an account or log in with your existing BMW credentials",
         "step3": "Register a new application - choose 'Car Data API'",
         "step4": "Copy your Client ID from the application details"
