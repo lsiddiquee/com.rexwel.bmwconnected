@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { ContainerManager, type ContainerManagerOptions } from '../../../lib/api/ContainerManager';
 import type { IHttpClient, HttpResponse } from '../../../lib/http/IHttpClient';
 import type { ILogger } from '../../../lib/types/ILogger';
-import { ApiError } from '../../../lib/types/errors';
+import { ApiError, RateLimitError } from '../../../lib/types/errors';
 
 describe('ContainerManager - Simplified Architecture Tests', () => {
   let containerManager: ContainerManager;
@@ -373,6 +373,33 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       // Assert
       expect(containerId).toBe('created_despite_list_failure');
       expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+    });
+
+    // Issue #108: when BMW returns CU-429 from the list-containers endpoint,
+    // the user has already exhausted their 50-request/24h quota. Falling
+    // through to createContainer() burns ANOTHER quota request and guarantees
+    // a second CU-429. We must short-circuit so pairing fails fast with the
+    // accurate rate-limit message and the user's remaining quota is preserved.
+    it('should_propagateRateLimitError_when_listContainersHitsCu429', async () => {
+      // Arrange - listing returns RateLimitError (BMW's CU-429)
+      mockHttpClient.get.mockRejectedValue(
+        new RateLimitError(
+          'BMW CarData daily rate limit reached (50 requests / 24h per user)',
+          3600
+        )
+      );
+      mockHttpClient.post.mockResolvedValue(
+        createHttpResponse({ containerId: 'should_not_be_created' })
+      );
+
+      // Act
+      const error = await containerManager
+        .getOrCreateContainer('HOMEY-6f3c3e2a')
+        .catch((e: unknown) => e);
+
+      // Assert - rate-limit propagated unchanged; create never attempted
+      expect(error).toBeInstanceOf(RateLimitError);
+      expect(mockHttpClient.post).not.toHaveBeenCalled();
     });
 
     it('should_listOnlyOnce_when_calledConcurrentlyForSameIdentifier', async () => {

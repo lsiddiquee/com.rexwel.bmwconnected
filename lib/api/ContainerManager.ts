@@ -9,7 +9,7 @@
 
 import type { IHttpClient } from '../http/IHttpClient';
 import type { ILogger } from '../types/ILogger';
-import { ApiError } from '../types/errors';
+import { ApiError, RateLimitError } from '../types/errors';
 import { ESSENTIAL_KEYS } from '../types/TelematicKeys';
 
 /**
@@ -242,6 +242,18 @@ export class ContainerManager {
         return match.containerId;
       }
     } catch (error) {
+      // Issue #108: when BMW returns CU-429 (daily rate limit), falling back
+      // to createContainer() burns another request from an already-exhausted
+      // quota and guarantees a second failure. Propagate the rate-limit error
+      // so pairing fails fast with the accurate message and preserves what's
+      // left of the user's 50/24h quota.
+      if (error instanceof RateLimitError) {
+        this.logger?.warn('Container list lookup hit BMW rate limit - not falling back to create', {
+          identifier,
+          error: error.message,
+        });
+        throw error;
+      }
       this.logger?.warn('Container list lookup failed - falling back to create', {
         identifier,
         error: error instanceof Error ? error.message : String(error),
