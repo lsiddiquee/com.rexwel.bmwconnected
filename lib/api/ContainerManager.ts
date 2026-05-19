@@ -242,22 +242,25 @@ export class ContainerManager {
         containers: existing.map((c) => ({ containerId: c.containerId, name: c.name })),
       });
       const match = existing.find((c) => c.name === expectedName);
-      // Identify every container that looks like one of ours so we can clean
-      // up duplicates/orphans left behind by older versions (pre-1.0.18 created
-      // an unsuffixed container on every pair attempt — see issue #108).
-      const oursToDelete = existing.filter(
-        (c) => this.isOurContainer(c.name) && c.containerId !== match?.containerId
-      );
-      if (oursToDelete.length > 0) {
-        await this.cleanupOurContainers(oursToDelete);
-      }
       if (match) {
+        // Reuse path: don't touch orphans. Each DELETE costs 1 of the user's
+        // 50-per-24h request quota, so we only spend that quota when it's
+        // strictly necessary to free a container slot (i.e. before a create).
         this.logger?.info('Reusing existing container', {
           identifier,
           containerId: match.containerId,
         });
         this.containerCache.set(identifier, match.containerId);
         return match.containerId;
+      }
+      // No match — we're about to create. Pre-1.0.18 created an unsuffixed
+      // container on every pair attempt (issue #108), so users can hit BMW's
+      // per-user container slot quota. Delete ONE orphan to free a slot;
+      // subsequent pair attempts will progressively clean the rest. This
+      // keeps request-quota usage to "create + at most one delete" per pair.
+      const orphan = existing.find((c) => this.isOurContainer(c.name));
+      if (orphan) {
+        await this.cleanupOneOrphan(orphan);
       }
     } catch (error) {
       // Issue #108: when BMW returns CU-429 (daily rate limit), falling back
@@ -310,33 +313,26 @@ export class ContainerManager {
   }
 
   /**
-   * Best-effort deletion of orphaned/duplicate containers we created on
-   * previous pair attempts. Each delete burns 1 of the user's 50-per-24h
-   * quota, so failures are logged but never rethrown — we still want the
-   * caller to proceed with the active container.
+   * Deletes a single orphaned Homey container to free up one slot before
+   * createContainer(). RateLimitError propagates (the caller's create will
+   * also fail, so abort early); other delete failures are logged but
+   * swallowed so create still gets attempted.
    */
-  private async cleanupOurContainers(toDelete: ApiContainerResponse[]): Promise<void> {
-    this.logger?.info('Cleaning up orphan/duplicate Homey containers', {
-      count: toDelete.length,
-      containers: toDelete.map((c) => ({ containerId: c.containerId, name: c.name })),
+  private async cleanupOneOrphan(orphan: ApiContainerResponse): Promise<void> {
+    this.logger?.info('Deleting one orphan Homey container to free quota slot', {
+      containerId: orphan.containerId,
+      name: orphan.name,
     });
-    for (const container of toDelete) {
-      try {
-        await this.deleteContainer(container.containerId);
-      } catch (error) {
-        if (error instanceof RateLimitError) {
-          // Stop cleanup on rate limit — we've burned what we can; preserve
-          // remaining quota for the actual create/reuse path.
-          this.logger?.warn('Cleanup hit BMW rate limit - stopping early', {
-            remainingToDelete: toDelete.length,
-          });
-          return;
-        }
-        this.logger?.warn('Failed to delete orphan container - continuing', {
-          containerId: container.containerId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+    try {
+      await this.deleteContainer(orphan.containerId);
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        throw error;
       }
+      this.logger?.warn('Failed to delete orphan container - continuing with create', {
+        containerId: orphan.containerId,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

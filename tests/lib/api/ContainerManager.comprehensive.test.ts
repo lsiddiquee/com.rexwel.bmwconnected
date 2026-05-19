@@ -436,18 +436,22 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
   describe('Orphan Container Cleanup (issue #108 - max containers reached)', () => {
     // Bug: pre-1.0.18 created a fresh container on every pair attempt with the
     // identical literal name 'Test Container' (no identifier suffix), so users
-    // who loop-paired filled their BMW per-user container quota. 1.0.20 must
-    // proactively delete any container that looks like ours but isn't the one
-    // we're currently using — both the legacy unsuffixed shape and any stale
-    // suffixed shape from older HOMEY-XXXXXXXX identifiers.
+    // who loop-paired filled their BMW per-user container slot quota.
+    //
+    // 1.0.20 cleanup is intentionally PROGRESSIVE and CONSERVATIVE: each DELETE
+    // burns 1 of the user's 50-per-24h request quota, so we only delete when
+    // we strictly need to free a slot — i.e. when we're about to create. And
+    // we only delete ONE orphan per pair attempt; subsequent pair attempts
+    // progressively reclaim the rest.
     beforeEach(() => {
       containerManager = new ContainerManager(managerOptions);
       mockGetAccessToken.mockResolvedValue('valid_access_token');
     });
 
-    it('should_deleteLegacyUnsuffixedContainers_when_listingForReuse', async () => {
-      // Arrange - one match for current identifier + two pre-1.0.18 orphans
-      // with the bare containerName (no suffix).
+    it('should_notDeleteAnyOrphans_when_matchExistsForReuse', async () => {
+      // Arrange - reuse path: match found, several orphans present. Deleting
+      // them would burn quota for no functional gain (we already have our
+      // container), so cleanup must be skipped entirely.
       const match = {
         containerId: 'current_container',
         name: 'Test Container (HOMEY-6f3c3e2a)',
@@ -467,56 +471,19 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
         technicalDescriptors: [],
       };
       mockHttpClient.get.mockResolvedValue(createHttpResponse([legacy1, match, legacy2]));
-      mockHttpClient.delete.mockResolvedValue(createHttpResponse(undefined));
 
       // Act
       const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
 
-      // Assert - reuse the match, delete the two legacy orphans, never create.
+      // Assert
       expect(containerId).toBe('current_container');
       expect(mockHttpClient.post).not.toHaveBeenCalled();
-      expect(mockHttpClient.delete).toHaveBeenCalledTimes(2);
-      const deletedIds = mockHttpClient.delete.mock.calls.map((args) => args[0]);
-      expect(deletedIds).toEqual(
-        expect.arrayContaining([
-          expect.stringContaining('legacy_one'),
-          expect.stringContaining('legacy_two'),
-        ])
-      );
-      expect(deletedIds.every((u) => !u.includes('current_container'))).toBe(true);
+      expect(mockHttpClient.delete).not.toHaveBeenCalled();
     });
 
-    it('should_deleteStaleSuffixedContainers_when_identifierChanged', async () => {
-      // Arrange - no match for current identifier but a stale suffixed orphan
-      // from a previous BMW CarData client ID exists.
-      const staleOrphan = {
-        containerId: 'stale_homey_container',
-        name: 'Test Container (HOMEY-deadbeef)',
-        purpose: 'p',
-        technicalDescriptors: [],
-      };
-      mockHttpClient.get.mockResolvedValue(createHttpResponse([staleOrphan]));
-      mockHttpClient.delete.mockResolvedValue(createHttpResponse(undefined));
-      mockHttpClient.post.mockResolvedValue(createHttpResponse({ containerId: 'freshly_created' }));
-
-      // Act
-      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
-
-      // Assert - orphan deleted, then new container created.
-      expect(containerId).toBe('freshly_created');
-      expect(mockHttpClient.delete).toHaveBeenCalledTimes(1);
-      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
-    });
-
-    it('should_continueCleanup_when_individualDeleteFails', async () => {
-      // Arrange - two orphans, first delete fails (e.g. 500); we must still
-      // attempt the second one and proceed to the reuse/create step.
-      const match = {
-        containerId: 'current_container',
-        name: 'Test Container (HOMEY-6f3c3e2a)',
-        purpose: 'p',
-        technicalDescriptors: [],
-      };
+    it('should_deleteExactlyOneOrphan_when_creatingNewContainer', async () => {
+      // Arrange - no match, multiple orphans. We must delete only ONE to free
+      // a slot, then create. Subsequent pair attempts will clean the rest.
       const orphan1 = {
         containerId: 'orphan_one',
         name: 'Test Container',
@@ -525,47 +492,70 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       };
       const orphan2 = {
         containerId: 'orphan_two',
+        name: 'Test Container (HOMEY-deadbeef)',
+        purpose: 'p',
+        technicalDescriptors: [],
+      };
+      const orphan3 = {
+        containerId: 'orphan_three',
         name: 'Test Container',
         purpose: 'p',
         technicalDescriptors: [],
       };
-      mockHttpClient.get.mockResolvedValue(createHttpResponse([orphan1, match, orphan2]));
-      mockHttpClient.delete
-        .mockRejectedValueOnce(new Error('500 server error'))
-        .mockResolvedValueOnce(createHttpResponse(undefined));
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([orphan1, orphan2, orphan3]));
+      mockHttpClient.delete.mockResolvedValue(createHttpResponse(undefined));
+      mockHttpClient.post.mockResolvedValue(createHttpResponse({ containerId: 'freshly_created' }));
+
+      // Act
+      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert - exactly one delete, then create.
+      expect(containerId).toBe('freshly_created');
+      expect(mockHttpClient.delete).toHaveBeenCalledTimes(1);
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_proceedWithCreate_when_orphanDeleteFailsNonRateLimit', async () => {
+      // Arrange - lone orphan; delete fails with a 500 (not rate limit). We
+      // still attempt create (BMW may have already freed the slot, or quota
+      // wasn't the problem in the first place); a real CU-429 on create will
+      // surface cleanly.
+      const orphan = {
+        containerId: 'orphan_one',
+        name: 'Test Container',
+        purpose: 'p',
+        technicalDescriptors: [],
+      };
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([orphan]));
+      mockHttpClient.delete.mockRejectedValueOnce(new Error('500 server error'));
+      mockHttpClient.post.mockResolvedValue(createHttpResponse({ containerId: 'freshly_created' }));
 
       // Act
       const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
 
       // Assert
-      expect(containerId).toBe('current_container');
-      expect(mockHttpClient.delete).toHaveBeenCalledTimes(2);
+      expect(containerId).toBe('freshly_created');
+      expect(mockHttpClient.delete).toHaveBeenCalledTimes(1);
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
     });
 
-    it('should_stopCleanup_when_deleteHitsRateLimit', async () => {
-      // Arrange - many orphans; first delete hits CU-429. Cleanup must abort
-      // immediately to preserve remaining quota, but the reuse must still
-      // succeed (we already have the listed match).
-      const match = {
-        containerId: 'current_container',
-        name: 'Test Container (HOMEY-6f3c3e2a)',
-        purpose: 'p',
-        technicalDescriptors: [],
-      };
-      const orphans = Array.from({ length: 5 }, (_, i) => ({
-        containerId: `orphan_${i}`,
+    it('should_propagateRateLimit_when_orphanDeleteHitsRateLimit', async () => {
+      // Arrange - lone orphan; delete hits CU-429. The subsequent create
+      // would also fail (same quota), so propagate the rate-limit error
+      // instead of burning another request.
+      const orphan = {
+        containerId: 'orphan_one',
         name: 'Test Container',
         purpose: 'p',
         technicalDescriptors: [],
-      }));
-      mockHttpClient.get.mockResolvedValue(createHttpResponse([...orphans, match]));
+      };
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([orphan]));
       mockHttpClient.delete.mockRejectedValueOnce(new RateLimitError('rate limited', 3600));
 
-      // Act
-      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
-
-      // Assert - first delete attempted, then bailed; reuse still wins.
-      expect(containerId).toBe('current_container');
+      // Act + Assert
+      await expect(containerManager.getOrCreateContainer('HOMEY-6f3c3e2a')).rejects.toBeInstanceOf(
+        RateLimitError
+      );
       expect(mockHttpClient.delete).toHaveBeenCalledTimes(1);
       expect(mockHttpClient.post).not.toHaveBeenCalled();
     });

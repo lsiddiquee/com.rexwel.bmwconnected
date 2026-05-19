@@ -133,5 +133,8 @@
   },
   "1.0.20": {
     "en": "If a previous failed pairing left old entries behind in your BMW CarData account, the app now cleans them up automatically the next time you pair, so 'maximum number of containers reached' errors fix themselves. Error messages no longer point you to BMW support — this is a community app and BMW cannot help with it; instead you'll be asked to open a GitHub issue and attach a copy of the log from the Homey app's log view. When pairing fails at the very last step, the sign-in is now kept so retrying doesn't ask you for the device code again."
+  },
+  "1.0.21": {
+    "en": "Cleanup of old leftover entries in your BMW CarData account is now spread across pairings — the app removes one old entry per pairing attempt instead of all at once. This keeps each pairing within BMW's daily request limit (50 requests per 24 hours), so a backlog of old entries is cleared gradually over a few pairings rather than risking the limit on a single attempt."
   }
 }
