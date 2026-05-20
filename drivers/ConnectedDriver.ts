@@ -39,6 +39,90 @@ export abstract class ConnectedDriver extends Driver {
   }
 
   /**
+   * Centralised post-authentication completion.
+   *
+   * Invariants this enforces across every code path that has a valid token
+   * (polling success, request_device_code short-circuit, client_id_entered
+   * short-circuit):
+   * - Token persistence is the auth provider's responsibility; we never
+   *   delete tokens from here. Downstream failures (container, store update,
+   *   navigation) must not invalidate the OAuth credentials.
+   * - Container or device-store failures emit `setup_error`, NEVER
+   *   `authentication_error`. Auth itself has already succeeded.
+   * - Session-closed errors (user cancelled / navigated away) are logged
+   *   and swallowed - they are not failures.
+   *
+   * Returns true on full success, false if a setup_error was emitted.
+   * Throws only for genuinely unexpected programmer errors (none expected).
+   */
+  protected async completePostAuthSuccess(
+    session: PairSession,
+    device: Device | undefined
+  ): Promise<boolean> {
+    // Step 1: container - any failure is setup_error, not auth error.
+    try {
+      await this.validateOrCreateContainer();
+    } catch (containerError) {
+      const detail =
+        containerError instanceof Error ? containerError.message : String(containerError);
+      this.homey.error('Container setup failed:', containerError);
+      await this.emitSafely(session, 'setup_error', `Container setup failed: ${detail}`);
+      return false;
+    }
+
+    // Step 2: repair flow - update device store. Failure is still a setup
+    // problem, not an auth problem; tokens remain valid for the next retry.
+    if (device) {
+      try {
+        await this.updateDeviceStore(device);
+      } catch (storeError) {
+        const detail = storeError instanceof Error ? storeError.message : String(storeError);
+        this.homey.error('Device store update failed:', storeError);
+        await this.emitSafely(session, 'setup_error', `Device setup failed: ${detail}`);
+        return false;
+      }
+    }
+
+    // Step 3: notify the frontend that auth + setup succeeded.
+    await this.emitSafely(session, 'authentication_success', {});
+
+    // Step 4: advance the wizard. Session-closed here is benign (user
+    // navigated away after seeing success); other errors are unexpected.
+    try {
+      if (device) {
+        await session.done();
+      } else {
+        await session.showView('list_devices');
+      }
+    } catch (navError) {
+      if (navError instanceof Error && navError.message.includes('Not Found: PairSession')) {
+        this.logger?.info('Session closed before navigation - user already moved on');
+      } else {
+        this.homey.error('Failed to advance pair view after success:', navError);
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Emit a session event, swallowing only the "session closed" race that
+   * happens when the user cancels mid-flow. Every other emit failure is
+   * surfaced so we don't paper over real bugs.
+   */
+  private async emitSafely(session: PairSession, event: string, payload: unknown): Promise<void> {
+    try {
+      await session.emit(event, payload);
+    } catch (emitError) {
+      if (emitError instanceof Error && emitError.message.includes('Not Found: PairSession')) {
+        this.logger?.info(`Session closed - cannot emit ${event}`);
+      } else {
+        this.homey.error(`Failed to emit ${event}:`, emitError);
+      }
+    }
+  }
+
+  /**
    * Get shared auth provider from app
    * Protected to allow test overrides
    */
@@ -220,31 +304,26 @@ export abstract class ConnectedDriver extends Driver {
           this.currentContainerId = undefined;
         }
 
-        // Check if we already have valid tokens for this client ID
+        // Check if we already have valid tokens for this client ID.
+        // Token lookup failure (no token / expired / refresh failed) means
+        // we genuinely need a fresh device code; fall through. Token success
+        // hands off to completePostAuthSuccess, which has its own scoped
+        // error handling for container / store / navigation steps and never
+        // confuses post-auth failures with auth failures.
+        let accessToken: string | undefined;
         try {
           const authProvider = this.getAuthProvider();
-          const accessToken = await authProvider.getValidAccessToken();
-          if (accessToken) {
-            this.logger?.info('Valid tokens found - skipping device code authentication');
+          accessToken = await authProvider.getValidAccessToken();
+        } catch (tokenError) {
+          this.logger?.info('No valid tokens found - proceeding with device code authentication', {
+            error: tokenError instanceof Error ? tokenError.message : String(tokenError),
+          });
+        }
 
-            // Validate/create container now since we're skipping device code flow
-            await this.validateOrCreateContainer();
-
-            await session.emit('authentication_success', {});
-
-            // Update device store if this is a repair flow
-            if (device) {
-              await this.updateDeviceStore(device);
-              await session.done();
-            } else {
-              // Skip device code view and go directly to list_devices/completion
-              await session.showView('list_devices');
-            }
-
-            return;
-          }
-        } catch {
-          this.logger?.info('No valid tokens found - proceeding with device code authentication');
+        if (accessToken) {
+          this.logger?.info('Valid tokens found - skipping device code authentication');
+          await this.completePostAuthSuccess(session, device);
+          return;
         }
 
         // No valid tokens - proceed to device code authentication
@@ -269,36 +348,13 @@ export abstract class ConnectedDriver extends Driver {
 
         // Issue #108: if we already have a valid access token (e.g. user is
         // retrying after a container setup failure), skip the device code
-        // round-trip entirely and re-run the container step. This avoids
-        // making the user re-authenticate when auth itself never failed.
+        // round-trip entirely. Token lookup is the ONLY failure that should
+        // fall through to a new device code; container / store / navigation
+        // errors must NOT cause a fresh BMW round-trip - completePostAuthSuccess
+        // handles them as setup_error and stays put.
+        let existingToken: string | undefined;
         try {
-          const existing = await authProvider.getValidAccessToken();
-          if (existing) {
-            this.logger?.info(
-              'Valid tokens already present - skipping device code flow and re-running container setup'
-            );
-            try {
-              await this.validateOrCreateContainer();
-            } catch (containerError) {
-              const detail =
-                containerError instanceof Error ? containerError.message : String(containerError);
-              this.homey.error('Container setup failed during retry:', containerError);
-              await session.emit('setup_error', `Container setup failed: ${detail}`).catch(() => {
-                // session may have closed; swallow
-              });
-              // Return a sentinel so the frontend knows not to render a device
-              // code; the error event above drives the UI to the error view.
-              return { skipCode: true };
-            }
-            if (device) {
-              await this.updateDeviceStore(device);
-              await session.done();
-            } else {
-              await session.emit('authentication_success', {});
-              await session.showView('list_devices');
-            }
-            return { skipCode: true };
-          }
+          existingToken = await authProvider.getValidAccessToken();
         } catch (tokenLookupError) {
           this.logger?.debug('No valid tokens for short-circuit - falling through to device code', {
             error:
@@ -306,6 +362,16 @@ export abstract class ConnectedDriver extends Driver {
                 ? tokenLookupError.message
                 : String(tokenLookupError),
           });
+        }
+
+        if (existingToken) {
+          this.logger?.info(
+            'Valid tokens already present - skipping device code flow and re-running container setup'
+          );
+          await this.completePostAuthSuccess(session, device);
+          // Frontend treats { skipCode: true } as "do not render a device code;
+          // backend has driven the view transition already".
+          return { skipCode: true };
         }
 
         this.currentDeviceCodeResponse = await authProvider.requestDeviceCode();
@@ -393,47 +459,16 @@ export abstract class ConnectedDriver extends Driver {
       // Token persistence: DeviceCodeAuthProvider.pollForTokens has already
       // written the tokens to the token store at this point, so even if the
       // container step below fails the user can retry pairing without going
-      // through the device-code flow again — client_id_entered will find the
-      // stored tokens via getValidAccessToken() and skip straight to the
-      // container step (issue #108).
-      try {
-        await this.validateOrCreateContainer();
-      } catch (containerError) {
-        if (this.currentDeviceCodeResponse?.deviceCode !== ownDeviceCode) {
-          // superseded mid-container-setup
-          return;
-        }
-        const detail =
-          containerError instanceof Error ? containerError.message : String(containerError);
-        this.homey.error('Container setup failed after successful auth:', containerError);
-        // Issue #108: emit `setup_error` (not `authentication_error`) so the UI
-        // shows a "Device Setup Failed" title instead of "Authorization Failed".
-        // Auth itself succeeded — tokens have been persisted by pollForTokens —
-        // so retrying via the device_code view's `request_device_code` handler
-        // will short-circuit on the stored tokens and skip straight back to the
-        // container step without making the user re-enter their device code.
-        await session
-          .emit('setup_error', `Container setup failed: ${detail}`)
-          .catch((emitError) => {
-            if (
-              emitError instanceof Error &&
-              emitError.message.includes('Not Found: PairSession')
-            ) {
-              this.logger?.info('Session closed - cannot report container error to user');
-            } else {
-              this.homey.error('Failed to emit container error:', emitError);
-            }
-          });
+      // through the device-code flow again - request_device_code and
+      // client_id_entered both short-circuit on stored tokens. Failures
+      // inside completePostAuthSuccess emit `setup_error`, NOT
+      // `authentication_error` (auth itself succeeded), and tokens are never
+      // cleared on container / store failure.
+      if (this.currentDeviceCodeResponse?.deviceCode !== ownDeviceCode) {
+        // Superseded by a newer pairing attempt between auth and container.
         return;
       }
-
-      // Update device store for repair flow
-      if (device) {
-        await this.updateDeviceStore(device);
-      }
-
-      // Notify the frontend
-      await session.emit('authentication_success', {});
+      await this.completePostAuthSuccess(session, device);
     } catch (error) {
       // Check if this was a cancellation
       if (this.pollingCancelled) {

@@ -139,5 +139,8 @@
   },
   "1.0.22": {
     "en": "When sign-in works but the next step (setting up the BMW data container) fails, the error now clearly says 'Device Setup Failed' instead of the misleading 'Authorization Failed', and explains that your sign-in is kept. Tapping Try Again now skips re-entering the BMW authorization code and goes straight back to the setup step — saving you both time and a request from BMW's daily limit."
+  },
+  "1.0.23": {
+    "en": "Fixed pairing getting stuck on 'Waiting for authorization…' even after BMW confirmed your sign-in — the app now reliably continues to the vehicle list (or finishes a repair) as soon as authorization succeeds. Errors that happen after sign-in (like setting up the BMW data container) are no longer mislabelled as authorization failures, and your sign-in is always kept, so tapping Try Again never asks you to re-authorize with BMW unnecessarily."
   }
 }
