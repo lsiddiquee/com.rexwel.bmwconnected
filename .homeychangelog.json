@@ -136,5 +136,8 @@
   },
   "1.0.21": {
     "en": "Cleanup of old leftover entries in your BMW CarData account is now spread across pairings — the app removes one old entry per pairing attempt instead of all at once. This keeps each pairing within BMW's daily request limit (50 requests per 24 hours), so a backlog of old entries is cleared gradually over a few pairings rather than risking the limit on a single attempt."
+  },
+  "1.0.22": {
+    "en": "When sign-in works but the next step (setting up the BMW data container) fails, the error now clearly says 'Device Setup Failed' instead of the misleading 'Authorization Failed', and explains that your sign-in is kept. Tapping Try Again now skips re-entering the BMW authorization code and goes straight back to the setup step — saving you both time and a request from BMW's daily limit."
   }
 }

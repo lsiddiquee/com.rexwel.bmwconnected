@@ -82,6 +82,10 @@
         "user_denied": "Authorization was denied. Please try again and complete the authorization.",
         "network_error": "Network error. Please check your connection and try again.",
         "timeout": "Authorization timed out. Please try again."
+      },
+      "setup_error": {
+        "title": "Device Setup Failed",
+        "hint": "Sign-in succeeded, but setting up the BMW data container failed. Your sign-in is kept, so tapping Try Again will retry just the setup step without asking for a new authorization code."
       }
     }
   }

@@ -533,9 +533,11 @@ describe('ConnectedDriver - Comprehensive', () => {
     // Fix C: when authentication succeeds but container setup fails, the user should
     // see a message that makes the container failure obvious rather than the misleading
     // "Authorization Failed". Auth genuinely succeeded; the post-auth step failed.
-    // Reporters of #108 see "Authorization Failed" when CU-105 or similar container
-    // errors occur, leading to wasted re-auth attempts.
-    it('should_emitContainerErrorMessage_when_containerSetupFailsAfterAuthSuccess', async () => {
+    // Reporters of #108 see "Authorization Failed" when CU-105/CU-429 container errors
+    // occur, leading to wasted re-auth attempts. Emit a distinct `setup_error` event
+    // so the UI can label it correctly (e.g. "Device Setup Failed") and so the user
+    // doesn't burn another device-code cycle on retry.
+    it('should_emitSetupErrorEvent_when_containerSetupFailsAfterAuthSuccess', async () => {
       // Arrange - pollForTokens succeeds, but container creation throws with a
       // BMW container error message that does NOT itself mention "container".
       driver.mockAuthProvider.pollForTokens.mockResolvedValue(undefined as never);
@@ -547,14 +549,19 @@ describe('ConnectedDriver - Comprehensive', () => {
       // Act
       await driver.testPollForAuthorizationAsync(mockSession);
 
-      // Assert - emitted message must explicitly label this as a container setup
-      // failure so the user does not waste time re-authenticating.
-      const errorEmits = mockSession.emit.mock.calls.filter((c) => c[0] === 'authentication_error');
-      expect(errorEmits.length).toBeGreaterThan(0);
-      const errorMessage = errorEmits[0][1] as string;
+      // Assert - setup_error (not authentication_error) so the UI shows the correct
+      // "setup failed" title instead of "Authorization Failed".
+      const setupErrorEmits = mockSession.emit.mock.calls.filter((c) => c[0] === 'setup_error');
+      expect(setupErrorEmits.length).toBeGreaterThan(0);
+      const errorMessage = setupErrorEmits[0][1] as string;
       expect(errorMessage).toMatch(/container setup failed/i);
       expect(errorMessage).toContain('CU-105');
-      // Auth success should NOT be emitted
+      // authentication_error must NOT be emitted - auth itself succeeded.
+      const authErrorEmits = mockSession.emit.mock.calls.filter(
+        (c) => c[0] === 'authentication_error'
+      );
+      expect(authErrorEmits).toHaveLength(0);
+      // authentication_success must also NOT be emitted.
       const successEmits = mockSession.emit.mock.calls.filter(
         (c) => c[0] === 'authentication_success'
       );

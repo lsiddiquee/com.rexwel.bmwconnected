@@ -267,6 +267,47 @@ export abstract class ConnectedDriver extends Driver {
         // Get shared auth provider from app (creates if doesn't exist)
         const authProvider = this.getAuthProvider();
 
+        // Issue #108: if we already have a valid access token (e.g. user is
+        // retrying after a container setup failure), skip the device code
+        // round-trip entirely and re-run the container step. This avoids
+        // making the user re-authenticate when auth itself never failed.
+        try {
+          const existing = await authProvider.getValidAccessToken();
+          if (existing) {
+            this.logger?.info(
+              'Valid tokens already present - skipping device code flow and re-running container setup'
+            );
+            try {
+              await this.validateOrCreateContainer();
+            } catch (containerError) {
+              const detail =
+                containerError instanceof Error ? containerError.message : String(containerError);
+              this.homey.error('Container setup failed during retry:', containerError);
+              await session.emit('setup_error', `Container setup failed: ${detail}`).catch(() => {
+                // session may have closed; swallow
+              });
+              // Return a sentinel so the frontend knows not to render a device
+              // code; the error event above drives the UI to the error view.
+              return { skipCode: true };
+            }
+            if (device) {
+              await this.updateDeviceStore(device);
+              await session.done();
+            } else {
+              await session.emit('authentication_success', {});
+              await session.showView('list_devices');
+            }
+            return { skipCode: true };
+          }
+        } catch (tokenLookupError) {
+          this.logger?.debug('No valid tokens for short-circuit - falling through to device code', {
+            error:
+              tokenLookupError instanceof Error
+                ? tokenLookupError.message
+                : String(tokenLookupError),
+          });
+        }
+
         this.currentDeviceCodeResponse = await authProvider.requestDeviceCode();
 
         // Start polling in the background
@@ -365,8 +406,14 @@ export abstract class ConnectedDriver extends Driver {
         const detail =
           containerError instanceof Error ? containerError.message : String(containerError);
         this.homey.error('Container setup failed after successful auth:', containerError);
+        // Issue #108: emit `setup_error` (not `authentication_error`) so the UI
+        // shows a "Device Setup Failed" title instead of "Authorization Failed".
+        // Auth itself succeeded — tokens have been persisted by pollForTokens —
+        // so retrying via the device_code view's `request_device_code` handler
+        // will short-circuit on the stored tokens and skip straight back to the
+        // container step without making the user re-enter their device code.
         await session
-          .emit('authentication_error', `Container setup failed: ${detail}`)
+          .emit('setup_error', `Container setup failed: ${detail}`)
           .catch((emitError) => {
             if (
               emitError instanceof Error &&
