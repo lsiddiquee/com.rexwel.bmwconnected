@@ -9,7 +9,6 @@
 import { ConnectedDriver } from '../../drivers/ConnectedDriver';
 import type { Vehicle } from '../../drivers/Vehicle';
 import type { CarDataClient } from '../../lib/api/CarDataClient';
-import type { ContainerManager } from '../../lib/api/ContainerManager';
 import type { DeviceCodeAuthProvider } from '../../lib/auth/DeviceCodeAuthProvider';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import {
@@ -34,11 +33,6 @@ type MockCarDataClient = {
   >;
 };
 
-type MockContainerManager = {
-  getOrCreateContainer: jest.Mock<Promise<string>, [string]>;
-  validateContainer: jest.Mock<Promise<{ isValid: boolean; missingKeys?: string[] }>, [string]>;
-};
-
 type MockSession = {
   setHandler: jest.Mock<void, [string, (...args: unknown[]) => unknown]>;
   emit: jest.Mock<Promise<void>, [string, unknown]>;
@@ -50,7 +44,6 @@ type MockSession = {
 class TestableConnectedDriver extends ConnectedDriver {
   public readonly mockAuthProvider: MockAuthProvider;
   public readonly mockCarDataClient: MockCarDataClient;
-  public readonly mockContainerManager: MockContainerManager;
 
   protected get brand(): string {
     return 'BMW';
@@ -71,11 +64,6 @@ class TestableConnectedDriver extends ConnectedDriver {
 
     this.mockCarDataClient = {
       getVehicles: jest.fn(),
-    };
-
-    this.mockContainerManager = {
-      getOrCreateContainer: jest.fn(),
-      validateContainer: jest.fn(),
     };
   }
 
@@ -111,25 +99,6 @@ class TestableConnectedDriver extends ConnectedDriver {
       throw new Error('Client ID not initialized');
     }
     return this.mockCarDataClient as unknown as CarDataClient;
-  }
-
-  protected async createContainerManager(): Promise<ContainerManager> {
-    if (!this.currentClientId) {
-      throw new Error('Client ID not initialized');
-    }
-    return this.mockContainerManager as unknown as ContainerManager;
-  }
-
-  public async testValidateOrCreateContainer(): Promise<void> {
-    return this.validateOrCreateContainer();
-  }
-
-  public async testCreateNewContainer(): Promise<void> {
-    return this.createNewContainer();
-  }
-
-  public async testValidateExistingContainer(): Promise<void> {
-    return this.validateExistingContainer();
   }
 
   public async testUpdateDeviceStore(device: Vehicle): Promise<void> {
@@ -224,86 +193,9 @@ describe('ConnectedDriver - Comprehensive', () => {
   });
 
   describe('Container management', () => {
-    beforeEach(async () => {
-      await driver.onInit();
-      driver.setCurrentClientIdForTest('test-client-id');
-    });
-
-    it('should create container when none provided', async () => {
-      driver.setCurrentContainerIdForTest(undefined);
-      driver.mockContainerManager.getOrCreateContainer.mockResolvedValue('new-container-id');
-
-      await driver.testValidateOrCreateContainer();
-
-      expect(driver.mockContainerManager.getOrCreateContainer).toHaveBeenCalledWith(
-        'HOMEY-test-cli'
-      );
-      expect(driver.getCurrentContainerIdForTest()).toBe('new-container-id');
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'No container ID - creating new container after authentication'
-      );
-      expect(mockLogger.info).toHaveBeenCalledWith('Container created: new-container-id');
-    });
-
-    it('should propagate container creation error', async () => {
-      driver.setCurrentContainerIdForTest(undefined);
-      const failure = new Error('Container creation failed');
-      driver.mockContainerManager.getOrCreateContainer.mockRejectedValue(failure);
-
-      await expect(driver.testCreateNewContainer()).rejects.toThrow(
-        'Failed to create container: Container creation failed'
-      );
-      expect(mockLogger.error).toHaveBeenCalledWith(
-        'Failed to create container: Container creation failed'
-      );
-    });
-
-    it('should validate existing container', async () => {
-      driver.setCurrentContainerIdForTest('existing-container-id');
-      driver.mockContainerManager.validateContainer.mockResolvedValue({
-        isValid: true,
-        missingKeys: [],
-      });
-
-      await driver.testValidateExistingContainer();
-
-      expect(driver.mockContainerManager.validateContainer).toHaveBeenCalledWith(
-        'existing-container-id'
-      );
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Validating user-provided container ID: existing-container-id'
-      );
-      expect(mockLogger.info).toHaveBeenCalledWith(
-        'Container existing-container-id validated successfully'
-      );
-    });
-
-    it('should throw when validation reports missing keys', async () => {
-      driver.setCurrentContainerIdForTest('invalid-container');
-      driver.mockContainerManager.validateContainer.mockResolvedValue({
-        isValid: false,
-        missingKeys: ['key1'],
-      });
-
-      await expect(driver.testValidateExistingContainer()).rejects.toThrow(
-        'Container is missing 1 required keys. Please use a different container or leave empty to create a new one.'
-      );
-      expect(mockLogger.warn).toHaveBeenCalledWith(
-        'Container invalid-container is missing 1 required keys'
-      );
-    });
-
-    it('should throw friendly error when container not found', async () => {
-      const { ApiError } = await import('../../lib/types/errors');
-      driver.setCurrentContainerIdForTest('missing-container');
-      driver.mockContainerManager.validateContainer.mockRejectedValue(
-        new ApiError('Not found', 404)
-      );
-
-      await expect(driver.testValidateExistingContainer()).rejects.toThrow(
-        'Container ID not found. Please check the ID or leave empty to create a new one.'
-      );
-    });
+    // Container provisioning was moved out of the pair/repair flow in v1.0.25 -
+    // it now runs lazily on the first API poll (Vehicle.ensureContainer). The
+    // driver no longer owns those methods; their tests live alongside Vehicle.
   });
 
   describe('Device store updates', () => {
@@ -502,14 +394,13 @@ describe('ConnectedDriver - Comprehensive', () => {
       expect(devices.map((d) => d.data.id)).toEqual(['VINBMW']);
     });
 
-    // Regression: issue #108 (aagehellem) - rapid double-click on "Get Code"
-    // could land the user on list_devices while `currentContainerId` was still
-    // undefined (container creation hadn't finished yet). The resulting device
-    // was persisted with `containerId: undefined` and produced no data. v1.0.18
-    // must refuse to persist such half-formed devices.
-    it('should_throwClearError_when_listDevicesRunsWithoutContainerId', async () => {
-      // Arrange - simulate the race: client_id present but container creation
-      // hasn't completed (currentContainerId still undefined)
+    // Regression: issue #108 (aagehellem) - in v1.0.18-v1.0.24 the list_devices
+    // handler threw if currentContainerId was undefined, forcing the user to
+    // restart pairing if container creation hadn't completed yet. v1.0.25 moves
+    // container creation to the first API poll, so list_devices must persist
+    // the device even when currentContainerId is undefined.
+    it('should_persistDeviceWithUndefinedContainer_when_listDevicesRunsBeforeFirstPoll', async () => {
+      // Arrange
       driver.setCurrentContainerIdForTest(undefined);
 
       // Act
@@ -517,10 +408,16 @@ describe('ConnectedDriver - Comprehensive', () => {
       const listHandler = mockSession.setHandler.mock.calls.find(
         (call) => call[0] === 'list_devices'
       )?.[1];
+      const devices = await (
+        listHandler as () => Promise<
+          Array<{ store: Record<string, unknown>; data: { id: string } }>
+        >
+      )();
 
-      // Assert - must reject with a user-actionable message, NOT silently return
-      // a device with containerId: undefined.
-      await expect((listHandler as () => Promise<unknown>)()).rejects.toThrow(/container/i);
+      // Assert - device is returned; container is undefined and will be filled
+      // in by Vehicle.ensureContainer on the first poll.
+      expect(devices).toHaveLength(1);
+      expect(devices[0].store[STORE_KEY_CONTAINER_ID]).toBeUndefined();
     });
   });
 
@@ -532,57 +429,22 @@ describe('ConnectedDriver - Comprehensive', () => {
       driver.setPollingCancelledForTest(false);
     });
 
-    // Fix C: when authentication succeeds but container setup fails, the user should
-    // see a message that makes the container failure obvious rather than the misleading
-    // "Authorization Failed". Auth genuinely succeeded; the post-auth step failed.
-    // Reporters of #108 see "Authorization Failed" when CU-105/CU-429 container errors
-    // occur, leading to wasted re-auth attempts. Emit a distinct `setup_error` event
-    // so the UI can label it correctly (e.g. "Device Setup Failed") and so the user
-    // doesn't burn another device-code cycle on retry.
-    it('should_emitSetupErrorEvent_when_containerSetupFailsAfterAuthSuccess', async () => {
-      // Arrange - pollForTokens succeeds, but container creation throws with a
-      // BMW container error message that does NOT itself mention "container".
-      driver.mockAuthProvider.pollForTokens.mockResolvedValue(undefined as never);
-      driver.setCurrentContainerIdForTest(undefined);
-      driver.mockContainerManager.getOrCreateContainer.mockRejectedValue(
-        new Error('HTTP 403: CU-105')
-      );
-
-      // Act
-      await driver.testPollForAuthorizationAsync(mockSession);
-
-      // Assert - setup_error (not authentication_error) so the UI shows the correct
-      // "setup failed" title instead of "Authorization Failed".
-      const setupErrorEmits = mockSession.emit.mock.calls.filter((c) => c[0] === 'setup_error');
-      expect(setupErrorEmits.length).toBeGreaterThan(0);
-      const errorMessage = setupErrorEmits[0][1] as string;
-      expect(errorMessage).toMatch(/container setup failed/i);
-      expect(errorMessage).toContain('CU-105');
-      // authentication_error must NOT be emitted - auth itself succeeded.
-      const authErrorEmits = mockSession.emit.mock.calls.filter(
-        (c) => c[0] === 'authentication_error'
-      );
-      expect(authErrorEmits).toHaveLength(0);
-      // authentication_success must also NOT be emitted.
-      const successEmits = mockSession.emit.mock.calls.filter(
-        (c) => c[0] === 'authentication_success'
-      );
-      expect(successEmits).toHaveLength(0);
-    });
+    // Note: v1.0.25 removed container provisioning from the pair/repair flow
+    // entirely (now lazy in Vehicle.ensureContainer), so the pre-v1.0.25 tests
+    // for container-failure-during-auth (CU-105 / CU-429 mid-pair, short-circuit
+    // container retry, request_device_code container failure) have been removed.
+    // Container failures now log a warning and are retried on the next poll
+    // cycle, with no UI surface.
 
     // Issue #108 (aagehellem, v1.0.22): "BMW LOGIN SUCCESSFUL" but Homey stuck on
     // "Waiting for authorization...". Root cause: the polling success path emitted
     // `authentication_success` but never navigated the pair view, so the frontend's
     // listener only updated the status text and the user remained on device_code.
     // For pair, must call showView('list_devices'); for repair, must call done().
-    it('should_navigateToListDevices_when_pairFlowAuthSucceedsAndContainerReady', async () => {
-      // Arrange - pair flow (no device), auth succeeds, container already valid
+    it('should_navigateToListDevices_when_pairFlowAuthSucceeds', async () => {
+      // Arrange - pair flow (no device), auth succeeds
       driver.mockAuthProvider.pollForTokens.mockResolvedValue(undefined as never);
       driver.setCurrentContainerIdForTest('existing-container');
-      driver.mockContainerManager.validateContainer.mockResolvedValue({
-        isValid: true,
-        missingKeys: [],
-      });
 
       // Act
       await driver.testPollForAuthorizationAsync(mockSession);
@@ -595,8 +457,8 @@ describe('ConnectedDriver - Comprehensive', () => {
       expect(mockSession.showView).toHaveBeenCalledWith('list_devices');
     });
 
-    it('should_callDone_when_repairFlowAuthSucceedsAndContainerReady', async () => {
-      // Arrange - repair flow (device passed), auth succeeds, container valid.
+    it('should_callDone_when_repairFlowAuthSucceeds', async () => {
+      // Arrange - repair flow (device passed), auth succeeds.
       // updateDeviceStore touches vehicleDevice.stateManager + initialize +
       // setAvailable, so mock those out to keep this test focused on the
       // navigation contract (session.done() must be called).
@@ -612,10 +474,6 @@ describe('ConnectedDriver - Comprehensive', () => {
       };
       driver.mockAuthProvider.pollForTokens.mockResolvedValue(undefined as never);
       driver.setCurrentContainerIdForTest('existing-container');
-      driver.mockContainerManager.validateContainer.mockResolvedValue({
-        isValid: true,
-        missingKeys: [],
-      });
 
       // Act
       await driver.testPollForAuthorizationAsync(mockSession, mockDevice);
@@ -632,10 +490,6 @@ describe('ConnectedDriver - Comprehensive', () => {
     it('should_notEmitSuccess_when_pollResolvesAfterDeviceCodeChanged', async () => {
       // Arrange - poll loop captures device code 'dc-active'
       driver.setCurrentContainerIdForTest('existing-container');
-      driver.mockContainerManager.validateContainer.mockResolvedValue({
-        isValid: true,
-        missingKeys: [],
-      });
 
       // The contract: the poll loop captures its starting device code and bails
       // out before emitting if it no longer matches. Mid-poll, simulate the user
@@ -655,38 +509,10 @@ describe('ConnectedDriver - Comprehensive', () => {
       expect(successEmits).toHaveLength(0);
     });
 
-    // Silvinnio's 1.0.20 try-3 scenario: token is already in store (from a prior
-    // successful auth) but the short-circuit's validateOrCreateContainer step
-    // throws (e.g. CU-429 from quota-exhausted cleanup). Pre-1.0.23 a bare
-    // catch swallowed the error and dropped the user into the device-code view
-    // as if no token existed, burning another OAuth round-trip. The handler
-    // must instead surface setup_error and stay on the current view.
-    it('should_emitSetupErrorAndNotAdvance_when_shortCircuitContainerStepFails', async () => {
-      // Arrange - valid token cached, but container resolution will fail
-      mockHomey.drivers.getDrivers.mockReturnValue({});
-      driver.mockAuthProvider.getValidAccessToken.mockResolvedValue('valid-token-abc');
-      driver.setCurrentContainerIdForTest(undefined);
-      driver.mockContainerManager.getOrCreateContainer.mockRejectedValue(
-        new Error('HTTP 429: CU-429 daily limit reached')
-      );
-
-      // Act - drive the client_id_entered handler
-      await driver.onPair(mockSession as unknown as any);
-      const clientIdHandler = mockSession.setHandler.mock.calls.find(
-        (call) => call[0] === 'client_id_entered'
-      )?.[1] as (data: { client_id: string }) => Promise<void>;
-      await clientIdHandler({ client_id: 'existing-client' });
-
-      // Assert - setup_error surfaced, NO advance to device-code view, NO success
-      const setupErrorEmits = mockSession.emit.mock.calls.filter((c) => c[0] === 'setup_error');
-      expect(setupErrorEmits).toHaveLength(1);
-      expect(setupErrorEmits[0][1]).toMatch(/CU-429/);
-      expect(mockSession.nextView).not.toHaveBeenCalled();
-      const successEmits = mockSession.emit.mock.calls.filter(
-        (c) => c[0] === 'authentication_success'
-      );
-      expect(successEmits).toHaveLength(0);
-    });
+    // Silvinnio's 1.0.20 try-3 scenario regression (pre-v1.0.25): obsolete since
+    // container provisioning no longer runs inside the short-circuit. The handler
+    // now simply navigates on token success - any container issue surfaces later
+    // via the poll cycle's logs.
 
     // Counterpart: when getValidAccessToken itself throws (no token / refresh
     // failed), the handler must fall through to device-code as before.
@@ -713,12 +539,8 @@ describe('ConnectedDriver - Comprehensive', () => {
     // implying the user needed to re-authenticate when in fact auth had
     // succeeded and tokens were already persisted. It must emit setup_error.
     it('should_emitSetupError_when_updateDeviceStoreFailsInRepairPoll', async () => {
-      // Arrange - poll succeeds, container succeeds, store update fails
+      // Arrange - poll succeeds, store update fails
       driver.setCurrentContainerIdForTest('existing-container');
-      driver.mockContainerManager.validateContainer.mockResolvedValue({
-        isValid: true,
-        missingKeys: [],
-      });
       driver.mockAuthProvider.pollForTokens.mockResolvedValue(undefined as never);
 
       const storeError = new Error('disk full');
@@ -748,34 +570,9 @@ describe('ConnectedDriver - Comprehensive', () => {
       expect(mockSession.done).not.toHaveBeenCalled();
     });
 
-    // Hazard F: in request_device_code, when a token already exists but the
-    // container step fails, the handler must NOT call requestDeviceCode (which
-    // would burn an OAuth round-trip and quota). It must emit setup_error and
-    // return { skipCode: true }.
-    it('should_notRequestDeviceCode_when_shortCircuitContainerFailsInRequestDeviceCode', async () => {
-      // Arrange
-      mockHomey.drivers.getDrivers.mockReturnValue({});
-      driver.setCurrentClientIdForTest('cached-client');
-      driver.mockAuthProvider.getValidAccessToken.mockResolvedValue('cached-token');
-      driver.setCurrentContainerIdForTest(undefined);
-      driver.mockContainerManager.getOrCreateContainer.mockRejectedValue(
-        new Error('container service unavailable')
-      );
-
-      // Act - drive the request_device_code handler
-      await driver.onPair(mockSession as unknown as any);
-      const requestHandler = mockSession.setHandler.mock.calls.find(
-        (call) => call[0] === 'request_device_code'
-      )?.[1] as () => Promise<unknown>;
-      const result = await requestHandler();
-
-      // Assert - setup_error emitted, NO new device code requested
-      const setupErrorEmits = mockSession.emit.mock.calls.filter((c) => c[0] === 'setup_error');
-      expect(setupErrorEmits).toHaveLength(1);
-      expect(setupErrorEmits[0][1]).toMatch(/container service unavailable/);
-      expect(driver.mockAuthProvider.requestDeviceCode).not.toHaveBeenCalled();
-      expect(result).toEqual({ skipCode: true });
-    });
+    // Hazard F (request_device_code container failure) is obsolete after
+    // v1.0.25 - container work no longer happens in request_device_code, so
+    // the short-circuit only short-circuits on auth success and navigates.
 
     // Hazard E: session-closed errors on the final navigation step (user
     // navigated away after success) must be silently swallowed, not surface as
@@ -784,10 +581,6 @@ describe('ConnectedDriver - Comprehensive', () => {
       // Arrange - everything succeeds, but session.done() rejects with the
       // characteristic "Not Found: PairSession" error.
       driver.setCurrentContainerIdForTest('existing-container');
-      driver.mockContainerManager.validateContainer.mockResolvedValue({
-        isValid: true,
-        missingKeys: [],
-      });
       driver.mockAuthProvider.pollForTokens.mockResolvedValue(undefined as never);
       mockSession.done.mockRejectedValue(new Error('Not Found: PairSession'));
 
@@ -816,13 +609,9 @@ describe('ConnectedDriver - Comprehensive', () => {
     // the Client ID screen because our handler bubbled the error back to the
     // UI. The isSessionClosedError predicate must match BOTH wordings.
     it('should_swallowSessionClosedError_when_homeyProSaysCouldNotFindThatPairSession', async () => {
-      // Arrange - poll succeeds, container ready; navigation rejects with the
-      // newer "Could not find that PairSession" wording.
+      // Arrange - poll succeeds; navigation rejects with the newer
+      // "Could not find that PairSession" wording.
       driver.setCurrentContainerIdForTest('existing-container');
-      driver.mockContainerManager.validateContainer.mockResolvedValue({
-        isValid: true,
-        missingKeys: [],
-      });
       driver.mockAuthProvider.pollForTokens.mockResolvedValue(undefined as never);
       mockSession.showView.mockRejectedValue(new Error('Could not find that PairSession'));
 

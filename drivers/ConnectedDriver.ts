@@ -15,7 +15,6 @@ import { DeviceStoreData } from '../utils/DeviceStateManager';
 // Import types for factory methods and casting
 type DeviceCodeAuthProvider = import('../lib/auth/DeviceCodeAuthProvider').DeviceCodeAuthProvider;
 type CarDataClient = import('../lib/api/CarDataClient').CarDataClient;
-type ContainerManager = import('../lib/api/ContainerManager').ContainerManager;
 type Vehicle = import('./Vehicle').Vehicle;
 
 export abstract class ConnectedDriver extends Driver {
@@ -41,37 +40,30 @@ export abstract class ConnectedDriver extends Driver {
   /**
    * Centralised post-authentication completion.
    *
-   * Invariants this enforces across every code path that has a valid token
-   * (polling success, request_device_code short-circuit, client_id_entered
-   * short-circuit):
+   * Container setup is intentionally NOT done here - it now happens lazily on
+   * the first API poll (see Vehicle.ensureContainer). This keeps pairing fast
+   * and lets MQTT streaming come up immediately, with container creation
+   * (and any rate-limit backoff) deferred until the polling subsystem is
+   * actually ready to consume it.
+   *
+   * Invariants:
    * - Token persistence is the auth provider's responsibility; we never
-   *   delete tokens from here. Downstream failures (container, store update,
-   *   navigation) must not invalidate the OAuth credentials.
-   * - Container or device-store failures emit `setup_error`, NEVER
-   *   `authentication_error`. Auth itself has already succeeded.
+   *   delete tokens from here. Downstream failures (store update, navigation)
+   *   must not invalidate the OAuth credentials.
+   * - Device-store failures emit `setup_error`, NEVER `authentication_error`.
+   *   Auth itself has already succeeded.
    * - Session-closed errors (user cancelled / navigated away) are logged
    *   and swallowed - they are not failures.
    *
    * Returns true on full success, false if a setup_error was emitted.
-   * Throws only for genuinely unexpected programmer errors (none expected).
    */
   protected async completePostAuthSuccess(
     session: PairSession,
     device: Device | undefined
   ): Promise<boolean> {
-    // Step 1: container - any failure is setup_error, not auth error.
-    try {
-      await this.validateOrCreateContainer();
-    } catch (containerError) {
-      const detail =
-        containerError instanceof Error ? containerError.message : String(containerError);
-      this.homey.error('Container setup failed:', containerError);
-      await this.emitSafely(session, 'setup_error', `Container setup failed: ${detail}`);
-      return false;
-    }
-
-    // Step 2: repair flow - update device store. Failure is still a setup
-    // problem, not an auth problem; tokens remain valid for the next retry.
+    // Repair flow only: persist the new client/container hint to the device
+    // store and re-initialise services. Failure is a setup problem, not an
+    // auth problem; tokens remain valid for the next retry.
     if (device) {
       try {
         await this.updateDeviceStore(device);
@@ -159,31 +151,6 @@ export abstract class ConnectedDriver extends Driver {
     return this.app.getApiClient(this.currentClientId);
   }
 
-  /**
-   * Factory method for creating ContainerManager
-   * Protected to allow test overrides
-   */
-  protected async createContainerManager(): Promise<ContainerManager> {
-    if (!this.currentClientId) {
-      throw new Error('Client ID not initialized');
-    }
-
-    // Use app's factory method to create HttpClient with consistent configuration
-    const httpClient = this.app.createHttpClient();
-
-    // Get shared auth provider from app
-    const authProvider = this.getAuthProvider();
-
-    const { ContainerManager } = await import('../lib/api/ContainerManager');
-    return new ContainerManager({
-      httpClient,
-      getAccessToken: async () => {
-        return await authProvider.getValidAccessToken();
-      },
-      logger: this.logger,
-    });
-  }
-
   async onPair(session: PairSession) {
     await Promise.resolve();
 
@@ -215,20 +182,12 @@ export abstract class ConnectedDriver extends Driver {
         throw new Error('Authentication not completed - please authenticate first');
       }
 
-      // Issue #108 (aagehellem): rapid double-click on "Get Code" could land
-      // the user on list_devices before container creation had finished, which
-      // persisted a half-formed device with `containerId: undefined`. Refuse
-      // to enumerate vehicles until the container step has completed so the
-      // user is forced to retry rather than ending up with a broken device.
-      if (!this.currentContainerId) {
-        throw new Error('Container setup is not yet complete - please cancel and retry pairing');
-      }
-
       const api = this.getCarDataClient();
 
-      // Note: Container management now happens in pollForAuthorizationAsync
-      // for both pairing and repair flows
-
+      // Container creation is deferred to the first API poll (Vehicle.ensureContainer).
+      // Vehicle listing only needs the access token, so we can show the user
+      // their vehicles immediately and let MQTT start while the container
+      // (used only for HTTP polling) is provisioned in the background.
       const vehicles = await api.getVehicles();
 
       return vehicles
@@ -391,9 +350,7 @@ export abstract class ConnectedDriver extends Driver {
         }
 
         if (existingToken) {
-          this.logger?.info(
-            'Valid tokens already present - skipping device code flow and re-running container setup'
-          );
+          this.logger?.info('Valid tokens already present - skipping device code flow');
           await this.completePostAuthSuccess(session, device);
           // Frontend treats { skipCode: true } as "do not render a device code;
           // backend has driven the view transition already".
@@ -479,19 +436,15 @@ export abstract class ConnectedDriver extends Driver {
         return;
       }
 
-      // Container validation/creation now happens in pollForAuthorizationAsync
-      // for both pairing and repair flows.
-      //
       // Token persistence: DeviceCodeAuthProvider.pollForTokens has already
-      // written the tokens to the token store at this point, so even if the
-      // container step below fails the user can retry pairing without going
-      // through the device-code flow again - request_device_code and
-      // client_id_entered both short-circuit on stored tokens. Failures
-      // inside completePostAuthSuccess emit `setup_error`, NOT
-      // `authentication_error` (auth itself succeeded), and tokens are never
-      // cleared on container / store failure.
+      // written the tokens to the token store at this point. Container setup
+      // is intentionally deferred to the first API poll (Vehicle.ensureContainer),
+      // so we emit authentication_success while the session is still warm and
+      // the user sees the vehicle list immediately. Failures inside
+      // completePostAuthSuccess emit `setup_error`, NOT `authentication_error`
+      // (auth itself succeeded), and tokens are never cleared on store failure.
       if (this.currentDeviceCodeResponse?.deviceCode !== ownDeviceCode) {
-        // Superseded by a newer pairing attempt between auth and container.
+        // Superseded by a newer pairing attempt between auth and completion.
         return;
       }
       await this.completePostAuthSuccess(session, device);
@@ -522,75 +475,6 @@ export abstract class ConnectedDriver extends Driver {
           this.homey.error('Failed to emit authentication error:', emitError);
         }
       });
-    }
-  }
-
-  /**
-   * Ensure container is ready (validate existing or create new)
-   * Called after successful authentication (either via tokens or device code)
-   */
-  protected async validateOrCreateContainer(): Promise<void> {
-    if (!this.currentContainerId) {
-      await this.createNewContainer();
-    } else {
-      await this.validateExistingContainer();
-    }
-  }
-
-  /**
-   * Create new container for authentication
-   */
-  protected async createNewContainer(): Promise<void> {
-    this.logger?.info('No container ID - creating new container after authentication');
-
-    const containerManager = await this.createContainerManager();
-
-    try {
-      // Create container - use client ID as identifier (containers are per-GCID, not per-VIN)
-      // Multiple vehicles under same GCID share the same container
-      const containerKey = `HOMEY-${this.currentClientId?.substring(0, 8)}`;
-      this.currentContainerId = await containerManager.getOrCreateContainer(containerKey);
-      this.logger?.info(`Container created: ${this.currentContainerId}`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger?.error(`Failed to create container: ${errorMessage}`);
-      throw new Error(`Failed to create container: ${errorMessage}`);
-    }
-  }
-
-  /**
-   * Validate existing user-provided container
-   */
-  protected async validateExistingContainer(): Promise<void> {
-    if (!this.currentContainerId) {
-      throw new Error('Container ID is required for validation');
-    }
-
-    this.logger?.info(`Validating user-provided container ID: ${this.currentContainerId}`);
-
-    const containerManager = await this.createContainerManager();
-    const { ApiError } = await import('../lib/types/errors');
-
-    try {
-      const validation = await containerManager.validateContainer(this.currentContainerId);
-
-      if (!validation.isValid) {
-        this.logger?.warn(
-          `Container ${this.currentContainerId} is missing ${validation.missingKeys?.length} required keys`
-        );
-        throw new Error(
-          `Container is missing ${validation.missingKeys?.length} required keys. Please use a different container or leave empty to create a new one.`
-        );
-      }
-
-      this.logger?.info(`Container ${this.currentContainerId} validated successfully`);
-    } catch (error) {
-      if (error instanceof ApiError && error.statusCode === 404) {
-        throw new Error(
-          'Container ID not found. Please check the ID or leave empty to create a new one.'
-        );
-      }
-      throw error;
     }
   }
 

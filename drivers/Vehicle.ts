@@ -14,6 +14,8 @@ import type { VehicleStatus } from '../lib/models/VehicleStatus';
 import { DeviceCodeAuthProvider } from '../lib/auth/DeviceCodeAuthProvider';
 import { MqttStreamClient } from '../lib/streaming/MqttStreamClient';
 import type { StreamMessage } from '../lib/streaming/StreamMessage';
+import { ApiError, RateLimitError } from '../lib/types/errors';
+import type { ContainerManager } from '../lib/api/ContainerManager';
 import { DeviceStateManager } from '../utils/DeviceStateManager';
 import {
   HV_BATTERY_DRIVE_TRAINS,
@@ -312,7 +314,10 @@ export class Vehicle extends Device {
   /**
    * Check if API polling can be started
    *
-   * Validates all prerequisites for starting API polling.
+   * Validates prerequisites for starting API polling. Container availability
+   * is NOT a prerequisite - the container is created lazily on the first
+   * poll (see ensureContainer) so MQTT streaming can start immediately and
+   * a failing container operation only delays the next polling cycle.
    *
    * @returns Validation result with canStart flag and optional reason
    */
@@ -325,22 +330,96 @@ export class Vehicle extends Device {
       return { canStart: false, reason: 'API client not initialized - cannot start API polling' };
     }
 
-    const containerId = this.stateManager.getContainerId();
-    if (!containerId) {
-      return {
-        canStart: false,
-        reason: 'No container ID available - API polling requires container',
-      };
+    return { canStart: true };
+  }
+
+  /**
+   * Create a per-device ContainerManager. Mirrors the wiring in `app.ts`:
+   * shared HttpClient, shared auth provider for the device's clientId.
+   *
+   * Protected and async to mirror the `createContainerManager` shape used in
+   * the driver layer and to allow tests to override the import lazily.
+   */
+  protected async createContainerManager(): Promise<ContainerManager | undefined> {
+    const clientId = this.stateManager.getClientId();
+    if (!clientId || !this._authProvider) {
+      return undefined;
     }
 
-    return { canStart: true };
+    const httpClient = this.app.createHttpClient();
+    const authProvider = this._authProvider;
+    const { ContainerManager: ContainerManagerCtor } = await import('../lib/api/ContainerManager');
+    return new ContainerManagerCtor({
+      httpClient,
+      getAccessToken: async () => authProvider.getValidAccessToken(),
+      logger: this.logger,
+    });
+  }
+
+  /**
+   * Lazily resolve the container ID used for API polling.
+   *
+   * Resolution order:
+   * 1. If the device store already has a container ID (user-supplied or
+   *    previously auto-created), return it - polling will discover staleness
+   *    via a 404 on `getRawTelematicData` and clear it for the next cycle.
+   * 2. Otherwise call ContainerManager.getOrCreateContainer, which handles
+   *    list / orphan cleanup / create. The returned ID is persisted to both
+   *    the device store and the user-visible setting.
+   *
+   * Returns `undefined` on any failure (rate-limit, network, auth). The
+   * caller is expected to skip this poll and try again on the next cycle -
+   * MQTT streaming is unaffected.
+   */
+  private async ensureContainer(): Promise<string | undefined> {
+    const existing = this.stateManager.getContainerId();
+    if (existing) {
+      return existing;
+    }
+
+    const clientId = this.stateManager.getClientId();
+    if (!clientId) {
+      this.logger?.warn('Cannot create container - no client ID for this device');
+      return undefined;
+    }
+
+    const containerManager = await this.createContainerManager();
+    if (!containerManager) {
+      this.logger?.warn('Cannot create container - container manager unavailable');
+      return undefined;
+    }
+
+    // Per-GCID identifier; multiple vehicles under the same client share one container.
+    const containerKey = `HOMEY-${clientId.substring(0, 8)}`;
+
+    try {
+      this.logger?.info(`Provisioning BMW container for client ${clientId.substring(0, 8)}…`);
+      const newId = await containerManager.getOrCreateContainer(containerKey);
+      await this.stateManager.setContainerId(newId);
+      this.logger?.info(`Container provisioned: ${newId}`);
+      return newId;
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        this.logger?.warn(
+          'Container provisioning hit BMW rate limit - will retry on next poll cycle'
+        );
+      } else {
+        this.logger?.error(
+          `Container provisioning failed - will retry on next poll cycle: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+      return undefined;
+    }
   }
 
   /**
    * Execute a single API poll
    *
    * Fetches raw telematic data from the API and updates the state manager cache.
-   * Handles errors gracefully and logs poll status.
+   * Lazily provisions the container if one is not yet available, and clears a
+   * stale container ID if the API returns 404 so the next cycle re-creates it.
    *
    * @private Extracted for testability
    */
@@ -351,16 +430,32 @@ export class Vehicle extends Device {
         return;
       }
 
-      const containerId = this.stateManager.getContainerId();
+      const containerId = await this.ensureContainer();
       if (!containerId) {
-        this.logger?.warn('Container ID missing - skipping API poll');
+        // ensureContainer logged the specific reason; nothing more to do until
+        // the next scheduled poll cycle.
         return;
       }
 
       this.logger?.debug(`Polling API for vehicle ${this.deviceData.id}`);
 
-      // Fetch raw telematic data
-      const rawData = await this.api.getRawTelematicData(this.deviceData.id, containerId);
+      let rawData;
+      try {
+        rawData = await this.api.getRawTelematicData(this.deviceData.id, containerId);
+      } catch (pollError) {
+        if (pollError instanceof ApiError && pollError.statusCode === 404) {
+          // Container was deleted out from under us (manual cleanup, BMW-side
+          // expiry, etc.). Drop the stored ID so the next cycle provisions a
+          // fresh one. Power users can also override via the repair flow's
+          // container_id field.
+          this.logger?.warn(
+            `Container ${containerId} returned 404 - clearing and recreating on next poll`
+          );
+          await this.stateManager.clearContainerId();
+          return;
+        }
+        throw pollError;
+      }
 
       // Update state manager cache with API data
       await this.stateManager.updateFromApi(rawData);

@@ -121,7 +121,10 @@ describe('Vehicle API Polling', () => {
       expect(result.reason).toBe('API client not initialized - cannot start API polling');
     });
 
-    it('should_returnFalse_when_noContainerId', () => {
+    it('should_returnTrue_when_noContainerId', () => {
+      // Container is provisioned lazily on the first poll via ensureContainer,
+      // so its absence must NOT block canStartApiPolling - otherwise polling
+      // never starts for a fresh device and the lazy path never runs.
       // Arrange
       mockStateManager.getContainerId.mockReturnValue(undefined);
 
@@ -129,8 +132,8 @@ describe('Vehicle API Polling', () => {
       const result = vehicle['canStartApiPolling'](mockSettings);
 
       // Assert
-      expect(result.canStart).toBe(false);
-      expect(result.reason).toBe('No container ID available - API polling requires container');
+      expect(result.canStart).toBe(true);
+      expect(result.reason).toBeUndefined();
     });
   });
 
@@ -171,15 +174,18 @@ describe('Vehicle API Polling', () => {
       expect(mockApiClient.getRawTelematicData).not.toHaveBeenCalled();
     });
 
-    it('should_skipPoll_when_noContainerId', async () => {
-      // Arrange
+    it('should_skipPoll_when_ensureContainerReturnsUndefined', async () => {
+      // Arrange - no stored container and no client id forces ensureContainer to bail.
       mockStateManager.getContainerId.mockReturnValue(undefined);
+      mockStateManager.getClientId.mockReturnValue(undefined);
 
       // Act
       await vehicle['executePoll']();
 
       // Assert
-      expect(mockLogger.warn).toHaveBeenCalledWith('Container ID missing - skipping API poll');
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        'Cannot create container - no client ID for this device'
+      );
       expect(mockApiClient.getRawTelematicData).not.toHaveBeenCalled();
     });
 
@@ -316,7 +322,9 @@ describe('Vehicle API Polling', () => {
       expect(vehicle['executePoll']).not.toHaveBeenCalled();
     });
 
-    it('should_notStartPolling_when_noContainerId', () => {
+    it('should_startPolling_when_noContainerIdYet', () => {
+      // Container is created lazily on the first poll, so startApiPolling must
+      // proceed even when the store has no container ID.
       // Arrange
       mockStateManager.getContainerId.mockReturnValue(undefined);
 
@@ -325,9 +333,9 @@ describe('Vehicle API Polling', () => {
 
       // Assert
       expect(mockLogger.info).toHaveBeenCalledWith(
-        'No container ID available - API polling requires container'
+        'Starting API polling for vehicle TEST_VIN_123 (interval: 60 minutes)'
       );
-      expect(vehicle['executePoll']).not.toHaveBeenCalled();
+      expect(vehicle['executePoll']).toHaveBeenCalled();
     });
 
     it('should_useCustomInterval_when_intervalSet', () => {

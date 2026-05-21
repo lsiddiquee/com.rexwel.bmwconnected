@@ -1,4 +1,7 @@
 {
+  "1.0.25": {
+    "en": "Defer container provisioning from pairing to first API poll. Fixes 'Could not find that PairSession' errors during pairing (#108) and lets MQTT streaming start immediately. Container is created lazily and re-provisioned automatically on 404."
+  },
   "0.0.1": {
     "en": "Ability to add BMW with Connected Drive Services"
   },
