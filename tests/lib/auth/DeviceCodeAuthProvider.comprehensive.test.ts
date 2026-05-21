@@ -365,6 +365,52 @@ describe('DeviceCodeAuthProvider - Comprehensive Tests', () => {
       expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
+    // Issue #108 v1.0.23 (aagehellem): BMW's token endpoint returned HTTP 500
+    // immediately after the user authorised in the BMW portal. The user saw
+    // "Authorization Failed: Token polling failed (HTTP 500)" even though BMW
+    // had accepted their sign-in - their authorisation was effectively wasted.
+    // Per RFC 8628 the client SHOULD treat 5xx as transient and keep polling;
+    // the next successful response wins. Only a true terminal error (access
+    // denied, expired code, definitive 4xx) should abort the poll loop.
+    it('should_continuePolling_when_tokenEndpointReturns500', async () => {
+      // Arrange
+      const fastProvider = new DeviceCodeAuthProvider(mockTokenStore, clientId, {
+        ...options,
+        pollInterval: 1,
+      });
+      const deviceCode = 'device_12345';
+
+      mockFetch.mockResolvedValueOnce(
+        createFetchResponse({
+          device_code: deviceCode,
+          user_code: 'ABCD-1234',
+          verification_uri: 'https://auth.bmwgroup.com/device',
+          expires_in: 900,
+          interval: 5,
+        })
+      );
+      await fastProvider.requestDeviceCode();
+
+      // First poll: BMW server hiccup (HTTP 500, no usable error code);
+      // second poll: tokens.
+      mockFetch.mockResolvedValueOnce(createFetchResponse({}, 500)).mockResolvedValueOnce(
+        createFetchResponse({
+          gcid: 'gcid',
+          access_token: 'at_after_500',
+          refresh_token: 'rt',
+          id_token: 'idt',
+          token_type: 'Bearer',
+          expires_in: 3600,
+          scope: 'vehicle:read',
+        })
+      );
+
+      // Act + Assert - 500 must NOT be reported as AuthenticationError
+      const result = await fastProvider.pollForTokens(deviceCode);
+      expect(result.accessToken).toBe('at_after_500');
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+    }, 10000);
+
     // requestDeviceCode should tolerate a single transient network failure by
     // retrying once with backoff (issue #99 - "Failed to connect to OAuth server"
     // on first attempt, succeeds on retry).

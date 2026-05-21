@@ -309,6 +309,23 @@ export class DeviceCodeAuthProvider implements IAuthProvider {
         } else if (errorCode === 'access_denied') {
           // User denied authorization
           throw new AuthenticationError('User denied authorization', 'ACCESS_DENIED');
+        } else if (response.status >= 500) {
+          // BMW's token endpoint hiccup. RFC 8628 polling clients MUST treat
+          // transient server errors as retryable; previously we threw
+          // AuthenticationError on the first 5xx and the user saw a misleading
+          // "Authorization Failed" screen even though their sign-in had been
+          // accepted by BMW. Continue polling - the device code is still valid
+          // and BMW typically recovers within a couple of seconds. If the
+          // server stays down past the device-code expiry we'll surface a
+          // proper TimeoutError instead.
+          const correlationId =
+            response.headers.get('x-correlation-id') ?? response.headers.get('x-request-id');
+          this.logger?.warn('Transient server error from BMW token endpoint; continuing to poll', {
+            status: response.status,
+            correlationId,
+          });
+          // Back off a little so we don't hammer a struggling endpoint
+          currentInterval = Math.min(currentInterval + 5000, 30000);
         } else {
           // Unknown / malformed error response. Guard against missing `error` field
           // (issue #106) so we surface a real AuthenticationError instead of crashing

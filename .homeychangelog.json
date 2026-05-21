@@ -142,5 +142,8 @@
   },
   "1.0.23": {
     "en": "Fixed pairing getting stuck on 'Waiting for authorization…' even after BMW confirmed your sign-in — the app now reliably continues to the vehicle list (or finishes a repair) as soon as authorization succeeds. Errors that happen after sign-in (like setting up the BMW data container) are no longer mislabelled as authorization failures, and your sign-in is always kept, so tapping Try Again never asks you to re-authorize with BMW unnecessarily."
+  },
+  "1.0.24": {
+    "en": "Fixed two pairing glitches reported on v1.0.23. Pressing Continue on the Client ID screen no longer triggers stray 'Could not find that PairSession' error toasts when the wizard has already moved on. And if BMW's sign-in server has a brief hiccup (HTTP 500) right after you authorise, the app now quietly waits and retries instead of falsely reporting 'Authorization Failed' — your sign-in is preserved and pairing continues."
   }
 }

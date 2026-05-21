@@ -809,5 +809,27 @@ describe('ConnectedDriver - Comprehensive', () => {
       const setupErrorEmits = mockSession.emit.mock.calls.filter((c) => c[0] === 'setup_error');
       expect(setupErrorEmits).toHaveLength(0);
     });
+
+    // Issue #108 v1.0.23 (aagehellem): Homey Pro 2023's web UI surfaces the
+    // session-closed race with the wording "Could not find that PairSession"
+    // (older SDKs say "Not Found: PairSession"). Three red toasts appeared on
+    // the Client ID screen because our handler bubbled the error back to the
+    // UI. The isSessionClosedError predicate must match BOTH wordings.
+    it('should_swallowSessionClosedError_when_homeyProSaysCouldNotFindThatPairSession', async () => {
+      // Arrange - poll succeeds, container ready; navigation rejects with the
+      // newer "Could not find that PairSession" wording.
+      driver.setCurrentContainerIdForTest('existing-container');
+      driver.mockContainerManager.validateContainer.mockResolvedValue({
+        isValid: true,
+        missingKeys: [],
+      });
+      driver.mockAuthProvider.pollForTokens.mockResolvedValue(undefined as never);
+      mockSession.showView.mockRejectedValue(new Error('Could not find that PairSession'));
+
+      // Act + Assert - must not throw and must not emit setup_error
+      await expect(driver.testPollForAuthorizationAsync(mockSession)).resolves.toBeUndefined();
+      const setupErrorEmits = mockSession.emit.mock.calls.filter((c) => c[0] === 'setup_error');
+      expect(setupErrorEmits).toHaveLength(0);
+    });
   });
 });

@@ -95,7 +95,7 @@ export abstract class ConnectedDriver extends Driver {
         await session.showView('list_devices');
       }
     } catch (navError) {
-      if (navError instanceof Error && navError.message.includes('Not Found: PairSession')) {
+      if (this.isSessionClosedError(navError)) {
         this.logger?.info('Session closed before navigation - user already moved on');
       } else {
         this.homey.error('Failed to advance pair view after success:', navError);
@@ -103,6 +103,19 @@ export abstract class ConnectedDriver extends Driver {
     }
 
     return true;
+  }
+
+  /**
+   * Recognise the family of errors Homey raises when a PairSession is no
+   * longer reachable from the backend - the user closed the wizard, navigated
+   * away, or the session expired. We've seen at least two surface strings in
+   * the wild: 'Not Found: PairSession' (older SDKs) and 'Could not find that
+   * PairSession' (Homey Pro 2023 web UI, issue #108 v1.0.23). Match the
+   * 'PairSession' marker case-insensitively to cover both - it's a Homey
+   * internal type name and won't appear in legitimate errors.
+   */
+  private isSessionClosedError(error: unknown): boolean {
+    return error instanceof Error && /pairsession/i.test(error.message);
   }
 
   /**
@@ -114,7 +127,7 @@ export abstract class ConnectedDriver extends Driver {
     try {
       await session.emit(event, payload);
     } catch (emitError) {
-      if (emitError instanceof Error && emitError.message.includes('Not Found: PairSession')) {
+      if (this.isSessionClosedError(emitError)) {
         this.logger?.info(`Session closed - cannot emit ${event}`);
       } else {
         this.homey.error(`Failed to emit ${event}:`, emitError);
@@ -326,8 +339,21 @@ export abstract class ConnectedDriver extends Driver {
           return;
         }
 
-        // No valid tokens - proceed to device code authentication
-        await session.nextView();
+        // No valid tokens - proceed to device code authentication.
+        // nextView() can reject if the user closed the pair wizard between
+        // pressing Continue and us getting here; treat that as benign so we
+        // don't bubble "Could not find that PairSession" toasts back to a UI
+        // the user has already left (issue #108 v1.0.23 report from aagehellem).
+        try {
+          await session.nextView();
+        } catch (navError) {
+          if (this.isSessionClosedError(navError)) {
+            this.logger?.info('Session closed before advancing to device-code view');
+          } else {
+            this.homey.error('Failed to advance to device-code view:', navError);
+            throw navError;
+          }
+        }
       }
     );
 
@@ -477,7 +503,7 @@ export abstract class ConnectedDriver extends Driver {
       }
 
       // Check if error is from closed session (don't report as auth failure)
-      if (error instanceof Error && error.message.includes('Not Found: PairSession')) {
+      if (this.isSessionClosedError(error)) {
         this.logger?.info('Session closed before authentication completed - user likely cancelled');
         return;
       }
@@ -490,7 +516,7 @@ export abstract class ConnectedDriver extends Driver {
 
       // Try to notify frontend - will silently fail if session closed
       await session.emit('authentication_error', errorMessage).catch((emitError) => {
-        if (emitError instanceof Error && emitError.message.includes('Not Found: PairSession')) {
+        if (this.isSessionClosedError(emitError)) {
           this.logger?.info('Session closed - cannot report error to user');
         } else {
           this.homey.error('Failed to emit authentication error:', emitError);
