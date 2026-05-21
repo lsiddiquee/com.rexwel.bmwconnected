@@ -88,9 +88,10 @@
       <div id="errorView" style="display: none">
         <div class="homey-form-group">
           <p class="homey-text" style="color: #ff3b30">
-            <strong data-i18n="pair.device_code.error.title"></strong>
+            <strong id="errorTitle" data-i18n="pair.device_code.error.title"></strong>
           </p>
           <p id="errorMessage" class="homey-text"></p>
+          <p id="errorHint" class="homey-text-small" style="color: #666; display: none"></p>
         </div>
         <button
           class="homey-button-primary-full"
@@ -108,8 +109,18 @@
       function requestDeviceCode() {
         showView('loading');
         Homey.emit('request_device_code', null, (err, result) => {
-          if (err || !result) {
-            showError(err || Homey.__('pair.device_code.error.request_failed'));
+          if (err) {
+            showError(err);
+            return;
+          }
+          // Backend short-circuit: tokens already valid, container step is
+          // running server-side and will either advance the view on success
+          // or emit `setup_error` on failure. Stay on the loading spinner.
+          if (result && result.skipCode) {
+            return;
+          }
+          if (!result) {
+            showError(Homey.__('pair.device_code.error.request_failed'));
             return;
           }
 
@@ -166,8 +177,23 @@
         document.getElementById('errorView').style.display = view === 'error' ? 'block' : 'none';
       }
 
-      function showError(message) {
+      function showError(message, options) {
+        const opts = options || {};
+        const titleKey = opts.titleKey || 'pair.device_code.error.title';
+        const titleEl = document.getElementById('errorTitle');
+        titleEl.setAttribute('data-i18n', titleKey);
+        titleEl.textContent = Homey.__(titleKey);
         document.getElementById('errorMessage').textContent = message;
+        const hintEl = document.getElementById('errorHint');
+        if (opts.hintKey) {
+          hintEl.setAttribute('data-i18n', opts.hintKey);
+          hintEl.textContent = Homey.__(opts.hintKey);
+          hintEl.style.display = 'block';
+        } else {
+          hintEl.removeAttribute('data-i18n');
+          hintEl.textContent = '';
+          hintEl.style.display = 'none';
+        }
         showView('error');
         stopPolling();
       }
@@ -181,9 +207,19 @@
         document.getElementById('pollingSpinner').style.display = 'none';
       });
 
-      // Listen for authentication error from backend
+      // Listen for authentication error from backend (auth itself failed)
       Homey.on('authentication_error', (error) => {
         showError(error || Homey.__('pair.device_code.error.auth_failed'));
+      });
+
+      // Listen for setup error from backend (auth succeeded, post-auth setup
+      // failed — e.g. container creation hit BMW rate limit). Distinct title
+      // so the user doesn't think their authorization failed (issue #108).
+      Homey.on('setup_error', (error) => {
+        showError(error || Homey.__('pair.device_code.setup_error.title'), {
+          titleKey: 'pair.device_code.setup_error.title',
+          hintKey: 'pair.device_code.setup_error.hint',
+        });
       });
     </script>
   </body>

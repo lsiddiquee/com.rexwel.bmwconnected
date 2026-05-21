@@ -588,6 +588,16 @@ export class DeviceStateManager {
   }
 
   /**
+   * Clear the persisted container ID (e.g. after a 404 from polling so the
+   * next poll cycle re-creates one). Stored as `null` rather than removed so
+   * subsequent reads consistently return `undefined` via the type cast.
+   */
+  async clearContainerId(): Promise<void> {
+    await this.device.setStoreValue(STORE_KEY_CONTAINER_ID, null);
+    this.logger?.debug('Cleared container ID');
+  }
+
+  /**
    * Get vehicle drive train type for capability migration (persisted)
    *
    * @returns Drive train type or undefined if not set

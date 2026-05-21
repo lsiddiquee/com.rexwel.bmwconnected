@@ -15,7 +15,6 @@ import { DeviceStoreData } from '../utils/DeviceStateManager';
 // Import types for factory methods and casting
 type DeviceCodeAuthProvider = import('../lib/auth/DeviceCodeAuthProvider').DeviceCodeAuthProvider;
 type CarDataClient = import('../lib/api/CarDataClient').CarDataClient;
-type ContainerManager = import('../lib/api/ContainerManager').ContainerManager;
 type Vehicle = import('./Vehicle').Vehicle;
 
 export abstract class ConnectedDriver extends Driver {
@@ -36,6 +35,96 @@ export abstract class ConnectedDriver extends Driver {
 
   async onInit() {
     await super.onInit();
+  }
+
+  /**
+   * Centralised post-authentication completion.
+   *
+   * Container setup is intentionally NOT done here - it now happens lazily on
+   * the first API poll (see Vehicle.ensureContainer). This keeps pairing fast
+   * and lets MQTT streaming come up immediately, with container creation
+   * (and any rate-limit backoff) deferred until the polling subsystem is
+   * actually ready to consume it.
+   *
+   * Invariants:
+   * - Token persistence is the auth provider's responsibility; we never
+   *   delete tokens from here. Downstream failures (store update, navigation)
+   *   must not invalidate the OAuth credentials.
+   * - Device-store failures emit `setup_error`, NEVER `authentication_error`.
+   *   Auth itself has already succeeded.
+   * - Session-closed errors (user cancelled / navigated away) are logged
+   *   and swallowed - they are not failures.
+   *
+   * Returns true on full success, false if a setup_error was emitted.
+   */
+  protected async completePostAuthSuccess(
+    session: PairSession,
+    device: Device | undefined
+  ): Promise<boolean> {
+    // Repair flow only: persist the new client/container hint to the device
+    // store and re-initialise services. Failure is a setup problem, not an
+    // auth problem; tokens remain valid for the next retry.
+    if (device) {
+      try {
+        await this.updateDeviceStore(device);
+      } catch (storeError) {
+        const detail = storeError instanceof Error ? storeError.message : String(storeError);
+        this.homey.error('Device store update failed:', storeError);
+        await this.emitSafely(session, 'setup_error', `Device setup failed: ${detail}`);
+        return false;
+      }
+    }
+
+    // Step 3: notify the frontend that auth + setup succeeded.
+    await this.emitSafely(session, 'authentication_success', {});
+
+    // Step 4: advance the wizard. Session-closed here is benign (user
+    // navigated away after seeing success); other errors are unexpected.
+    try {
+      if (device) {
+        await session.done();
+      } else {
+        await session.showView('list_devices');
+      }
+    } catch (navError) {
+      if (this.isSessionClosedError(navError)) {
+        this.logger?.info('Session closed before navigation - user already moved on');
+      } else {
+        this.homey.error('Failed to advance pair view after success:', navError);
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * Recognise the family of errors Homey raises when a PairSession is no
+   * longer reachable from the backend - the user closed the wizard, navigated
+   * away, or the session expired. We've seen at least two surface strings in
+   * the wild: 'Not Found: PairSession' (older SDKs) and 'Could not find that
+   * PairSession' (Homey Pro 2023 web UI, issue #108 v1.0.23). Match the
+   * 'PairSession' marker case-insensitively to cover both - it's a Homey
+   * internal type name and won't appear in legitimate errors.
+   */
+  private isSessionClosedError(error: unknown): boolean {
+    return error instanceof Error && /pairsession/i.test(error.message);
+  }
+
+  /**
+   * Emit a session event, swallowing only the "session closed" race that
+   * happens when the user cancels mid-flow. Every other emit failure is
+   * surfaced so we don't paper over real bugs.
+   */
+  private async emitSafely(session: PairSession, event: string, payload: unknown): Promise<void> {
+    try {
+      await session.emit(event, payload);
+    } catch (emitError) {
+      if (this.isSessionClosedError(emitError)) {
+        this.logger?.info(`Session closed - cannot emit ${event}`);
+      } else {
+        this.homey.error(`Failed to emit ${event}:`, emitError);
+      }
+    }
   }
 
   /**
@@ -60,31 +149,6 @@ export abstract class ConnectedDriver extends Driver {
     }
 
     return this.app.getApiClient(this.currentClientId);
-  }
-
-  /**
-   * Factory method for creating ContainerManager
-   * Protected to allow test overrides
-   */
-  protected async createContainerManager(): Promise<ContainerManager> {
-    if (!this.currentClientId) {
-      throw new Error('Client ID not initialized');
-    }
-
-    // Use app's factory method to create HttpClient with consistent configuration
-    const httpClient = this.app.createHttpClient();
-
-    // Get shared auth provider from app
-    const authProvider = this.getAuthProvider();
-
-    const { ContainerManager } = await import('../lib/api/ContainerManager');
-    return new ContainerManager({
-      httpClient,
-      getAccessToken: async () => {
-        return await authProvider.getValidAccessToken();
-      },
-      logger: this.logger,
-    });
   }
 
   async onPair(session: PairSession) {
@@ -120,13 +184,20 @@ export abstract class ConnectedDriver extends Driver {
 
       const api = this.getCarDataClient();
 
-      // Note: Container management now happens in pollForAuthorizationAsync
-      // for both pairing and repair flows
-
+      // Container creation is deferred to the first API poll (Vehicle.ensureContainer).
+      // Vehicle listing only needs the access token, so we can show the user
+      // their vehicles immediately and let MQTT start while the container
+      // (used only for HTTP polling) is provisioned in the background.
       const vehicles = await api.getVehicles();
 
       return vehicles
-        .filter((vehicle) => vehicle.brand.toLowerCase() == this.brand.toLowerCase())
+        .filter((vehicle) => {
+          // BMW CarData returns sub-brand identifiers like `BMW_I` (for electric iX/i3/i4
+          // etc.) and may use similar prefixes for MINI. Match on the brand family prefix
+          // so sub-brand vehicles are not silently dropped during pairing (issues #103, #105).
+          const brand = (vehicle.brand ?? '').toLowerCase();
+          return brand.startsWith(this.brand.toLowerCase());
+        })
         .map((vehicle) => {
           this.logger?.info(
             `Vehicle found: ${vehicle.brand}: ${vehicle.vin}, ${vehicle.model ?? 'Unknown Model'}`
@@ -205,35 +276,43 @@ export abstract class ConnectedDriver extends Driver {
           this.currentContainerId = undefined;
         }
 
-        // Check if we already have valid tokens for this client ID
+        // Check if we already have valid tokens for this client ID.
+        // Token lookup failure (no token / expired / refresh failed) means
+        // we genuinely need a fresh device code; fall through. Token success
+        // hands off to completePostAuthSuccess, which has its own scoped
+        // error handling for container / store / navigation steps and never
+        // confuses post-auth failures with auth failures.
+        let accessToken: string | undefined;
         try {
           const authProvider = this.getAuthProvider();
-          const accessToken = await authProvider.getValidAccessToken();
-          if (accessToken) {
-            this.logger?.info('Valid tokens found - skipping device code authentication');
-
-            // Validate/create container now since we're skipping device code flow
-            await this.validateOrCreateContainer();
-
-            await session.emit('authentication_success', {});
-
-            // Update device store if this is a repair flow
-            if (device) {
-              await this.updateDeviceStore(device);
-              await session.done();
-            } else {
-              // Skip device code view and go directly to list_devices/completion
-              await session.showView('list_devices');
-            }
-
-            return;
-          }
-        } catch {
-          this.logger?.info('No valid tokens found - proceeding with device code authentication');
+          accessToken = await authProvider.getValidAccessToken();
+        } catch (tokenError) {
+          this.logger?.info('No valid tokens found - proceeding with device code authentication', {
+            error: tokenError instanceof Error ? tokenError.message : String(tokenError),
+          });
         }
 
-        // No valid tokens - proceed to device code authentication
-        await session.nextView();
+        if (accessToken) {
+          this.logger?.info('Valid tokens found - skipping device code authentication');
+          await this.completePostAuthSuccess(session, device);
+          return;
+        }
+
+        // No valid tokens - proceed to device code authentication.
+        // nextView() can reject if the user closed the pair wizard between
+        // pressing Continue and us getting here; treat that as benign so we
+        // don't bubble "Could not find that PairSession" toasts back to a UI
+        // the user has already left (issue #108 v1.0.23 report from aagehellem).
+        try {
+          await session.nextView();
+        } catch (navError) {
+          if (this.isSessionClosedError(navError)) {
+            this.logger?.info('Session closed before advancing to device-code view');
+          } else {
+            this.homey.error('Failed to advance to device-code view:', navError);
+            throw navError;
+          }
+        }
       }
     );
 
@@ -251,6 +330,32 @@ export abstract class ConnectedDriver extends Driver {
 
         // Get shared auth provider from app (creates if doesn't exist)
         const authProvider = this.getAuthProvider();
+
+        // Issue #108: if we already have a valid access token (e.g. user is
+        // retrying after a container setup failure), skip the device code
+        // round-trip entirely. Token lookup is the ONLY failure that should
+        // fall through to a new device code; container / store / navigation
+        // errors must NOT cause a fresh BMW round-trip - completePostAuthSuccess
+        // handles them as setup_error and stays put.
+        let existingToken: string | undefined;
+        try {
+          existingToken = await authProvider.getValidAccessToken();
+        } catch (tokenLookupError) {
+          this.logger?.debug('No valid tokens for short-circuit - falling through to device code', {
+            error:
+              tokenLookupError instanceof Error
+                ? tokenLookupError.message
+                : String(tokenLookupError),
+          });
+        }
+
+        if (existingToken) {
+          this.logger?.info('Valid tokens already present - skipping device code flow');
+          await this.completePostAuthSuccess(session, device);
+          // Frontend treats { skipCode: true } as "do not render a device code;
+          // backend has driven the view transition already".
+          return { skipCode: true };
+        }
 
         this.currentDeviceCodeResponse = await authProvider.requestDeviceCode();
 
@@ -296,12 +401,17 @@ export abstract class ConnectedDriver extends Driver {
       return;
     }
 
+    // Capture the device code this poll loop started with (issue: stale poll
+    // loops can otherwise emit success/error against a newer pairing attempt
+    // when the user retries the request_device_code step).
+    const ownDeviceCode = this.currentDeviceCodeResponse.deviceCode;
+
     try {
       // Get shared auth provider from app
       const authProvider = this.getAuthProvider();
 
       // Start the polling process
-      const pollingPromise = authProvider.pollForTokens(this.currentDeviceCodeResponse.deviceCode);
+      const pollingPromise = authProvider.pollForTokens(ownDeviceCode);
 
       // Check cancellation status periodically
       const checkCancellation = async (): Promise<void> => {
@@ -320,16 +430,24 @@ export abstract class ConnectedDriver extends Driver {
         return;
       }
 
-      // Container validation/creation now happens in client_id_entered handler
-      await this.validateOrCreateContainer();
-
-      // Update device store for repair flow
-      if (device) {
-        await this.updateDeviceStore(device);
+      // Bail out silently if a newer pairing attempt has superseded this poll
+      if (this.currentDeviceCodeResponse?.deviceCode !== ownDeviceCode) {
+        this.logger?.info('Stale poll loop completed - newer device code is active, abandoning');
+        return;
       }
 
-      // Notify the frontend
-      await session.emit('authentication_success', {});
+      // Token persistence: DeviceCodeAuthProvider.pollForTokens has already
+      // written the tokens to the token store at this point. Container setup
+      // is intentionally deferred to the first API poll (Vehicle.ensureContainer),
+      // so we emit authentication_success while the session is still warm and
+      // the user sees the vehicle list immediately. Failures inside
+      // completePostAuthSuccess emit `setup_error`, NOT `authentication_error`
+      // (auth itself succeeded), and tokens are never cleared on store failure.
+      if (this.currentDeviceCodeResponse?.deviceCode !== ownDeviceCode) {
+        // Superseded by a newer pairing attempt between auth and completion.
+        return;
+      }
+      await this.completePostAuthSuccess(session, device);
     } catch (error) {
       // Check if this was a cancellation
       if (this.pollingCancelled) {
@@ -338,7 +456,7 @@ export abstract class ConnectedDriver extends Driver {
       }
 
       // Check if error is from closed session (don't report as auth failure)
-      if (error instanceof Error && error.message.includes('Not Found: PairSession')) {
+      if (this.isSessionClosedError(error)) {
         this.logger?.info('Session closed before authentication completed - user likely cancelled');
         return;
       }
@@ -351,81 +469,12 @@ export abstract class ConnectedDriver extends Driver {
 
       // Try to notify frontend - will silently fail if session closed
       await session.emit('authentication_error', errorMessage).catch((emitError) => {
-        if (emitError instanceof Error && emitError.message.includes('Not Found: PairSession')) {
+        if (this.isSessionClosedError(emitError)) {
           this.logger?.info('Session closed - cannot report error to user');
         } else {
           this.homey.error('Failed to emit authentication error:', emitError);
         }
       });
-    }
-  }
-
-  /**
-   * Ensure container is ready (validate existing or create new)
-   * Called after successful authentication (either via tokens or device code)
-   */
-  protected async validateOrCreateContainer(): Promise<void> {
-    if (!this.currentContainerId) {
-      await this.createNewContainer();
-    } else {
-      await this.validateExistingContainer();
-    }
-  }
-
-  /**
-   * Create new container for authentication
-   */
-  protected async createNewContainer(): Promise<void> {
-    this.logger?.info('No container ID - creating new container after authentication');
-
-    const containerManager = await this.createContainerManager();
-
-    try {
-      // Create container - use client ID as identifier (containers are per-GCID, not per-VIN)
-      // Multiple vehicles under same GCID share the same container
-      const containerKey = `HOMEY-${this.currentClientId?.substring(0, 8)}`;
-      this.currentContainerId = await containerManager.getOrCreateContainer(containerKey);
-      this.logger?.info(`Container created: ${this.currentContainerId}`);
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      this.logger?.error(`Failed to create container: ${errorMessage}`);
-      throw new Error(`Failed to create container: ${errorMessage}`);
-    }
-  }
-
-  /**
-   * Validate existing user-provided container
-   */
-  protected async validateExistingContainer(): Promise<void> {
-    if (!this.currentContainerId) {
-      throw new Error('Container ID is required for validation');
-    }
-
-    this.logger?.info(`Validating user-provided container ID: ${this.currentContainerId}`);
-
-    const containerManager = await this.createContainerManager();
-    const { ApiError } = await import('../lib/types/errors');
-
-    try {
-      const validation = await containerManager.validateContainer(this.currentContainerId);
-
-      if (!validation.isValid) {
-        this.logger?.warn(
-          `Container ${this.currentContainerId} is missing ${validation.missingKeys?.length} required keys`
-        );
-        throw new Error(
-          `Container is missing ${validation.missingKeys?.length} required keys. Please use a different container or leave empty to create a new one.`
-        );
-      }
-
-      this.logger?.info(`Container ${this.currentContainerId} validated successfully`);
-    } catch (error) {
-      if (error instanceof ApiError && error.statusCode === 404) {
-        throw new Error(
-          'Container ID not found. Please check the ID or leave empty to create a new one.'
-        );
-      }
-      throw error;
     }
   }
 

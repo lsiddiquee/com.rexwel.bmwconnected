@@ -1,10 +1,9 @@
 import { OpenStreetMap } from '../../utils/OpenStreetMap';
 import { ILogger } from '../../lib/types/ILogger';
-import fetch from 'cross-fetch';
 
-// Mock cross-fetch
-jest.mock('cross-fetch');
-const mockFetch = fetch as jest.MockedFunction<typeof fetch>;
+// Mock global fetch (native in Node.js 18+)
+const mockFetch = jest.fn();
+global.fetch = mockFetch as unknown as typeof fetch;
 
 describe('OpenStreetMap', () => {
   let mockLogger: jest.Mocked<ILogger>;

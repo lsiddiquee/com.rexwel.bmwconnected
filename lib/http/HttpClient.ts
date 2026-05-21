@@ -27,15 +27,6 @@ import { RetryConfig } from '../types/common';
 import { RateLimiter } from './RateLimiter';
 import { ILogger } from '../types';
 
-// TODO: Remove when Node.js 16 support is dropped (Homey Pro 2016-2019 EOL)
-// Polyfill fetch for Node.js < 18 (Homey Pro 2016-2019, Homey Bridge)
-// Node.js 18+ (Homey Pro 2023) has native fetch
-/* eslint-disable @typescript-eslint/no-require-imports */
-if (typeof fetch === 'undefined') {
-  require('cross-fetch/polyfill');
-}
-/* eslint-enable @typescript-eslint/no-require-imports */
-
 export type RequestInterceptor = (request: HttpRequest) => HttpRequest | Promise<HttpRequest>;
 export type ResponseInterceptor = <T>(
   response: HttpResponse<T>
@@ -235,10 +226,17 @@ export class HttpClient implements IHttpClient {
       ? request.url
       : `${this.options.baseUrl}${request.url}`;
 
+    // Generate a client-side correlation ID for this request so user-submitted
+    // logs can be matched across the HTTP layer and the error surfaced to the
+    // UI, even when the upstream gateway omits its own correlation header.
+    // Issue #108.
+    const clientCorrelationId = this.generateCorrelationId();
+
     // Merge headers
     const headers: HttpHeaders = {
       ...this.options.defaultHeaders,
       ...request.headers,
+      'x-correlation-id': clientCorrelationId,
     };
 
     // Add Content-Type for requests with body
@@ -249,7 +247,7 @@ export class HttpClient implements IHttpClient {
     // Build fetch options
     const fetchOptions: RequestInit = {
       method: request.method,
-      headers: headers as HeadersInit,
+      headers,
     };
 
     // Add body for POST/PUT/PATCH
@@ -272,9 +270,25 @@ export class HttpClient implements IHttpClient {
 
       // Parse response body
       let data: T | undefined;
+      let rawBody: string | undefined;
       const contentType = response.headers.get('Content-Type') ?? '';
 
-      if (contentType.includes('application/json')) {
+      if (!response.ok) {
+        // For errors, always read raw text first so we can include the actual body
+        // in logs even when the server omits/lies about Content-Type. Issue #108.
+        rawBody = await response.text();
+        if (rawBody && contentType.includes('application/json')) {
+          try {
+            data = JSON.parse(rawBody) as T;
+          } catch {
+            // Body claimed to be JSON but isn't parseable; fall back to raw text
+            // so the error mapper still has *something* to surface. Issue #108.
+            data = rawBody as unknown as T;
+          }
+        } else if (rawBody) {
+          data = rawBody as unknown as T;
+        }
+      } else if (contentType.includes('application/json')) {
         data = (await response.json()) as T;
       } else if (contentType.includes('text/')) {
         data = (await response.text()) as unknown as T;
@@ -289,7 +303,23 @@ export class HttpClient implements IHttpClient {
 
       // Check for HTTP errors
       if (!response.ok) {
-        throw this.mapHttpError(response.status, data, url);
+        const responseHeaders = this.parseHeaders(response.headers);
+        // Log full diagnostic detail (headers + raw body) so users can copy the
+        // log entry from the Homey app's log view into a GitHub issue — logs
+        // are local-only and never sent to a central service. Issue #108.
+        // The diagnostics MUST be passed as the 3rd `context` argument - the
+        // Logger only extracts `.message`/`.stack` from the 2nd Error arg, so
+        // earlier versions of this call site (v1.0.17) silently dropped them.
+        this.logger?.error('HTTP request failed', undefined, {
+          method: request.method,
+          url,
+          status: response.status,
+          statusText: response.statusText,
+          headers: responseHeaders,
+          body: rawBody,
+          clientCorrelationId,
+        });
+        throw this.mapHttpError(response.status, data, url, responseHeaders, clientCorrelationId);
       }
 
       // Build response object
@@ -326,26 +356,98 @@ export class HttpClient implements IHttpClient {
   /**
    * Map HTTP status codes to custom errors
    */
-  private mapHttpError(status: number, data: unknown, url: string): VehicleClientError {
-    const message = this.extractErrorMessage(data);
+  private mapHttpError(
+    status: number,
+    data: unknown,
+    url: string,
+    headers?: HttpHeaders,
+    clientCorrelationId?: string
+  ): VehicleClientError {
+    const rawMessage = this.extractErrorMessage(data);
+    // Preserve BMW-specific error codes (e.g. CU-105, CU-429) from the response
+    // body so downstream handlers (CarDataClient container errors, rate-limit
+    // classification below) can react. Issue #108.
+    const bmwCode = this.extractErrorCode(data);
+    // BMW responses include a correlation/request ID header that's required for
+    // their support team to investigate. Surface it in the message when the body
+    // gives us nothing actionable. Issue #108.
+    const serverCorrelationId = this.extractCorrelationId(headers);
+    // Always include *some* correlation ID in the surfaced error: prefer the
+    // upstream one when present, otherwise the client-generated ID we put on
+    // the request. This lets users grep the same identifier from the surfaced
+    // Homey error back into the diagnostic log entry. Issue #108.
+    const correlationToken = serverCorrelationId ?? clientCorrelationId;
+    const correlationSuffix = correlationToken ? ` (correlation: ${correlationToken})` : '';
+
+    // BMW maps the daily 50-request quota to HTTP 403 with `exveErrorCode`
+    // "CU-429" — NOT to HTTP 429. Detect this *before* falling through to the
+    // generic 403/Streaming-API branch so users get an actionable message
+    // instead of being sent to check a permission toggle. Issue #108.
+    if (bmwCode === 'CU-429' || status === 429) {
+      const retryAfter = this.extractRetryAfter(data, headers);
+      const detail = rawMessage && rawMessage !== 'Unknown error' ? `: ${rawMessage}` : '';
+      return new RateLimitError(
+        `BMW CarData daily rate limit reached (50 requests / 24h per user)${detail}. ` +
+          `Wait for the rolling 24-hour window to free up before retrying. Each pairing ` +
+          `attempt and background poll counts toward the limit.${correlationSuffix}`,
+        retryAfter,
+        { bmwCode, httpStatus: status, url }
+      );
+    }
+
+    // For the container 403 case (issue #108), append a next-step hint. The
+    // most common cause is the BMW CarData client missing the 'Streaming API'
+    // scope, but the toggle can already be enabled and a 403 still occurs —
+    // so the wording must not presume fault and must point the user at this
+    // app's repo (BMW support cannot help with a third-party Homey app).
+    // Skip the hint entirely when we already know it's a CU-429 (handled above).
+    const containerHint =
+      status === 403 && url.includes('/customers/containers')
+        ? " - if the 'Streaming API' option on your BMW CarData client is already enabled, open a GitHub issue on the Homey app's repository and include the log entry from the Homey app's log view"
+        : '';
+    const message = `${rawMessage}${correlationSuffix}${containerHint}`;
 
     switch (status) {
       case 401:
-        return new ApiError(`Authentication failed: ${message}`, status, 'AUTH_ERROR');
+        return new ApiError(`Authentication failed: ${message}`, status, bmwCode ?? 'AUTH_ERROR');
       case 404:
-        return new ApiError(`Resource not found: ${url}`, status, 'NOT_FOUND');
-      case 429: {
-        const retryAfter = this.extractRetryAfter(data);
-        return new RateLimitError(`Rate limit exceeded: ${message}`, retryAfter);
-      }
+        return new ApiError(`Resource not found: ${url}`, status, bmwCode ?? 'NOT_FOUND');
       case 500:
       case 502:
       case 503:
       case 504:
-        return new ApiError(`Server error: ${message}`, status, 'SERVER_ERROR');
+        return new ApiError(`Server error: ${message}`, status, bmwCode ?? 'SERVER_ERROR');
       default:
-        return new ApiError(`HTTP error ${status}: ${message}`, status, 'HTTP_ERROR');
+        return new ApiError(`HTTP error ${status}: ${message}`, status, bmwCode ?? 'HTTP_ERROR');
     }
+  }
+
+  /**
+   * Generate a client-side correlation ID for outbound requests. Format is a
+   * short, log-friendly random token (not a full UUID) so it's easy to copy
+   * from Homey error toasts and grep in the diagnostic logs. Issue #108.
+   */
+  private generateCorrelationId(): string {
+    // 12 hex chars + 4-char timestamp suffix is plenty to disambiguate within
+    // a single user's session while staying readable.
+    const rand = Math.random().toString(16).slice(2, 14).padEnd(12, '0');
+    const ts = (Date.now() & 0xffff).toString(16).padStart(4, '0');
+    return `cli-${rand}-${ts}`;
+  }
+
+  /**
+   * Extract a correlation / request ID from response headers. BMW CarData uses
+   * `x-correlation-id`; other gateways may use `x-request-id`. Issue #108.
+   */
+  private extractCorrelationId(headers?: HttpHeaders): string | undefined {
+    if (!headers) return undefined;
+    const candidates = ['x-correlation-id', 'x-request-id', 'request-id', 'correlation-id'];
+    for (const [key, value] of Object.entries(headers)) {
+      if (candidates.includes(key.toLowerCase()) && typeof value === 'string' && value.length > 0) {
+        return value;
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -358,16 +460,72 @@ export class HttpClient implements IHttpClient {
 
     if (data && typeof data === 'object') {
       const obj = data as Record<string, unknown>;
-      return (obj.message ?? obj.error ?? obj.error_description ?? 'Unknown error') as string;
+      // BMW CarData returns `{ code, message }` for application errors and
+      // `{ exveErrorCode, exveErrorMsg }` for gateway errors (issue #108).
+      // Gateway values are sometimes doubly-string-encoded (e.g. `'"CU-429"'`),
+      // so strip wrapping quotes when present. Fall through several common
+      // shapes so we never lose the server-provided detail.
+      const candidate =
+        obj.message ??
+        obj.error_description ??
+        obj.detail ??
+        obj.title ??
+        (typeof obj.error === 'string' ? obj.error : undefined) ??
+        (typeof obj.exveErrorMsg === 'string'
+          ? this.stripWrappingQuotes(obj.exveErrorMsg)
+          : undefined) ??
+        (typeof obj.code === 'string' ? obj.code : undefined) ??
+        (typeof obj.exveErrorCode === 'string'
+          ? this.stripWrappingQuotes(obj.exveErrorCode)
+          : undefined);
+      if (typeof candidate === 'string' && candidate.length > 0) {
+        return candidate;
+      }
     }
 
     return 'Unknown error';
   }
 
   /**
-   * Extract retry-after value from response data or headers
+   * Extract a BMW-specific error code from the response body, when present.
+   * Handles both the application-level `code` field and the gateway's
+   * `exveErrorCode` field (which is sometimes wrapped in literal quotes).
+   * Returns undefined for unstructured bodies so callers can fall back to
+   * their own default codes. Issue #108.
    */
-  private extractRetryAfter(data: unknown): number {
+  private extractErrorCode(data: unknown): string | undefined {
+    if (data && typeof data === 'object') {
+      const obj = data as Record<string, unknown>;
+      if (typeof obj.code === 'string' && obj.code.length > 0) {
+        return obj.code;
+      }
+      if (typeof obj.exveErrorCode === 'string' && obj.exveErrorCode.length > 0) {
+        const stripped = this.stripWrappingQuotes(obj.exveErrorCode);
+        if (stripped.length > 0) {
+          return stripped;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  /**
+   * Strip a single pair of wrapping ASCII double-quotes from a string. BMW's
+   * API gateway double-encodes some string values (`'"CU-429"'`) which would
+   * otherwise leak literal quote characters into surfaced messages. Issue #108.
+   */
+  private stripWrappingQuotes(value: string): string {
+    if (value.length >= 2 && value.startsWith('"') && value.endsWith('"')) {
+      return value.slice(1, -1);
+    }
+    return value;
+  }
+
+  /**
+   * Extract retry-after value from response data or headers. Falls back to
+   * a long default for BMW's daily quota so callers don't retry aggressively.
+   */
+  private extractRetryAfter(data: unknown, headers?: HttpHeaders): number {
     if (data && typeof data === 'object') {
       const obj = data as Record<string, unknown>;
       if (typeof obj.retry_after === 'number') {
@@ -375,6 +533,16 @@ export class HttpClient implements IHttpClient {
       }
       if (typeof obj.retryAfter === 'number') {
         return obj.retryAfter;
+      }
+    }
+    if (headers) {
+      for (const [key, value] of Object.entries(headers)) {
+        if (key.toLowerCase() === 'retry-after' && typeof value === 'string') {
+          const parsed = parseInt(value, 10);
+          if (Number.isFinite(parsed) && parsed > 0) {
+            return parsed;
+          }
+        }
       }
     }
 
