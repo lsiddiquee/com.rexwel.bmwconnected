@@ -13,6 +13,7 @@ import type {
   WindowsState,
   WindowState,
   LockState,
+  AlarmState,
   ElectricVehicleState,
   ChargingStatus,
   CombustionVehicleState,
@@ -64,6 +65,7 @@ export class TelematicDataTransformer {
     const doors = this.getDoors(dataMap);
     const windows = this.getWindows(dataMap);
     const lockState = this.getLockState(dataMap);
+    const alarm = this.getAlarmState(dataMap);
     const electric = this.getElectricState(dataMap);
     const combustion = this.getCombustionState(dataMap);
     const climate = this.getClimateState(dataMap);
@@ -80,6 +82,7 @@ export class TelematicDataTransformer {
       doors,
       windows,
       lockState,
+      alarm,
       electric,
       combustion,
       climate,
@@ -273,7 +276,21 @@ export class TelematicDataTransformer {
   /**
    * Get lock state from telematic data
    */
+  // lib/transformers/TelematicDataTransformer.ts:276-289
   private static getLockState(dataMap: Record<string, TelematicDataPoint>): LockState | undefined {
+    const armStatusPoint =
+      dataMap[TelematicKey.VEHICLE_VEHICLE_ANTITHEFTALARMSYSTEM_ALARM_ARMSTATUS];
+
+    // Preferred: alarm arm status ('unarmed' = unlocked, 'doorsOnly' or other armed values = locked)
+    if (armStatusPoint) {
+      const isLocked = String(armStatusPoint.value).toLowerCase() !== 'unarmed';
+      return {
+        combinedSecurityState: isLocked ? 'SECURED' : 'UNLOCKED',
+        isLocked,
+      };
+    }
+
+    // Fallback: door status (only sporadically sent by BMW)
     const doorStatusPoint = dataMap[TelematicKey.VEHICLE_CABIN_DOOR_STATUS];
 
     // BMW provides door status: SECURED, UNLOCKED, SELECTIVE_LOCKED, etc.
@@ -284,6 +301,25 @@ export class TelematicDataTransformer {
     return {
       combinedSecurityState: isLocked ? 'SECURED' : 'UNLOCKED',
       isLocked,
+    };
+  }
+
+
+  /**
+   * Get alarm arming state from telematic data
+   */
+  private static getAlarmState(dataMap: Record<string, TelematicDataPoint>): AlarmState | undefined {
+    const armStatusPoint =
+      dataMap[TelematicKey.VEHICLE_VEHICLE_ANTITHEFTALARMSYSTEM_ALARM_ARMSTATUS];
+    const isOnPoint = dataMap[TelematicKey.VEHICLE_VEHICLE_ANTITHEFTALARMSYSTEM_ALARM_ISON];
+
+    if (!armStatusPoint && !isOnPoint) {
+      return undefined;
+    }
+
+    return {
+      armStatus: armStatusPoint ? String(armStatusPoint.value) : undefined,
+      isOn: isOnPoint ? String(isOnPoint.value).toLowerCase() === 'true' : undefined,
     };
   }
 

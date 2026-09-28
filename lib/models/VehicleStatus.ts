@@ -57,6 +57,11 @@ export interface VehicleStatus {
   lockState?: LockState;
 
   /**
+   * Alarm arming state
+   */
+  alarm?: AlarmState;
+
+  /**
    * Electric vehicle specific data
    */
   electric?: ElectricVehicleState;
@@ -139,6 +144,11 @@ export type WindowState = 'CLOSED' | 'OPEN' | 'INTERMEDIATE' | 'INVALID' | 'UNKN
 export interface LockState {
   combinedSecurityState: SecurityState;
   isLocked: boolean;
+}
+
+export interface AlarmState {
+  armStatus?: string;
+  isOn?: boolean;
 }
 
 export type SecurityState = 'SECURED' | 'UNLOCKED' | 'SELECTIVE_LOCKED' | 'UNKNOWN';

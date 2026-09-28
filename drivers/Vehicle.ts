@@ -298,6 +298,7 @@ export class Vehicle extends Device {
     await Promise.resolve();
 
     try {
+      // this.log('MQTT message:', JSON.stringify(message, null, 2));
       // Update state from MQTT message (ALWAYS happens regardless of trip detection)
       this.stateManager.updateFromMqttMessage(message);
 
@@ -591,9 +592,26 @@ export class Vehicle extends Device {
     }
 
     // Update lock state (read-only status, not control)
-    if (status.lockState) {
-      const isLocked = status.lockState.isLocked;
-      await this.setCapabilityValueSafe(Capabilities.ALARM_GENERIC, !isLocked);
+    // if (status.lockState) {
+    //   const isLocked = status.lockState.isLocked;
+    //   await this.setCapabilityValueSafe(Capabilities.ALARM_GENERIC, !isLocked);
+    // }
+
+    // Update alarm active state (true = alarm is going off)
+    if (status.alarm?.isOn !== undefined) {
+      await this.setCapabilityValueSafe(Capabilities.ALARM_GENERIC, status.alarm.isOn);
+    }
+
+    // Update car alarm arming state
+    if (status.alarm?.armStatus) {
+      const knownStates = ['doorsTiltCabin', 'doorsOnly', 'unarmed'];
+      const armStatus = knownStates.includes(status.alarm.armStatus)
+        ? status.alarm.armStatus
+        : 'unknown';
+      if (armStatus === 'unknown') {
+        this.logger?.warn(`Unknown alarm arm status: ${status.alarm.armStatus}`);
+      }
+      await this.setCapabilityValueSafe(Capabilities.CARALARM_STATE, armStatus);
     }
 
     // Update electric vehicle data
@@ -616,10 +634,17 @@ export class Vehicle extends Device {
         const oldChargingStatus = this.currentVehicleState?.electric?.chargingStatus;
         const newChargingStatus = status.electric.chargingStatus;
 
-        await this.setCapabilityValueSafe(
-          Capabilities.EV_CHARGING_STATE,
-          this.convertChargingStatus(newChargingStatus)
-        );
+        // await this.setCapabilityValueSafe(
+        //   Capabilities.EV_CHARGING_STATE,
+        //   this.convertChargingStatus(newChargingStatus)
+        // );
+
+        // Also use the charging port status: connected but not charging = 'plugged_in'
+        let evChargingState = this.convertChargingStatus(newChargingStatus);
+        if (evChargingState === 'plugged_out' && status.electric.isChargerConnected) {
+          evChargingState = 'plugged_in';
+        }
+        await this.setCapabilityValueSafe(Capabilities.EV_CHARGING_STATE, evChargingState);
 
         // Trigger charging status change flow if status changed or first status update
         if (!oldChargingStatus || oldChargingStatus !== newChargingStatus) {
@@ -790,6 +815,9 @@ export class Vehicle extends Device {
 
     // Climate preconditioning status is available for all vehicles
     await this.addCapabilitySafe(Capabilities.CLIMATE_STATUS);
+
+    // Car alarm arming state is available for all vehicles
+    await this.addCapabilitySafe(Capabilities.CARALARM_STATE);
 
     // Add EV charging state capability for Homey v12.4.5+
     if (semver.gte(this.homey.version, '12.4.5') && hasElectricDriveTrain) {

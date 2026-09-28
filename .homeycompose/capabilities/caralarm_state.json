@@ -1,0 +1,17 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Car alarm state",
+    "nl": "Autoalarm status"
+  },
+  "values": [
+    { "id": "doorsTiltCabin", "title": { "en": "Armed", "nl": "Geactiveerd" } },
+    { "id": "doorsOnly", "title": { "en": "Armed (doors only)", "nl": "Geactiveerd (alleen deuren)" } },
+    { "id": "unarmed", "title": { "en": "Disarmed", "nl": "Gedeactiveerd" } },
+    { "id": "unknown", "title": { "en": "Unknown", "nl": "Onbekend" } }
+  ],
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/shield-car.svg"
+}

@@ -8,6 +8,7 @@ export class Capabilities {
   // Security capabilities
   public static readonly LOCKED = 'locked';
   public static readonly ALARM_GENERIC = 'alarm_generic';
+  public static readonly CARALARM_STATE = 'caralarm_state';
 
   // Battery and charging capabilities
   public static readonly MEASURE_BATTERY = 'measure_battery';
@@ -50,6 +51,7 @@ export class Capabilities {
   public static readonly ALL_CAPABILITIES: string[] = [
     Capabilities.LOCKED,
     Capabilities.ALARM_GENERIC,
+    Capabilities.CARALARM_STATE,
     Capabilities.MEASURE_BATTERY,
     Capabilities.MEASURE_BATTERY_ACTUAL,
     Capabilities.CHARGING_STATUS,
