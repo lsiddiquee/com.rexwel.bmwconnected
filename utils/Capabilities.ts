@@ -18,6 +18,7 @@ export class Capabilities {
   public static readonly START_CHARGING = 'start_charging_capability';
   public static readonly STOP_CHARGING = 'stop_charging_capability';
   public static readonly EV_CHARGING_STATE = 'ev_charging_state';
+  public static readonly CARCHARGING_ETA = 'carcharging_eta';
   public static readonly AC_CHARGING_LIMIT = 'ac_charging_limit_capability';
   public static readonly CHARGING_TARGET_SOC = 'charging_target_soc_capability';
 
@@ -59,6 +60,7 @@ export class Capabilities {
     Capabilities.START_CHARGING,
     Capabilities.STOP_CHARGING,
     Capabilities.EV_CHARGING_STATE,
+    Capabilities.CARCHARGING_ETA,
     Capabilities.AC_CHARGING_LIMIT,
     Capabilities.CHARGING_TARGET_SOC,
     Capabilities.RANGE,

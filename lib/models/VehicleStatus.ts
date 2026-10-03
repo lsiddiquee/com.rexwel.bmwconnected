@@ -188,6 +188,11 @@ export interface ElectricVehicleState {
   remainingChargingMinutes?: number;
 
   /**
+   * Timestamp (ISO 8601, UTC) of the remainingChargingMinutes value
+   */
+  remainingChargingMinutesAt?: string;
+
+  /**
    * Type of charging connection
    */
   chargingConnectionType?: string;

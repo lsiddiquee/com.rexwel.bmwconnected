@@ -1,0 +1,191 @@
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <style>
+      :root {
+        --accent: var(--homey-color-blue, #2f80ff);
+        --success-bg: rgba(46, 168, 78, 0.14);
+        --success-text: var(--homey-color-green, #2ea84e);
+        --warn-bg: rgba(255, 179, 0, 0.16);
+        --warn-text: var(--homey-color-yellow, #b77900);
+        --panel-bg: rgba(127, 127, 127, 0.06);
+        --panel-border: rgba(127, 127, 127, 0.12);
+        --track: rgba(127, 127, 127, 0.16);
+      }
+      * { box-sizing: border-box; }
+      html, body {
+        margin: 0;
+        background: var(--homey-background-color);
+        color: var(--homey-text-color);
+        font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+      }
+      .card {
+        padding: var(--homey-su-3);
+        border-radius: 16px;
+        border: 1px solid var(--panel-border);
+        background: var(--panel-bg);
+      }
+      .row { display: flex; align-items: center; justify-content: space-between; gap: var(--homey-su-2); }
+      .eyebrow {
+        flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+        color: var(--homey-text-color-light);
+        font-size: var(--homey-font-size-small);
+        text-transform: uppercase; letter-spacing: 0.04em;
+      }
+      .pill { flex-shrink: 0; border-radius: 999px; padding: 4px 10px; font-size: var(--homey-font-size-small); line-height: var(--homey-line-height-small); font-weight: var(--homey-font-weight-medium); }
+      .pill.ready { background: var(--success-bg); color: var(--success-text); }
+      .pill.waiting { background: var(--warn-bg); color: var(--warn-text); }
+      .pill.idle { background: var(--track); color: var(--homey-text-color-light); }
+      .values { margin-top: var(--homey-su-1); align-items: baseline; }
+      .soc { font-size: var(--homey-font-size-large); font-weight: var(--homey-font-weight-bold); }
+      .range { color: var(--homey-text-color-light); font-size: var(--homey-font-size-default); }
+      .bar { position: relative; height: 13px; margin-top: var(--homey-su-2); border-radius: 999px; background: var(--track); }
+      .fill { position: absolute; inset: 0 auto 0 0; width: 0; border-radius: 999px; background: var(--accent); transition: width 0.3s ease; }
+      .fill.charging { background: var(--success-text); }
+      .target { position: absolute; top: -4px; bottom: -4px; width: 3px; margin-left: -1.5px; border-radius: 2px; background: var(--homey-text-color); }
+      .target[hidden] { display: none; }
+      .footer { margin-top: var(--homey-su-2); }
+      .subline, .alarm { color: var(--homey-text-color-light); font-size: var(--homey-font-size-small); }
+      .alarm { display: inline-flex; align-items: center; gap: 4px; flex-shrink: 0; }
+      .alarm[hidden] { display: none; }
+      .alarm-icon {
+        width: 1.3em;
+        height: 1.3em;
+        background-color: currentColor;
+        -webkit-mask: url('car-shield.svg') center / contain no-repeat;
+        mask: url('car-shield.svg') center / contain no-repeat;
+      }
+      .subline { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+      .eta-icon {
+        flex-shrink: 0;
+        width: 1.3em;
+        height: 1.3em;
+        background-color: currentColor;
+        -webkit-mask: url('car-charging-eta.svg') center / contain no-repeat;
+        mask: url('car-charging-eta.svg') center / contain no-repeat;
+      }
+      .eta-icon[hidden] { display: none; }
+      .car-image { display: block; width: 100%; height: auto; margin-top: var(--homey-su-5); }
+      .car-image[hidden] { display: none; }
+    </style>
+  </head>
+
+  <body class="homey-widget">
+    <div class="card" id="wrap">
+      <div class="row">
+        <span class="eyebrow" id="name">Car</span>
+        <span class="pill idle" id="pill">Loading</span>
+      </div>
+      <img class="car-image" id="carImage" alt="" hidden />
+      <div class="row values">
+        <span class="soc" id="soc">--</span>
+        <span class="range" id="range"></span>
+      </div>
+      <div class="bar">
+        <div class="fill" id="fill"></div>
+        <div class="target" id="target" hidden></div>
+      </div>
+      <div class="row footer">
+        <span class="subline"><span class="eta-icon" id="etaIcon" hidden></span><span id="subline"></span></span>
+        <span class="alarm" id="alarm" hidden><span id="alarmText"></span><span class="alarm-icon"></span></span>
+      </div>
+    </div>
+
+    <script type="text/javascript">
+      function onHomeyReady(Homey) {
+        const settings = Homey.getSettings() || {};
+        const deviceId = settings.device && settings.device.id;
+        const el = id => document.getElementById(id);
+
+        function setPill(text, cls) {
+          el('pill').textContent = text;
+          el('pill').className = 'pill ' + cls;
+        }
+
+        function fitHeight() {
+          const style = getComputedStyle(document.body);
+          const padding = parseFloat(style.paddingTop || 0) + parseFloat(style.paddingBottom || 0);
+          const height = Math.ceil(el('wrap').getBoundingClientRect().height + padding);
+          try {
+            Homey.setHeight(height);
+          } catch (err) {
+            /* ignore */
+          }
+          return height;
+        }
+
+        function render(s) {
+          el('name').textContent = s.name;
+          el('soc').textContent = typeof s.soc === 'number' ? Math.round(s.soc) + '%' : '--';
+          el('range').textContent = typeof s.range === 'number' ? Math.round(s.range) + ' ' + s.rangeUnit : '';
+
+          const charging = s.chargingStatus === 'CHARGING';
+          el('fill').style.width = Math.max(0, Math.min(100, s.soc || 0)) + '%';
+          el('fill').classList.toggle('charging', charging);
+
+          const hasTarget = typeof s.target === 'number';
+          el('target').hidden = !hasTarget;
+          if (hasTarget) el('target').style.left = s.target + '%';
+
+          if (charging) setPill('Charging', 'ready');
+          else if (s.chargingStatus === 'COMPLETE') setPill('Complete', 'ready');
+          else if (s.pluggedIn) setPill('Plugged in', 'waiting');
+          else setPill('Not plugged in', 'idle');
+
+          el('etaIcon').hidden = !(charging && s.eta);
+          if (charging && s.eta) el('subline').textContent = (hasTarget ? s.target + '% at ' : 'Ready at ') + s.eta;
+          else if (hasTarget) el('subline').textContent = 'Target ' + s.target + '%';
+          else el('subline').textContent = '';
+
+          const alarmLabels = {
+            doorsTiltCabin: 'Armed',
+            doorsOnly: 'Armed (doors only)',
+            unarmed: 'Disarmed',
+            unknown: 'Unknown',
+          };
+          el('alarm').hidden = !s.alarm;
+          el('alarmText').textContent = alarmLabels[s.alarm] || s.alarm || '';
+        }
+
+        async function refresh() {
+          try {
+            const s = await Homey.api('GET', '/status?id=' + encodeURIComponent(deviceId));
+            if (s && s.error) throw new Error(s.error);
+            render(s);
+            fitHeight();
+          } catch (err) {
+            el('subline').textContent = err.message || 'Failed to load status.';
+          }
+        }
+
+        if (!deviceId) {
+          el('name').textContent = 'Battery status';
+          setPill('Setup', 'waiting');
+          el('subline').textContent = 'Choose a car in the widget settings.';
+          Homey.ready({ height: fitHeight() });
+          return;
+        }
+
+        if (settings.device.name) el('name').textContent = settings.device.name;
+        el('carImage').hidden = true;
+        if (settings.showImage) {
+          Homey.api('GET', '/image?id=' + encodeURIComponent(deviceId))
+            .then(response => {
+              if (response && response.image) {
+                el('carImage').src = response.image;
+                el('carImage').hidden = false;
+              }
+            })
+            .catch(() => {
+              /* no image available, keep it hidden */
+            });
+        }
+        el('carImage').addEventListener('load', fitHeight);
+        Homey.ready({ height: fitHeight() });
+        refresh();
+        setInterval(refresh, 30000);
+      }
+    </script>
+  </body>
+</html>

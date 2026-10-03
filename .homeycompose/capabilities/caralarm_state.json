@@ -13,5 +13,5 @@
   "getable": true,
   "setable": false,
   "uiComponent": "sensor",
-  "icon": "/assets/shield-car.svg"
+  "icon": "/assets/car-shield.svg"
 }

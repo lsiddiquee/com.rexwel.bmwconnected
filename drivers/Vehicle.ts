@@ -299,6 +299,9 @@ export class Vehicle extends Device {
 
     try {
       // this.log('MQTT message:', JSON.stringify(message, null, 2));
+      for (const [key, point] of Object.entries(message.data)) {
+        this.log(`MQTT ${key} = ${point.value}`);
+      }
       // Update state from MQTT message (ALWAYS happens regardless of trip detection)
       this.stateManager.updateFromMqttMessage(message);
 
@@ -661,6 +664,27 @@ export class Vehicle extends Device {
         }
       }
 
+      // Update charging ETA text (e.g. "80% at 16:55" or "Not charging")
+      const { chargingStatus, remainingChargingMinutes, remainingChargingMinutesAt, chargingTarget } =
+        status.electric;
+      let chargingEta = 'Not charging';
+      if (
+        chargingStatus === 'CHARGING' &&
+        remainingChargingMinutes !== undefined &&
+        remainingChargingMinutesAt
+      ) {
+        const end = new Date(
+          new Date(remainingChargingMinutesAt).getTime() + remainingChargingMinutes * 60000
+        );
+        const time = end.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: this.homey.clock.getTimezone(),
+        });
+        chargingEta = chargingTarget !== undefined ? `${chargingTarget}% at ${time}` : time;
+      }
+      await this.setCapabilityValueSafe(Capabilities.CARCHARGING_ETA, chargingEta);
+
       // TODO: Add these capabilities if needed
       // if (status.electric.chargingTarget !== undefined) {
       //   await this.updateCapabilityValue('charging_target', status.electric.chargingTarget);
@@ -776,10 +800,12 @@ export class Vehicle extends Device {
       this.logger?.info(`Vehicle '${this.getName()}' has electric drive train.`);
       await this.addCapabilitySafe(Capabilities.MEASURE_BATTERY);
       await this.addCapabilitySafe(Capabilities.EV_CHARGING_STATE);
+      await this.addCapabilitySafe(Capabilities.CARCHARGING_ETA);
     } else {
       await this.removeCapabilitySafe(Capabilities.MEASURE_BATTERY);
       await this.removeCapabilitySafe(Capabilities.RANGE_BATTERY);
       await this.removeCapabilitySafe(Capabilities.EV_CHARGING_STATE);
+      await this.removeCapabilitySafe(Capabilities.CARCHARGING_ETA);
     }
 
     // RANGE_BATTERY (electric range) is only meaningful alongside a combustion range.

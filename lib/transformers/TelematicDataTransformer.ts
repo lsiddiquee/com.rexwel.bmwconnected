@@ -370,6 +370,7 @@ export class TelematicDataTransformer {
       chargingStatus,
       chargingTarget,
       remainingChargingMinutes,
+      remainingChargingMinutesAt: remainingTimePoint?.timestamp,
     };
   }
 

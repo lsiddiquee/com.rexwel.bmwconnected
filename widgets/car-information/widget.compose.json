@@ -1,0 +1,21 @@
+{
+  "name": { "en": "Battery status", "nl": "Batterijstatus" },
+  "height": 110,
+  "settings": [
+    {
+      "id": "device",
+      "type": "autocomplete",
+      "title": { "en": "Car", "nl": "Auto" }
+    },
+    {
+      "id": "showImage",
+      "type": "checkbox",
+      "value": false,
+      "title": { "en": "Show car image", "nl": "Autoafbeelding tonen" }
+    }
+  ],
+  "api": {
+    "getStatus": { "method": "GET", "path": "/status" },
+    "getImage": { "method": "GET", "path": "/image" }
+  }
+}
