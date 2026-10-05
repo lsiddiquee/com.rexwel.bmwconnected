@@ -45,6 +45,7 @@ module.exports = {
         pluggedIn: !!(electric && electric.isChargerConnected),
         eta,
         alarm: vehicle.getCapabilityValue('caralarm_state'),
+        location: (vehicle.stateManager.getLastLocation() || {}).label || null,
       };
     } catch (err) {
       homey.log && homey.log('widget.car-information getStatus error: ' + String(err));

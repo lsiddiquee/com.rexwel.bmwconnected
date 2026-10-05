@@ -66,6 +66,19 @@
         mask: url('car-charging-eta.svg') center / contain no-repeat;
       }
       .eta-icon[hidden] { display: none; }
+      .location-icon {
+        flex-shrink: 0;
+        width: 1.3em;
+        height: 1.3em;
+        font-size: var(--homey-font-size-small);
+        color: var(--homey-text-color-light);
+        background-color: currentColor;
+        -webkit-mask: center / contain no-repeat;
+        mask: center / contain no-repeat;
+      }
+      .location-icon.home { -webkit-mask-image: url('location-home.svg'); mask-image: url('location-home.svg'); }
+      .location-icon.office { -webkit-mask-image: url('location-office.svg'); mask-image: url('location-office.svg'); }
+      .location-icon[hidden] { display: none; }
       .car-image { display: block; width: 100%; height: auto; margin-top: var(--homey-su-5); }
       .car-image[hidden] { display: none; }
     </style>
@@ -88,6 +101,7 @@
       </div>
       <div class="row footer">
         <span class="subline"><span class="eta-icon" id="etaIcon" hidden></span><span id="subline"></span></span>
+        <span class="location-icon" id="locationIcon" hidden></span>
         <span class="alarm" id="alarm" hidden><span id="alarmText"></span><span class="alarm-icon"></span></span>
       </div>
     </div>
@@ -146,6 +160,12 @@
           };
           el('alarm').hidden = !s.alarm;
           el('alarmText').textContent = alarmLabels[s.alarm] || s.alarm || '';
+
+          const locationIcons = ['home', 'office'];
+          const locationKey = (s.location || '').trim().toLowerCase();
+          const hasLocationIcon = locationIcons.includes(locationKey);
+          el('locationIcon').hidden = !hasLocationIcon;
+          el('locationIcon').className = 'location-icon' + (hasLocationIcon ? ' ' + locationKey : '');
         }
 
         async function refresh() {
