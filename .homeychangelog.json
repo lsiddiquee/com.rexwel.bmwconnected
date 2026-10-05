@@ -117,6 +117,6 @@
     "en": "Bug fixes"
   },
   "1.0.15": {
-    "en": "New Car alarm state (armed, armed doors only, disarmed) • 'Alarm active' now shows whether the car alarm is actually going off • New capabilities for doors, windows (with new icons), fuel level (combustion) and climate preconditioning status • Charging state now shows 'Plugged in' when the cable is connected but the car is not charging • Fixed an authentication check issue • API polling setting now takes effect immediately • Added Car Information widget for Homey Dashboard"
+    "en": "New Car alarm state (armed, armed doors only, disarmed) • 'Alarm active' now shows whether the car alarm is actually going off • New capabilities for doors, windows (with new icons), fuel level (combustion) and climate preconditioning status • Charging state now shows 'Plugged in' when the cable is connected but the car is not charging • Fixed an authentication check issue • API polling setting now takes effect immediately • Added Car Information widget for Homey Dashboard • Added icons for known location such as Home and Office"
   }
 }
