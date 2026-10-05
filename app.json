@@ -1,8 +1,8 @@
 {
   "_comment": "This file is generated. Please edit .homeycompose/app.json instead.",
   "id": "com.rexwel.bmwconnected",
-  "version": "1.0.14",
-  "compatibility": ">=5.0.0",
+  "version": "1.0.15",
+  "compatibility": ">=12.3.0",
   "sdk": 3,
   "name": {
     "en": "BMW / Mini Connected"
@@ -30,6 +30,9 @@
       {
         "name": "Sander Schutten",
         "email": "sander@dotnetstudio.nl"
+      },
+      {
+        "name": "Danee de Kruijff"
       }
     ],
     "translators": [
@@ -67,6 +70,14 @@
     "getClientTokens": {
       "method": "GET",
       "path": "/getClientTokens"
+    },
+    "getWidgetImage": {
+      "method": "GET",
+      "path": "/getWidgetImage"
+    },
+    "setWidgetImage": {
+      "method": "POST",
+      "path": "/setWidgetImage"
     }
   },
   "bugs": {
@@ -650,14 +661,15 @@
       ],
       "capabilities": [
         "alarm_generic",
+        "caralarm_state",
         "mileage_capability",
         "range_capability"
       ],
       "capabilitiesOptions": {
         "alarm_generic": {
           "title": {
-            "en": "Alarm disarmed",
-            "nl": "Alarm uitgeschakeld"
+            "en": "Alarm active",
+            "nl": "Alarm actief"
           }
         },
         "range_capability.battery": {
@@ -837,14 +849,15 @@
       ],
       "capabilities": [
         "alarm_generic",
+        "caralarm_state",
         "mileage_capability",
         "range_capability"
       ],
       "capabilitiesOptions": {
         "alarm_generic": {
           "title": {
-            "en": "Alarm disarmed",
-            "nl": "Alarm uitgeschakeld"
+            "en": "Alarm active",
+            "nl": "Alarm actief"
           }
         },
         "range_capability.battery": {
@@ -1018,7 +1031,98 @@
       ]
     }
   ],
+  "widgets": {
+    "car-information": {
+      "name": {
+        "en": "Battery status",
+        "nl": "Batterijstatus"
+      },
+      "height": 110,
+      "settings": [
+        {
+          "id": "device",
+          "type": "autocomplete",
+          "title": {
+            "en": "Car",
+            "nl": "Auto"
+          }
+        },
+        {
+          "id": "showImage",
+          "type": "checkbox",
+          "value": false,
+          "title": {
+            "en": "Show car image",
+            "nl": "Autoafbeelding tonen"
+          }
+        }
+      ],
+      "api": {
+        "getStatus": {
+          "method": "GET",
+          "path": "/status"
+        },
+        "getImage": {
+          "method": "GET",
+          "path": "/image"
+        }
+      },
+      "id": "car-information"
+    }
+  },
   "capabilities": {
+    "caralarm_state": {
+      "type": "enum",
+      "title": {
+        "en": "Car alarm state",
+        "nl": "Autoalarm status"
+      },
+      "values": [
+        {
+          "id": "doorsTiltCabin",
+          "title": {
+            "en": "Armed",
+            "nl": "Geactiveerd"
+          }
+        },
+        {
+          "id": "doorsOnly",
+          "title": {
+            "en": "Armed (doors only)",
+            "nl": "Geactiveerd (alleen deuren)"
+          }
+        },
+        {
+          "id": "unarmed",
+          "title": {
+            "en": "Disarmed",
+            "nl": "Gedeactiveerd"
+          }
+        },
+        {
+          "id": "unknown",
+          "title": {
+            "en": "Unknown",
+            "nl": "Onbekend"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/car-shield.svg"
+    },
+    "carcharging_eta": {
+      "type": "string",
+      "title": {
+        "en": "Charging complete",
+        "nl": "Laden gereed"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/car-charging-eta.svg"
+    },
     "charging_status_capability": {
       "type": "enum",
       "title": {
@@ -1133,6 +1237,54 @@
       "setable": false,
       "uiComponent": "sensor"
     },
+    "climate_status_capability": {
+      "type": "enum",
+      "title": {
+        "en": "Climate status",
+        "nl": "Klimaatstatus"
+      },
+      "values": [
+        {
+          "id": "HEATING",
+          "title": {
+            "en": "Heating",
+            "nl": "Verwarming"
+          }
+        },
+        {
+          "id": "COOLING",
+          "title": {
+            "en": "Cooling",
+            "nl": "Koeling"
+          }
+        },
+        {
+          "id": "VENTILATION",
+          "title": {
+            "en": "Ventilation",
+            "nl": "Ventilatie"
+          }
+        },
+        {
+          "id": "INACTIVE",
+          "title": {
+            "en": "Inactive",
+            "nl": "Inactief"
+          }
+        },
+        {
+          "id": "UNKNOWN",
+          "title": {
+            "en": "Unknown",
+            "nl": "Onbekend"
+          }
+        }
+      ],
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/airco.svg"
+    },
     "door_state_capability": {
       "type": "enum",
       "title": {
@@ -1164,7 +1316,23 @@
       ],
       "getable": true,
       "setable": false,
-      "uiComponent": "sensor"
+      "uiComponent": "sensor",
+      "icon": "/assets/car-door.svg"
+    },
+    "fuel_level_percent_capability": {
+      "type": "number",
+      "title": {
+        "en": "Fuel level",
+        "nl": "Brandstofniveau"
+      },
+      "getable": true,
+      "setable": false,
+      "uiComponent": "sensor",
+      "icon": "/assets/gas-station.svg",
+      "units": "%",
+      "min": 0,
+      "max": 100,
+      "insights": true
     },
     "mileage_capability": {
       "type": "number",
@@ -1243,55 +1411,8 @@
       ],
       "getable": true,
       "setable": false,
-      "uiComponent": "sensor"
-    },
-    "climate_status_capability": {
-      "type": "enum",
-      "title": {
-        "en": "Climate status",
-        "nl": "Klimaatstatus"
-      },
-      "values": [
-        {
-          "id": "HEATING",
-          "title": {
-            "en": "Heating",
-            "nl": "Verwarming"
-          }
-        },
-        {
-          "id": "COOLING",
-          "title": {
-            "en": "Cooling",
-            "nl": "Koeling"
-          }
-        },
-        {
-          "id": "VENTILATION",
-          "title": {
-            "en": "Ventilation",
-            "nl": "Ventilatie"
-          }
-        },
-        {
-          "id": "INACTIVE",
-          "title": {
-            "en": "Inactive",
-            "nl": "Inactief"
-          }
-        },
-        {
-          "id": "UNKNOWN",
-          "title": {
-            "en": "Unknown",
-            "nl": "Onbekend"
-          }
-        }
-      ],
-      "getable": true,
-      "setable": false,
       "uiComponent": "sensor",
-      "icon": "/assets/airco.svg"
+      "icon": "/assets/car-window.svg"
     }
   }
 }

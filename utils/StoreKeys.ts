@@ -34,3 +34,8 @@ export const STORE_KEY_CLIENT_ID = 'clientId';
  * Container ID for telematic data access
  */
 export const STORE_KEY_CONTAINER_ID = 'containerId';
+
+/**
+ * Car image shown in the dashboard widget (data URL, set via the app settings page)
+ */
+export const STORE_KEY_WIDGET_IMAGE = 'widgetImage';

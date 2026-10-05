@@ -5,14 +5,15 @@
     ],
     "capabilities": [
         "alarm_generic",
+        "caralarm_state",
         "mileage_capability",
         "range_capability"
     ],
     "capabilitiesOptions": {
         "alarm_generic": {
             "title": {
-                "en": "Alarm disarmed",
-                "nl": "Alarm uitgeschakeld"
+                "en": "Alarm active",
+                "nl": "Alarm actief"
             }
         },
         "range_capability.battery": {

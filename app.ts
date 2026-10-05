@@ -168,6 +168,23 @@ export class BMWConnectedDrive extends Homey.App {
     // Register condition cards only (read-only)
     // All action cards for remote services have been removed due to BMW CarData API limitations
     this.registerConditionCards();
+    this.registerWidgets();
+  }
+
+  private registerWidgets() {
+    const widget = this.homey.dashboards.getWidget('car-information');
+    widget.registerSettingAutocompleteListener('device', async (query: string) => {
+      const results: { id: string; name: string }[] = [];
+      for (const driver of Object.values(this.homey.drivers.getDrivers())) {
+        for (const device of driver.getDevices()) {
+          const name = device.getName();
+          if (!query || name.toLowerCase().includes(query.toLowerCase())) {
+            results.push({ id: (device.getData() as { id: string }).id, name });
+          }
+        }
+      }
+      return results;
+    });
   }
 
   private registerConditionCards() {

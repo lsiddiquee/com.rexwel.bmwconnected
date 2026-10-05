@@ -259,6 +259,20 @@
 
         <button id="save" type="button" class="homey-button-primary-full">Save changes</button>
       </form>
+      <form class="homey-form" style="margin-top: 32px">
+        <fieldset class="homey-form-fieldset">
+          <legend class="homey-form-legend">Car image for Dashboard Widget</legend>
+          <div class="homey-form-group">
+            <p>
+              Tip: use a cut-out of your car with a transparent background, for example a screenshot
+              from the My BMW app where you lift the car from the background (on iPhone: touch and
+              hold the car, then Copy). PNG, JPEG or WebP.
+            </p>
+          </div>
+          </p>
+          <div id="widgetImages">Loading cars...</div>
+        </fieldset>
+      </form>
     </div>
     <div id="logs" class="tabcontent">
       <div class="homey-form">
@@ -468,6 +482,7 @@
 
           // Render hierarchical capabilities structure
           renderDeviceDetails(deviceDetails, devicesListElement);
+          renderWidgetImages(Homey, deviceDetails);
         });
 
         // Tell Homey we're ready to be displayed
@@ -493,6 +508,134 @@
         // Show the current tab, and add an "active" class to the button that opened the tab
         document.getElementById(tabName).style.display = 'block';
         evt.currentTarget.className += ' active';
+      }
+
+      var WIDGET_IMAGE_WIDTH = 480;
+      var WIDGET_IMAGE_MAX_LENGTH = 300000;
+
+      function processWidgetImage(file, callback) {
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        img.onload = function () {
+          URL.revokeObjectURL(url);
+          var scale = Math.min(1, WIDGET_IMAGE_WIDTH / img.width);
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.round(img.width * scale);
+          canvas.height = Math.round(img.height * scale);
+          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+          var dataUrl = canvas.toDataURL('image/webp', 0.85);
+          if (dataUrl.indexOf('data:image/webp') !== 0) {
+            dataUrl = canvas.toDataURL('image/png');
+          }
+          if (dataUrl.length > WIDGET_IMAGE_MAX_LENGTH) {
+            callback(new Error('Image is too large, even after scaling.'));
+            return;
+          }
+          callback(null, dataUrl);
+        };
+        img.onerror = function () {
+          URL.revokeObjectURL(url);
+          callback(new Error('This image format is not supported here. Use PNG or JPEG.'));
+        };
+        img.src = url;
+      }
+
+      function renderWidgetImages(Homey, devices) {
+        var container = document.getElementById('widgetImages');
+        container.innerHTML = '';
+        if (!devices.length) {
+          container.textContent = 'No cars paired yet.';
+          return;
+        }
+
+        devices.forEach(function (device) {
+          var row = document.createElement('div');
+          row.className = 'homey-form-group';
+          row.innerHTML =
+            '<label class="homey-form-label"></label>' +
+            '<div data-action="choose" style="position:relative;box-sizing:border-box;width:100%;height:160px;padding:16px;border-radius:8px;background:#26272b;display:flex;align-items:center;justify-content:center;color:#888;font-size:14px;text-align:center;cursor:pointer">' +
+            '<img alt="" style="max-width:100%;max-height:100%;display:none" /><span>No image<br />Click here to select an image</span>' +
+            '<button type="button" class="homey-button-danger-small" data-action="remove" style="position:absolute;right:8px;bottom:8px;display:none;background:rgba(0,0,0,0.6);padding:4px 10px;border-radius:999px">Remove</button>' +
+            '</div>' +
+            '<input type="file" accept="image/*" style="display:none" />' +
+            '<div contenteditable="true" data-action="paste" style="margin-top:12px;padding:8px 10px;border:1px dashed #888;border-radius:8px;font-size:14px;text-align:center;cursor:text;outline:none">Paste image from clipboard here.</div>' +
+            '<p style="margin:8px 0 0;font-size:12px"></p>';
+          container.appendChild(row);
+
+          var label = row.querySelector('label');
+          var preview = row.querySelector('img');
+          var placeholder = row.querySelector('span');
+          var fileInput = row.querySelector('input[type=file]');
+          var pasteZone = row.querySelector('[data-action=paste]');
+          var removeButton = row.querySelector('[data-action=remove]');
+          var status = row.querySelector('p');
+          label.textContent = device.deviceName;
+
+          function showImage(dataUrl) {
+            preview.src = dataUrl || '';
+            preview.style.display = dataUrl ? 'block' : 'none';
+            placeholder.style.display = dataUrl ? 'none' : 'inline';
+            removeButton.style.display = dataUrl ? 'block' : 'none';
+          }
+
+          function save(dataUrl) {
+            status.style.color = '';
+            status.textContent = 'Saving...';
+            Homey.api('POST', '/setWidgetImage', { deviceId: device.deviceId, image: dataUrl }, function (err) {
+              if (err) {
+                status.style.color = 'red';
+                status.textContent = err.message || String(err);
+                return;
+              }
+              showImage(dataUrl);
+              status.textContent = dataUrl ? 'Saved (' + Math.round((dataUrl.length * 3) / 4 / 1024) + ' KB).' : 'Removed.';
+            });
+          }
+
+          function handleFile(file) {
+            if (!file) return;
+            processWidgetImage(file, function (err, dataUrl) {
+              if (err) {
+                status.style.color = 'red';
+                status.textContent = err.message;
+                return;
+              }
+              save(dataUrl);
+            });
+          }
+
+          row.querySelector('[data-action=choose]').addEventListener('click', function () {
+            fileInput.click();
+          });
+          fileInput.addEventListener('change', function () {
+            handleFile(fileInput.files[0]);
+            fileInput.value = '';
+          });
+          pasteZone.addEventListener('paste', function (e) {
+            e.preventDefault();
+            var items = (e.clipboardData && e.clipboardData.items) || [];
+            for (var i = 0; i < items.length; i++) {
+              if (items[i].type.indexOf('image/') === 0) {
+                handleFile(items[i].getAsFile());
+                return;
+              }
+            }
+            status.style.color = 'red';
+            status.textContent = 'The clipboard does not contain an image.';
+          });
+          pasteZone.addEventListener('keydown', function (e) {
+            if (!(e.metaKey || e.ctrlKey)) e.preventDefault();
+          });
+          removeButton.addEventListener('click', function (e) {
+            e.stopPropagation();
+            save(null);
+          });
+
+          showImage(null);
+          Homey.api('GET', '/getWidgetImage?id=' + encodeURIComponent(device.deviceId), {}, function (err, dataUrl) {
+            if (!err) showImage(dataUrl);
+          });
+        });
       }
 
       document.getElementById('defaultOpen').click();

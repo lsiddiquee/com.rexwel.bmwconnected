@@ -57,6 +57,11 @@ export interface VehicleStatus {
   lockState?: LockState;
 
   /**
+   * Alarm arming state
+   */
+  alarm?: AlarmState;
+
+  /**
    * Electric vehicle specific data
    */
   electric?: ElectricVehicleState;
@@ -141,6 +146,11 @@ export interface LockState {
   isLocked: boolean;
 }
 
+export interface AlarmState {
+  armStatus?: string;
+  isOn?: boolean;
+}
+
 export type SecurityState = 'SECURED' | 'UNLOCKED' | 'SELECTIVE_LOCKED' | 'UNKNOWN';
 
 /**
@@ -176,6 +186,11 @@ export interface ElectricVehicleState {
    * Estimated minutes until fully charged
    */
   remainingChargingMinutes?: number;
+
+  /**
+   * Timestamp (ISO 8601, UTC) of the remainingChargingMinutes value
+   */
+  remainingChargingMinutesAt?: string;
 
   /**
    * Type of charging connection

@@ -296,6 +296,10 @@ export class Vehicle extends Device {
     await Promise.resolve();
 
     try {
+      // this.log('MQTT message:', JSON.stringify(message, null, 2));
+      for (const [key, point] of Object.entries(message.data)) {
+        this.log(`MQTT ${key} = ${point.value}`);
+      }
       // Update state from MQTT message (ALWAYS happens regardless of trip detection)
       this.stateManager.updateFromMqttMessage(message);
 
@@ -361,6 +365,7 @@ export class Vehicle extends Device {
 
       // Fetch raw telematic data
       const rawData = await this.api.getRawTelematicData(this.deviceData.id, containerId);
+      // this.log('Raw API data:', JSON.stringify(rawData, null, 2));
 
       // Update state manager cache with API data
       await this.stateManager.updateFromApi(rawData);
@@ -384,8 +389,8 @@ export class Vehicle extends Device {
    * Rate limit: BMW CarData API has 50 requests/24h per vehicle limit.
    * Recommended minimum interval: 30 minutes (48 requests/day).
    */
-  private startApiPolling(): void {
-    const settings = this.settings;
+  private startApiPolling(settings: DeviceSettings = this.settings): void {
+    // const settings = this.settings;
 
     // Stop existing timer if running
     this.stopApiPolling();
@@ -496,9 +501,26 @@ export class Vehicle extends Device {
     }
 
     // Update lock state (read-only status, not control)
-    if (status.lockState) {
-      const isLocked = status.lockState.isLocked;
-      await this.setCapabilityValueSafe(Capabilities.ALARM_GENERIC, !isLocked);
+    // if (status.lockState) {
+    //   const isLocked = status.lockState.isLocked;
+    //   await this.setCapabilityValueSafe(Capabilities.ALARM_GENERIC, !isLocked);
+    // }
+
+    // Update alarm active state (true = alarm is going off)
+    if (status.alarm?.isOn !== undefined) {
+      await this.setCapabilityValueSafe(Capabilities.ALARM_GENERIC, status.alarm.isOn);
+    }
+
+    // Update car alarm arming state
+    if (status.alarm?.armStatus) {
+      const knownStates = ['doorsTiltCabin', 'doorsOnly', 'unarmed'];
+      const armStatus = knownStates.includes(status.alarm.armStatus)
+        ? status.alarm.armStatus
+        : 'unknown';
+      if (armStatus === 'unknown') {
+        this.logger?.warn(`Unknown alarm arm status: ${status.alarm.armStatus}`);
+      }
+      await this.setCapabilityValueSafe(Capabilities.CARALARM_STATE, armStatus);
     }
 
     // Update electric vehicle data
@@ -521,10 +543,17 @@ export class Vehicle extends Device {
         const oldChargingStatus = this.currentVehicleState?.electric?.chargingStatus;
         const newChargingStatus = status.electric.chargingStatus;
 
-        await this.setCapabilityValueSafe(
-          Capabilities.EV_CHARGING_STATE,
-          this.convertChargingStatus(newChargingStatus)
-        );
+        // await this.setCapabilityValueSafe(
+        //   Capabilities.EV_CHARGING_STATE,
+        //   this.convertChargingStatus(newChargingStatus)
+        // );
+
+        // Also use the charging port status: connected but not charging = 'plugged_in'
+        let evChargingState = this.convertChargingStatus(newChargingStatus);
+        if (evChargingState === 'plugged_out' && status.electric.isChargerConnected) {
+          evChargingState = 'plugged_in';
+        }
+        await this.setCapabilityValueSafe(Capabilities.EV_CHARGING_STATE, evChargingState);
 
         // Trigger charging status change flow if status changed or first status update
         if (!oldChargingStatus || oldChargingStatus !== newChargingStatus) {
@@ -540,6 +569,27 @@ export class Vehicle extends Device {
           );
         }
       }
+
+      // Update charging ETA text (e.g. "80% at 16:55" or "Not charging")
+      const { chargingStatus, remainingChargingMinutes, remainingChargingMinutesAt, chargingTarget } =
+        status.electric;
+      let chargingEta = 'Not charging';
+      if (
+        chargingStatus === 'CHARGING' &&
+        remainingChargingMinutes !== undefined &&
+        remainingChargingMinutesAt
+      ) {
+        const end = new Date(
+          new Date(remainingChargingMinutesAt).getTime() + remainingChargingMinutes * 60000
+        );
+        const time = end.toLocaleTimeString('en-GB', {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: this.homey.clock.getTimezone(),
+        });
+        chargingEta = chargingTarget !== undefined ? `${chargingTarget}% at ${time}` : time;
+      }
+      await this.setCapabilityValueSafe(Capabilities.CARCHARGING_ETA, chargingEta);
 
       // TODO: Add these capabilities if needed
       // if (status.electric.chargingTarget !== undefined) {
@@ -656,10 +706,12 @@ export class Vehicle extends Device {
       this.logger?.info(`Vehicle '${this.getName()}' has electric drive train.`);
       await this.addCapabilitySafe(Capabilities.MEASURE_BATTERY);
       await this.addCapabilitySafe(Capabilities.EV_CHARGING_STATE);
+      await this.addCapabilitySafe(Capabilities.CARCHARGING_ETA);
     } else {
       await this.removeCapabilitySafe(Capabilities.MEASURE_BATTERY);
       await this.removeCapabilitySafe(Capabilities.RANGE_BATTERY);
       await this.removeCapabilitySafe(Capabilities.EV_CHARGING_STATE);
+      await this.removeCapabilitySafe(Capabilities.CARCHARGING_ETA);
     }
 
     // RANGE_BATTERY (electric range) is only meaningful alongside a combustion range.
@@ -695,6 +747,9 @@ export class Vehicle extends Device {
 
     // Climate preconditioning status is available for all vehicles
     await this.addCapabilitySafe(Capabilities.CLIMATE_STATUS);
+
+    // Car alarm arming state is available for all vehicles
+    await this.addCapabilitySafe(Capabilities.CARALARM_STATE);
 
     // Add EV charging state capability for Homey v12.4.5+
     if (semver.gte(this.homey.version, '12.4.5') && hasElectricDriveTrain) {
@@ -765,7 +820,7 @@ export class Vehicle extends Device {
 
       // Start or stop API polling based on current enabled state
       if (settings.apiPollingEnabled) {
-        this.startApiPolling();
+        this.startApiPolling(settings);
       } else {
         this.stopApiPolling();
       }

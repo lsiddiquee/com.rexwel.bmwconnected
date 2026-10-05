@@ -1,7 +1,7 @@
 {
   "id": "com.rexwel.bmwconnected",
-  "version": "1.0.14",
-  "compatibility": ">=5.0.0",
+  "version": "1.0.15",
+  "compatibility": ">=12.3.0",
   "sdk": 3,
   "name": {
     "en": "BMW / Mini Connected"
@@ -29,6 +29,9 @@
       {
         "name": "Sander Schutten",
         "email": "sander@dotnetstudio.nl"
+      },
+      {
+        "name": "Danee de Kruijff"
       }
     ],
     "translators": [
@@ -66,6 +69,14 @@
     "getClientTokens": {
       "method": "GET",
       "path": "/getClientTokens"
+    },
+    "getWidgetImage": {
+      "method": "GET",
+      "path": "/getWidgetImage"
+    },
+    "setWidgetImage": {
+      "method": "POST",
+      "path": "/setWidgetImage"
     }
   },
   "bugs": {

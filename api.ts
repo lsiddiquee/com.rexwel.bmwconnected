@@ -9,7 +9,7 @@ import { DeviceData } from './utils/DeviceData';
 import { Vehicle } from './drivers/Vehicle';
 import { VehicleStatus } from './lib';
 import { DeviceStoreData } from './utils/DeviceStateManager';
-import { STORE_KEY_DEVICE_STATE } from './utils/StoreKeys';
+import { STORE_KEY_DEVICE_STATE, STORE_KEY_WIDGET_IMAGE } from './utils/StoreKeys';
 
 export async function saveSettings({
   homey,
@@ -212,4 +212,68 @@ export async function getClientTokens({ homey }: { homey: Homey }): Promise<
   }
 
   return tokens;
+}
+
+const MAX_WIDGET_IMAGE_LENGTH = 300000; // ~220 KB as data URL
+
+function findVehicleByVin(homey: Homey, vin: string): Vehicle | undefined {
+  const drivers = homey.drivers.getDrivers() as { [key: string]: Driver };
+  for (const key in drivers) {
+    for (const device of drivers[key].getDevices()) {
+      if ((device.getData() as DeviceData).id === vin) {
+        return device as Vehicle;
+      }
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Get the widget car image (data URL) for a vehicle, or null if none is set
+ */
+export async function getWidgetImage({
+  homey,
+  query,
+}: {
+  homey: Homey;
+  query: { id: string };
+}): Promise<string | null> {
+  await Promise.resolve(); // Ensure async context
+
+  const vehicle = findVehicleByVin(homey, query.id);
+  return (vehicle?.getStoreValue(STORE_KEY_WIDGET_IMAGE) as string | undefined) ?? null;
+}
+
+/**
+ * Set (or remove, when image is null) the widget car image for a vehicle
+ */
+export async function setWidgetImage({
+  homey,
+  body,
+}: {
+  homey: Homey;
+  body: { deviceId: string; image: string | null };
+}): Promise<boolean> {
+  const app = homey.app as BMWConnectedDrive;
+  app.logger?.info(`setWidgetImage invoked for ${body.deviceId}.`);
+
+  const vehicle = findVehicleByVin(homey, body.deviceId);
+  if (!vehicle) {
+    throw new Error('Vehicle not found.');
+  }
+
+  if (body.image === null) {
+    await vehicle.unsetStoreValue(STORE_KEY_WIDGET_IMAGE);
+    return true;
+  }
+
+  if (!/^data:image\/(png|jpeg|webp);base64,/.test(body.image)) {
+    throw new Error('Unsupported image format. Use PNG, JPEG or WebP.');
+  }
+  if (body.image.length > MAX_WIDGET_IMAGE_LENGTH) {
+    throw new Error('Image is too large.');
+  }
+
+  await vehicle.setStoreValue(STORE_KEY_WIDGET_IMAGE, body.image);
+  return true;
 }

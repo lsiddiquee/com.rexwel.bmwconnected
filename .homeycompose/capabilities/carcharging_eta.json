@@ -1,0 +1,11 @@
+{
+  "type": "string",
+  "title": {
+    "en": "Charging complete",
+    "nl": "Laden gereed"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor",
+  "icon": "/assets/car-charging-eta.svg"
+}
