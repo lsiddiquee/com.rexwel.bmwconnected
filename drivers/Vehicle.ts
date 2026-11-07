@@ -46,6 +46,12 @@ import {
   resolveCarDataTimeMs,
 } from '../utils/CarDataFreshness';
 import type { ConnectionState } from '../lib/streaming/IMqttClient';
+import {
+  BATTERY_WIDGET_EVENT,
+  BatteryWidgetState,
+  buildBatteryWidgetState,
+  shouldEmitBatteryWidgetState,
+} from '../utils/BatteryWidgetState';
 
 /**
  * The values of the Homey ev_charging_state capability that the app sets. The system capability
@@ -102,6 +108,8 @@ export class Vehicle extends Device {
   private _lastDataUpdateMs?: number;
   // Time (wall clock) the last-update value was last written to the device store (epoch ms)
   private _lastDataUpdatePersistedMs?: number;
+  // Battery widget state as last pushed to the dashboard widget (see emitBatteryWidgetState)
+  private _lastEmittedBatteryWidgetState?: BatteryWidgetState;
   // Lock, charging, charging cable, climate and battery states of the newest status handed to
   // updateCapabilitiesFromStatus. Recorded as soon as a status arrives, not when its update has
   // finished (unlike currentVehicleState), so overlapping updates see each other and a transition
@@ -741,7 +749,8 @@ export class Vehicle extends Device {
    *
    * Keeps the exact time in memory and persists it in the device store at most once a minute
    * (survives restarts, used by the `car_data_fresh` condition), and shows it in the
-   * `cardata_last_update` capability in the Homey's timezone. Never throws: bookkeeping must not
+   * `cardata_last_update` capability in the Homey's timezone. Pushes the new data time to the
+   * battery widget (throttled, see emitBatteryWidgetState). Never throws: bookkeeping must not
    * break data handling.
    *
    * @param dataTimeMs - When the car measured the data (epoch ms, see resolveCarDataTimeMs)
@@ -762,6 +771,7 @@ export class Vehicle extends Device {
         return;
       }
       this._lastDataUpdateMs = dataTime;
+      await this.emitBatteryWidgetState();
 
       // Persist at most once a minute (by time of writing, not data time): messages can arrive
       // several times a second while driving. A clock that stepped back also persists straight away.
@@ -811,6 +821,70 @@ export class Vehicle extends Device {
     }
     const stored: unknown = this.getStoreValue(STORE_KEY_LAST_DATA_UPDATE);
     return typeof stored === 'number' && Number.isFinite(stored) ? stored : undefined;
+  }
+
+  /**
+   * Get what the "Car battery" dashboard widget shows for this car.
+   *
+   * @returns The battery level, charging state, range and data time as of now
+   */
+  getBatteryWidgetState(): BatteryWidgetState {
+    return this.readBatteryWidgetState();
+  }
+
+  /**
+   * Build the widget state from the current vehicle status.
+   *
+   * @param overrides - Values that Homey has not persisted yet: the settings during onSettings, the
+   *   new name during onRenamed
+   */
+  private readBatteryWidgetState(
+    overrides: { settings?: DeviceSettings; name?: string } = {}
+  ): BatteryWidgetState {
+    return buildBatteryWidgetState({
+      deviceId: this.deviceData.id,
+      name: overrides.name ?? this.getName(),
+      status: this.currentVehicleState ?? undefined,
+      distanceUnit: (overrides.settings ?? this.settings).distanceUnit,
+      updatedAt: this.getLastDataUpdateMs(),
+      now: Date.now(),
+    });
+  }
+
+  /**
+   * Push the widget state to the dashboard widgets, when it differs enough from what they last
+   * received (see {@link shouldEmitBatteryWidgetState}).
+   *
+   * Never throws: the widget must not break data handling. The state is recorded before anything
+   * is awaited, so overlapping calls do not push the same state twice.
+   *
+   * @param overrides - Values that Homey has not persisted yet (see readBatteryWidgetState)
+   */
+  private async emitBatteryWidgetState(
+    overrides: { settings?: DeviceSettings; name?: string } = {}
+  ): Promise<void> {
+    try {
+      const state = this.readBatteryWidgetState(overrides);
+      if (!shouldEmitBatteryWidgetState(this._lastEmittedBatteryWidgetState, state)) {
+        return;
+      }
+
+      const previous = this._lastEmittedBatteryWidgetState;
+      this._lastEmittedBatteryWidgetState = state;
+      try {
+        await this.homey.api.realtime(BATTERY_WIDGET_EVENT, state);
+      } catch (error) {
+        // The widget did not get it: let the next change or data message push it again
+        if (this._lastEmittedBatteryWidgetState === state) {
+          this._lastEmittedBatteryWidgetState = previous;
+        }
+        throw error;
+      }
+    } catch (error) {
+      this.logger?.warn(
+        `Failed to push the battery widget state for vehicle ${this.deviceData.id}: ${String(error)}`
+      );
+    }
   }
 
   /**
@@ -1129,6 +1203,9 @@ export class Vehicle extends Device {
       // already recorded, so it would never be announced later
       await this.fireStateTriggers(stateTriggers);
     }
+
+    // The status is the current one now: show it on the dashboard widget
+    await this.emitBatteryWidgetState({ settings: settingsOverride });
   }
 
   /**
@@ -1546,10 +1623,11 @@ export class Vehicle extends Device {
   /**
    * onRenamed is called when the user updates the device's name.
    * This method can be used this to synchronise the name to the device.
-   * @param {string} _name The new name
+   * @param {string} name The new name
    */
-  onRenamed(_name: string) {
+  onRenamed(name: string) {
     this.logger?.info('Vehicle was renamed');
+    void this.emitBatteryWidgetState({ name });
   }
 
   /**

@@ -16,6 +16,8 @@ import { CarDataClient } from './lib/api/CarDataClient';
 import { HttpClient } from './lib/http/HttpClient';
 import { HomeyTokenStore } from './utils/HomeyTokenStore';
 import { Vehicle } from './drivers/Vehicle';
+import type { BatteryWidgetState } from './utils/BatteryWidgetState';
+import type { DeviceData } from './utils/DeviceData';
 
 // TODO:
 // Window states capability
@@ -171,6 +173,56 @@ export class BMWConnectedDrive extends Homey.App {
 
     // Trigger cards whose flows each filter on their own argument
     this.registerTriggerCards();
+
+    // The car picker of the "Car battery" dashboard widget
+    this.registerBatteryWidget();
+  }
+
+  /**
+   * Get every car (vehicle device) of the app, across all drivers.
+   */
+  private getVehicles(): Vehicle[] {
+    return Object.values(this.homey.drivers.getDrivers()).flatMap(
+      (driver) => driver.getDevices() as Vehicle[]
+    );
+  }
+
+  /**
+   * Get what the "Car battery" dashboard widget shows for a car.
+   *
+   * @param deviceId - The data id of the car (the widget's "car" setting). When it is missing or
+   *   no car has it (the car was removed), the first car is used
+   * @returns The widget state, or null when the app has no cars
+   */
+  getBatteryWidgetState(deviceId?: string): BatteryWidgetState | null {
+    const vehicles = this.getVehicles();
+    const vehicle =
+      vehicles.find((item) => (item.getData() as DeviceData).id === deviceId) ?? vehicles[0];
+    return vehicle ? vehicle.getBatteryWidgetState() : null;
+  }
+
+  /**
+   * Register the car picker of the "Car battery" dashboard widget: it lists the cars whose name
+   * contains what the user typed.
+   *
+   * Must never break the start of the app, so a failure is logged and nothing more.
+   */
+  private registerBatteryWidget(): void {
+    try {
+      this.homey.dashboards
+        .getWidget('battery')
+        .registerSettingAutocompleteListener('car', async (query: string) => {
+          await Promise.resolve();
+          return this.getVehicles()
+            .filter((vehicle) => vehicle.getName().toLowerCase().includes(query.toLowerCase()))
+            .map((vehicle) => ({
+              name: vehicle.getName(),
+              id: (vehicle.getData() as DeviceData).id,
+            }));
+        });
+    } catch (error) {
+      this.logger?.warn(`Failed to register the battery widget: ${String(error)}`);
+    }
   }
 
   /**

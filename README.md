@@ -112,6 +112,10 @@ Triggers fire only on a real change between two known states, not on the first d
 
 - None (read-only API)
 
+### Dashboard Widget
+
+**Car battery** shows a car's battery level, charging state, range and data age. Pick the car, a style (battery, circle or large number) and a light or dark background.
+
 ## Data Delivery: MQTT Streaming vs API Polling
 
 The BMW CarData API provides two methods for retrieving vehicle data:
