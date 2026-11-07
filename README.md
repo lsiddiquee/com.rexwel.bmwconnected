@@ -88,6 +88,12 @@ This app displays the following data in Homey:
 - Charging status changed (electric/hybrid)
 - Refueling detected (combustion/hybrid)
 - Trip completed (vehicle stopped after movement)
+- Car locked / unlocked
+- Charging flap locked / unlocked
+- Charging cable plugged in / unplugged
+- Battery level rose above X%
+- Climate started / stopped / status changed
+- Car data stream changed
 
 **Conditions:**
 
@@ -95,6 +101,12 @@ This app displays the following data in Homey:
 - Fuel level is above/below X%
 - Vehicle is charging (yes/no)
 - Vehicle is inside geofence (specific location)
+- Car is locked
+- Charging cable is plugged in
+- Car data stream is live
+- Car data was updated in the last X minutes
+
+Triggers fire only on a real change between two known states, not on the first data after a restart. If a condition's data isn't known yet, the flow stops with an error instead of guessing. The charging flap cards need `vehicle.body.flap.isLocked` in the stream.
 
 **Actions:**
 
