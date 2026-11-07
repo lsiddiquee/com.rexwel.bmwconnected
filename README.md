@@ -60,6 +60,8 @@ This app displays the following data in Homey:
 - Range (total remaining range)
 - Location (GPS map view)
 - Alarm (generic alarm status) (Door lock and/ir secured)
+- Car data stream (Live, Connecting, Reconnecting, Off or Unavailable)
+- Last car data (when the car measured its newest data)
 
 **Electric Vehicles (BEV/PHEV):**
 
@@ -153,6 +155,8 @@ To configure streaming in the BMW portal:
 4. Credentials will be visible for use
 
 **Status:** Automatically enabled if streaming subscription is active.
+
+**Recovery:** the stream renews the BMW login before the hourly token expires and retries a failed start or reconnect (30 s, 1, 2, 4, 8 min, then every 15 min). A once-a-minute check restarts it if it stopped.
 
 ### REST API Polling (Fallback)
 
