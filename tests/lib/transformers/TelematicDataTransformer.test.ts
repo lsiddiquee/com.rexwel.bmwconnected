@@ -535,6 +535,77 @@ describe('TelematicDataTransformer', () => {
     });
   });
 
+  describe('Distance units', () => {
+    // A UK car: the stream reports kilometres, the REST API the same values in miles
+    it('should_convertMilesToKilometres_when_apiReportsMiles', () => {
+      const telematicData: Record<string, TelematicDataPoint> = {
+        [TelematicKey.VEHICLE_VEHICLE_TRAVELLEDDISTANCE]: createDataPoint(62534.77, 'miles'),
+        [TelematicKey.VEHICLE_DRIVETRAIN_LASTREMAININGRANGE]: createDataPoint(168.39, 'miles'),
+        [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(88, '%'),
+        [TelematicKey.VEHICLE_DRIVETRAIN_ELECTRICENGINE_KOMBIREMAININGELECTRICRANGE]:
+          createDataPoint(168.39, 'miles'),
+      };
+
+      const result = TelematicDataTransformer.transform(
+        TEST_VIN,
+        DriveTrainType.ELECTRIC,
+        telematicData
+      );
+
+      expect(result.currentMileage).toBe(100639.96);
+      expect(result.range).toBe(271);
+      expect(result.electric?.range).toBe(271);
+    });
+
+    it('should_keepKilometres_when_streamReportsKilometres', () => {
+      const telematicData: Record<string, TelematicDataPoint> = {
+        [TelematicKey.VEHICLE_VEHICLE_TRAVELLEDDISTANCE]: createDataPoint(100640, 'km'),
+        [TelematicKey.VEHICLE_DRIVETRAIN_LASTREMAININGRANGE]: createDataPoint(271, 'km'),
+      };
+
+      const result = TelematicDataTransformer.transform(
+        TEST_VIN,
+        DriveTrainType.ELECTRIC,
+        telematicData
+      );
+
+      expect(result.currentMileage).toBe(100640);
+      expect(result.range).toBe(271);
+    });
+
+    it('should_readKilometres_when_noUnitGiven', () => {
+      const telematicData: Record<string, TelematicDataPoint> = {
+        [TelematicKey.VEHICLE_VEHICLE_TRAVELLEDDISTANCE]: createDataPoint(100640),
+        [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(88),
+        [TelematicKey.VEHICLE_DRIVETRAIN_ELECTRICENGINE_KOMBIREMAININGELECTRICRANGE]:
+          createDataPoint(271),
+      };
+
+      const result = TelematicDataTransformer.transform(
+        TEST_VIN,
+        DriveTrainType.ELECTRIC,
+        telematicData
+      );
+
+      expect(result.currentMileage).toBe(100640);
+      expect(result.electric?.range).toBe(271);
+    });
+
+    it.each(['mi', 'Miles', ' MILE '])('should_recogniseMiles_when_unitIs_%s', (unit) => {
+      const telematicData: Record<string, TelematicDataPoint> = {
+        [TelematicKey.VEHICLE_DRIVETRAIN_LASTREMAININGRANGE]: createDataPoint(100, unit),
+      };
+
+      const result = TelematicDataTransformer.transform(
+        TEST_VIN,
+        DriveTrainType.ELECTRIC,
+        telematicData
+      );
+
+      expect(result.range).toBe(160.93);
+    });
+  });
+
   describe('Edge Cases', () => {
     it('should_handleInvalidTimestamps_when_malformedDataProvided', () => {
       // Arrange - Data with invalid/missing timestamps

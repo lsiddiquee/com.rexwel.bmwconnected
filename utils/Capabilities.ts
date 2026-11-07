@@ -47,6 +47,10 @@ export class Capabilities {
   public static readonly CLIMATE_NOW = 'climate_now_capability';
   public static readonly CLIMATE_STATUS = 'climate_status_capability';
 
+  // Car data health capabilities
+  public static readonly CARDATA_STREAM_STATE = 'cardata_stream_state';
+  public static readonly CARDATA_LAST_UPDATE = 'cardata_last_update';
+
   public static readonly ALL_CAPABILITIES: string[] = [
     Capabilities.LOCKED,
     Capabilities.ALARM_GENERIC,
@@ -73,6 +77,8 @@ export class Capabilities {
     Capabilities.WINDOW_STATE,
     Capabilities.CLIMATE_NOW,
     Capabilities.CLIMATE_STATUS,
+    Capabilities.CARDATA_STREAM_STATE,
+    Capabilities.CARDATA_LAST_UPDATE,
   ];
 
   public static async GetCapabilityValueSafe<T>(

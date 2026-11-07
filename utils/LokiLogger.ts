@@ -42,7 +42,9 @@ export class LokiLogger extends SimpleClass implements ILogger {
   private tags: ContextTags = {};
   private extra: ContextExtra = {};
   private user: ContextUser = {};
-  private currentLevel: LogLevel = LogLevel.TRACE;
+  // Where the log level comes from. Asked on every log call so a level changed while the app runs
+  // (e.g. saved on the settings page) applies straight away.
+  private levelSource: () => LogLevel;
   private logs: LogEntry[] = [];
 
   // Although the reference homey-log package persists the entries for the lifetime of the app,
@@ -54,7 +56,7 @@ export class LokiLogger extends SimpleClass implements ILogger {
   constructor(homey: HomeyLike, lokiUrl: string, getLogLevel: () => LogLevel) {
     super();
 
-    this.setLevel(getLogLevel());
+    this.levelSource = getLogLevel;
     if (!homey) {
       this._error('Error: missing homey constructor parameter');
       throw new Error('Missing homey instance');
@@ -127,16 +129,19 @@ export class LokiLogger extends SimpleClass implements ILogger {
     });
   }
 
+  /**
+   * Pin the log level to a fixed value, replacing the level source given to the constructor.
+   */
   setLevel(level: LogLevel): void {
-    this.currentLevel = level;
+    this.levelSource = () => level;
   }
 
   getLevel(): LogLevel {
-    return this.currentLevel;
+    return this.levelSource();
   }
 
   private shouldLog(level: LogLevel): boolean {
-    return level >= this.currentLevel;
+    return level >= this.getLevel();
   }
 
   private logLevelToString(level: LogLevel): string {
