@@ -1,7 +1,7 @@
 /**
  * Minimum time between writes of the last-update timestamp to the device store (milliseconds).
  * Streamed messages can arrive several times a second while driving; the exact time is kept in
- * memory and only persisted this often, which is plenty for a label that shows the minute.
+ * memory and only persisted this often, which is plenty for minute-level freshness checks.
  */
 export const LAST_DATA_UPDATE_PERSIST_INTERVAL_MS = 60 * 1000;
 
@@ -29,6 +29,28 @@ export function formatLastUpdate(epochMs: number, timeZone: string | undefined):
   } catch {
     return date.toISOString();
   }
+}
+
+/**
+ * Check whether car data was updated within the given number of minutes.
+ *
+ * @param lastUpdateMs - Stored timestamp in epoch milliseconds (anything else counts as "no timestamp")
+ * @param minutes - Maximum age in minutes
+ * @param now - Current time in epoch milliseconds (injectable for tests)
+ * @returns True when the timestamp exists and is at most `minutes` old
+ */
+export function isCarDataFresh(
+  lastUpdateMs: unknown,
+  minutes: number,
+  now: number = Date.now()
+): boolean {
+  if (typeof lastUpdateMs !== 'number' || !Number.isFinite(lastUpdateMs)) {
+    return false;
+  }
+  if (typeof minutes !== 'number' || !Number.isFinite(minutes)) {
+    return false;
+  }
+  return now - lastUpdateMs <= minutes * 60 * 1000;
 }
 
 /**

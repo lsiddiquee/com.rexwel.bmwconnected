@@ -1,0 +1,18 @@
+{
+    "id": "car_data_stream_live",
+    "title": {
+        "en": "Car data stream !{{is|isn't}} live",
+        "nl": "Autodata-stream !{{is|is niet}} live"
+    },
+    "hint": {
+        "en": "Checks whether the real-time car data stream is connected. While it is live, changes in the car reach Homey within seconds. Otherwise the app falls back to periodic API polling, which can be minutes or hours behind.",
+        "nl": "Controleert of de realtime autodata-stream verbonden is. Zolang de stream live is, komen wijzigingen in de auto binnen enkele seconden in Homey aan. Anders valt de app terug op periodiek pollen van de API, wat minuten of uren achterloopt."
+    },
+    "args": [
+        {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+        }
+    ]
+}
