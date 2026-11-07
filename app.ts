@@ -231,6 +231,18 @@ export class BMWConnectedDrive extends Homey.App {
         // Compare with the Homey-standard charging state from flow card
         return currentChargingState === args.charging_state;
       });
+
+    // True when the car measured its newest data (received over MQTT or an API poll) within the last N minutes
+    this.homey.flow
+      .getConditionCard(Flows.CAR_DATA_FRESH_CONDITION)
+      .registerRunListener((args: { device: Vehicle; minutes: number }) =>
+        args.device.isCarDataFresh(Number(args.minutes))
+      );
+
+    // True when the real-time MQTT stream is connected, so changes reach Homey within seconds
+    this.homey.flow
+      .getConditionCard(Flows.CAR_DATA_STREAM_LIVE_CONDITION)
+      .registerRunListener((args: { device: Vehicle }) => args.device.isCarDataStreamLive());
   }
 
   /**

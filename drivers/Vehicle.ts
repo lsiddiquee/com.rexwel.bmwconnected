@@ -28,12 +28,14 @@ import { STORE_KEY_LAST_DATA_UPDATE } from '../utils/StoreKeys';
 import {
   isStreamState,
   mapConnectionState,
+  STREAM_STATE_TITLES,
   StreamState,
   StreamStateContext,
 } from '../utils/StreamState';
 import { getStreamRetryDelayMs, STREAM_WATCHDOG_INTERVAL_MS } from '../utils/StreamRetry';
 import {
   formatLastUpdate,
+  isCarDataFresh as isTimestampFresh,
   LAST_DATA_UPDATE_PERSIST_INTERVAL_MS,
   resolveCarDataTimeMs,
 } from '../utils/CarDataFreshness';
@@ -636,10 +638,11 @@ export class Vehicle extends Device {
   }
 
   /**
-   * Show the state of the MQTT stream in the `cardata_stream_state` capability when the value
-   * changes.
+   * Show the state of the MQTT stream in the `cardata_stream_state` capability and fire the
+   * "Car data stream changed" trigger when the value changes.
    *
-   * Duplicates are ignored. Never throws.
+   * Duplicates are ignored. The very first value (no previous value known) is not a change and
+   * does not fire the trigger. Never throws.
    *
    * @param next - The new stream state
    */
@@ -659,6 +662,11 @@ export class Vehicle extends Device {
       this.logger?.warn(
         `Failed to set stream state '${next}' for vehicle ${this.deviceData.id}: ${String(error)}`
       );
+      return;
+    }
+
+    if (previous !== undefined) {
+      await this.triggerStreamStateChanged(next);
     }
   }
 
@@ -674,6 +682,36 @@ export class Vehicle extends Device {
   }
 
   /**
+   * Fire the "Car data stream changed" flow trigger.
+   *
+   * @param state - The new stream state
+   */
+  private async triggerStreamStateChanged(state: StreamState): Promise<void> {
+    try {
+      const card = this.homey.flow.getDeviceTriggerCard(Flows.STREAM_STATE_CHANGED);
+      await card.trigger(this, { state: STREAM_STATE_TITLES[state] }, {});
+    } catch (error) {
+      this.logger?.error(
+        `Failed to fire stream state changed trigger for vehicle ${this.deviceData.id}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+
+  /**
+   * Check whether the MQTT stream is live right now, i.e. connected and delivering data.
+   *
+   * Used by the `car_data_stream_live` flow condition: while it is true, changes reach Homey
+   * within seconds. Only the state of this process counts; the capability value left over from
+   * before an app restart says nothing about the current stream.
+   *
+   * @returns True only when the stream state is `connected`
+   */
+  isCarDataStreamLive(): boolean {
+    return this._streamState === StreamState.CONNECTED;
+  }
+
+  /**
    * Remember the time the car measured the newest data we just received (MQTT message or
    * successful REST poll). Not the time we received it: a message replayed after a reconnect or a
    * poll that returns hours-old values must not make the data look fresh.
@@ -683,8 +721,9 @@ export class Vehicle extends Device {
    * app restart). The data time is clamped to now, as BMW and Homey clocks can differ.
    *
    * Keeps the exact time in memory and persists it in the device store at most once a minute
-   * (survives restarts), and shows it in the `cardata_last_update` capability in the Homey's
-   * timezone. Never throws: bookkeeping must not break data handling.
+   * (survives restarts, used by the `car_data_fresh` condition), and shows it in the
+   * `cardata_last_update` capability in the Homey's timezone. Never throws: bookkeeping must not
+   * break data handling.
    *
    * @param dataTimeMs - When the car measured the data (epoch ms, see resolveCarDataTimeMs)
    */
@@ -753,6 +792,20 @@ export class Vehicle extends Device {
     }
     const stored: unknown = this.getStoreValue(STORE_KEY_LAST_DATA_UPDATE);
     return typeof stored === 'number' && Number.isFinite(stored) ? stored : undefined;
+  }
+
+  /**
+   * Check whether the car's data is recent: the car measured it within the given number of minutes.
+   *
+   * Used by the `car_data_fresh` flow condition. This is the time the car measured the data, not
+   * the time it arrived, so a replayed message or a poll with old values is not fresh. A device
+   * that never received data is not fresh.
+   *
+   * @param minutes - Maximum age of the newest data, in minutes
+   * @returns True when the newest data was measured within the last `minutes` minutes
+   */
+  isCarDataFresh(minutes: number): boolean {
+    return isTimestampFresh(this.getLastDataUpdateMs(), minutes);
   }
 
   /**

@@ -3,9 +3,10 @@
  *
  * Covers the reliability features around the MQTT stream:
  * - retry of the initial stream start with exponential backoff
- * - the `cardata_stream_state` capability
- * - the `cardata_last_update` capability (time the CAR measured the data)
- * - the stream watchdog
+ * - the `cardata_stream_state` capability and the "Car data stream changed" trigger
+ * - the `cardata_last_update` capability (time the CAR measured the data) and the `car_data_fresh`
+ *   condition support
+ * - the stream watchdog and the `car_data_stream_live` condition support
  * - migration of the new capabilities to existing devices
  */
 
@@ -18,6 +19,7 @@ import type { ConnectionState } from '../../lib/streaming/IMqttClient';
 import type { StreamMessage } from '../../lib/streaming/StreamMessage';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { Capabilities } from '../../utils/Capabilities';
+import { Flows } from '../../utils/Flows';
 import { STORE_KEY_LAST_DATA_UPDATE } from '../../utils/StoreKeys';
 import { createHomeyTimers, createMockedVehicle } from '../helpers/vehicleTestHelper';
 
@@ -42,6 +44,7 @@ describe('Vehicle stream health', () => {
   let mockLogger: any;
   let mockSettings: any;
   let mockStateManager: any;
+  let triggerCard: { trigger: jest.Mock };
   let clients: FakeMqttClient[];
   let connectImpl: jest.Mock;
   let capabilities: Map<string, unknown>;
@@ -112,6 +115,7 @@ describe('Vehicle stream health', () => {
     store = new Map();
     clients = [];
     connectImpl = jest.fn().mockResolvedValue(undefined);
+    triggerCard = { trigger: jest.fn().mockResolvedValue(undefined) };
 
     (MqttStreamClient as unknown as jest.Mock).mockImplementation(() => {
       const client = createFakeClient();
@@ -125,6 +129,7 @@ describe('Vehicle stream health', () => {
       app: result.mocks.mockApp,
       version: '12.5.0',
       clock: { getTimezone: jest.fn().mockReturnValue('Europe/Amsterdam') },
+      flow: { getDeviceTriggerCard: jest.fn().mockReturnValue(triggerCard) },
       setTimeout: jest.fn(timers.setTimeout),
       clearTimeout: jest.fn(timers.clearTimeout),
       setInterval: jest.fn(timers.setInterval),
@@ -745,6 +750,90 @@ describe('Vehicle stream health', () => {
     });
   });
 
+  describe('stream_state_changed trigger', () => {
+    it('should_fireOncePerChange_when_stateChangesRepeatedly', async () => {
+      await vehicle['initializeMqttStreaming'](); // sets 'connecting' (first value, no trigger)
+
+      clients[0].emitState('connected');
+      clients[0].emitState('connected'); // duplicate
+      await settle();
+      clients[0].emitState('reconnecting');
+      await settle();
+      clients[0].emitState('reconnecting'); // duplicate
+      clients[0].emitState('connected');
+      await settle();
+
+      const tokens = triggerCard.trigger.mock.calls.map(([, tokens]) => tokens);
+      expect(tokens).toEqual([{ state: 'Live' }, { state: 'Reconnecting' }, { state: 'Live' }]);
+    });
+
+    it('should_passDeviceAndEnglishTitleToken_when_triggered', async () => {
+      await vehicle['initializeMqttStreaming']();
+
+      clients[0].emitState('connected');
+      await settle();
+
+      expect(vehicle.homey.flow.getDeviceTriggerCard).toHaveBeenCalledWith(
+        Flows.STREAM_STATE_CHANGED
+      );
+      expect(triggerCard.trigger).toHaveBeenCalledWith(vehicle, { state: 'Live' }, {});
+    });
+
+    it('should_notFire_when_firstEverStateIsSet', async () => {
+      await vehicle['initializeMqttStreaming']();
+
+      expect(streamState()).toBe('connecting');
+      expect(triggerCard.trigger).not.toHaveBeenCalled();
+    });
+
+    it('should_fire_when_stateDiffersFromValueStoredBeforeRestart', async () => {
+      capabilities.set(Capabilities.CARDATA_STREAM_STATE, 'connected');
+
+      await vehicle['initializeMqttStreaming']();
+
+      expect(triggerCard.trigger).toHaveBeenCalledWith(vehicle, { state: 'Connecting' }, {});
+    });
+
+    it('should_notFire_when_stateEqualsValueStoredBeforeRestart', async () => {
+      capabilities.set(Capabilities.CARDATA_STREAM_STATE, 'disabled');
+      setStreamingSettingInStore(false);
+
+      await vehicle['initializeMqttStreaming']();
+
+      expect(triggerCard.trigger).not.toHaveBeenCalled();
+    });
+
+    it('should_fire_when_streamingTurnedOffInSettings', async () => {
+      await vehicle['initializeMqttStreaming']();
+      clients[0].emitState('connected');
+      await settle();
+      triggerCard.trigger.mockClear();
+
+      await vehicle.onSettings({
+        newSettings: { ...mockSettings, streamingEnabled: false },
+        changedKeys: ['streamingEnabled'],
+      });
+
+      expect(triggerCard.trigger).toHaveBeenCalledTimes(1);
+      expect(triggerCard.trigger).toHaveBeenCalledWith(vehicle, { state: 'Off' }, {});
+    });
+
+    it('should_logAndContinue_when_triggerFails', async () => {
+      triggerCard.trigger.mockRejectedValue(new Error('flow engine down'));
+      await vehicle['initializeMqttStreaming']();
+
+      clients[0].emitState('connected');
+      await settle();
+      await settle();
+
+      expect(streamState()).toBe('connected');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('stream state changed trigger'),
+        expect.any(Error)
+      );
+    });
+  });
+
   /** Build a stream message. `pointTimestamps` are the times the car measured each value. */
   const mqttMessage = (messageTimestamp: string, pointTimestamps: string[] = []): StreamMessage =>
     ({
@@ -1195,6 +1284,81 @@ describe('Vehicle stream health', () => {
     });
   });
 
+  describe('isCarDataFresh (car_data_fresh condition)', () => {
+    it('should_returnTrue_when_updatedWithinWindow', () => {
+      store.set(STORE_KEY_LAST_DATA_UPDATE, NOW.getTime() - 10 * 60_000);
+
+      expect(vehicle.isCarDataFresh(30)).toBe(true);
+    });
+
+    it('should_returnFalse_when_updatedBeforeWindow', () => {
+      store.set(STORE_KEY_LAST_DATA_UPDATE, NOW.getTime() - 31 * 60_000);
+
+      expect(vehicle.isCarDataFresh(30)).toBe(false);
+    });
+
+    it('should_returnFalse_when_noTimestampYet', () => {
+      expect(vehicle.isCarDataFresh(30)).toBe(false);
+    });
+
+    it('should_becomeStale_when_timePassesWithoutData', async () => {
+      await handleMessage(messageMeasuredAt('2026-11-04T13:30:00Z'));
+      expect(vehicle.isCarDataFresh(5)).toBe(true);
+
+      jest.setSystemTime(new Date(NOW.getTime() + 6 * 60_000));
+
+      expect(vehicle.isCarDataFresh(5)).toBe(false);
+      expect(vehicle.isCarDataFresh(10)).toBe(true);
+    });
+
+    it('should_useLatestDataTime_when_storeWriteWasThrottled', async () => {
+      await handleMessage(messageNow());
+      jest.setSystemTime(new Date(NOW.getTime() + 50_000));
+      await handleMessage(messageNow()); // not persisted yet
+
+      // 1 min 30 s after the second message, 2 min 20 s after the persisted one
+      jest.setSystemTime(new Date(NOW.getTime() + 140_000));
+
+      expect(vehicle.isCarDataFresh(2)).toBe(true);
+    });
+
+    it('should_notBeFresh_when_replayedMessageIsHoursOld', async () => {
+      // Delivered right now, but the car measured the value 3.5 hours ago
+      await handleMessage(mqttMessage(NOW.toISOString(), ['2026-11-04T10:00:00Z']));
+
+      expect(vehicle.isCarDataFresh(30)).toBe(false);
+      expect(vehicle.isCarDataFresh(120)).toBe(false);
+      expect(vehicle.isCarDataFresh(240)).toBe(true);
+    });
+
+    it('should_stayFresh_when_oldMessageIsReplayedAfterNewerOne', async () => {
+      await handleMessage(messageNow());
+
+      jest.setSystemTime(new Date(NOW.getTime() + 2 * 60_000));
+      await handleMessage(mqttMessage(new Date().toISOString(), ['2026-11-04T09:00:00Z']));
+
+      expect(vehicle.isCarDataFresh(5)).toBe(true);
+      expect(vehicle.isCarDataFresh(1)).toBe(false);
+    });
+
+    it('should_notBeFresh_when_pollReturnsHoursOldValues', async () => {
+      pollReturns('2026-11-04T10:00:00Z', '2026-11-04T10:30:00Z');
+
+      await vehicle['executePoll']();
+
+      expect(vehicle.isCarDataFresh(30)).toBe(false);
+      expect(vehicle.isCarDataFresh(240)).toBe(true);
+    });
+
+    it('should_beFresh_when_pollReturnsRecentValues', async () => {
+      pollReturns('2026-11-04T10:00:00Z', '2026-11-04T13:29:00Z');
+
+      await vehicle['executePoll']();
+
+      expect(vehicle.isCarDataFresh(5)).toBe(true);
+    });
+  });
+
   describe('stream watchdog', () => {
     const WATCHDOG_MS = 60_000;
     const WATCHDOG_WARNING = 'MQTT stream found stopped with no retry pending - restarting';
@@ -1592,6 +1756,78 @@ describe('Vehicle stream health', () => {
         await jest.advanceTimersByTimeAsync(WATCHDOG_MS);
         expect(startSpy).toHaveBeenCalledTimes(2);
       });
+    });
+  });
+
+  describe('isCarDataStreamLive (car_data_stream_live condition)', () => {
+    it('should_returnFalse_when_nothingHasStartedYet', () => {
+      expect(vehicle.isCarDataStreamLive()).toBe(false);
+    });
+
+    it('should_returnTrue_when_streamIsConnected', async () => {
+      await vehicle['initializeMqttStreaming']();
+      clients[0].emitState('connected');
+      await settle();
+
+      expect(vehicle.isCarDataStreamLive()).toBe(true);
+    });
+
+    it.each(['connecting', 'reconnecting'] as ConnectionState[])(
+      'should_returnFalse_when_clientIs_%s',
+      async (state) => {
+        await vehicle['initializeMqttStreaming']();
+        clients[0].emitState('connected');
+        clients[0].emitState(state);
+        await settle();
+
+        expect(vehicle.isCarDataStreamLive()).toBe(false);
+      }
+    );
+
+    it('should_returnFalse_when_streamDropsAfterBeingLive', async () => {
+      await vehicle['initializeMqttStreaming']();
+      clients[0].emitState('connected');
+      await settle();
+      expect(vehicle.isCarDataStreamLive()).toBe(true);
+
+      clients[0].emitState('reconnecting');
+      await settle();
+
+      expect(vehicle.isCarDataStreamLive()).toBe(false);
+    });
+
+    it('should_returnFalse_when_startFailedAndRetryIsPending', async () => {
+      connectImpl.mockImplementation(failingConnect);
+
+      await vehicle['initializeMqttStreaming']();
+
+      expect(streamState()).toBe('reconnecting');
+      expect(vehicle.isCarDataStreamLive()).toBe(false);
+    });
+
+    it('should_returnFalse_when_streamingIsDisabled', async () => {
+      setStreamingSettingInStore(false);
+
+      await vehicle['initializeMqttStreaming']();
+
+      expect(streamState()).toBe('disabled');
+      expect(vehicle.isCarDataStreamLive()).toBe(false);
+    });
+
+    it('should_returnFalse_when_streamingIsUnavailable', async () => {
+      vehicle['_authProvider'] = undefined;
+
+      await vehicle['initializeMqttStreaming']();
+
+      expect(streamState()).toBe('unavailable');
+      expect(vehicle.isCarDataStreamLive()).toBe(false);
+    });
+
+    it('should_returnFalse_when_onlyAStaleCapabilityValueFromBeforeRestartExists', () => {
+      // Says nothing about the stream of this process
+      capabilities.set(Capabilities.CARDATA_STREAM_STATE, 'connected');
+
+      expect(vehicle.isCarDataStreamLive()).toBe(false);
     });
   });
 
