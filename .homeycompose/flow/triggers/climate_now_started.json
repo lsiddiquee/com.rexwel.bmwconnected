@@ -1,13 +1,19 @@
 {
     "id": "climate_now_started",
     "title": {
-        "en": "Climate now started",
-        "nl": "Nu klimatiseren gestart"
+        "en": "Climate started",
+        "nl": "Klimatisering gestart"
     },
-    "args": [{
-        "name": "device",
-        "type": "device",
-        "filter": "driver_id=bmw|mini"
-    }],
-    "$filter": "capabilities=climate_now_capability"
+    "hint": {
+        "en": "Fires when the car's climate preconditioning starts, for example when it is started from the My BMW app. Needs 'vehicle.vehicle.preConditioning.activity' to be ticked in the stream selection of the BMW CarData portal.",
+        "nl": "Gaat af wanneer de voorklimatisering van de auto start, bijvoorbeeld wanneer die vanuit de My BMW-app wordt gestart. Hiervoor moet 'vehicle.vehicle.preConditioning.activity' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+    },
+    "args": [
+        {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+        }
+    ],
+    "$filter": "capabilities=climate_status_capability"
 }

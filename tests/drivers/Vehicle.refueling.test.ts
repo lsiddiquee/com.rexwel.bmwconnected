@@ -19,6 +19,7 @@ import type { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { Capabilities } from '../../utils/Capabilities';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { createMockedVehicle } from '../helpers/vehicleTestHelper';
+import { UNKNOWN_FLOW_STATES } from '../../utils/FlowStates';
 
 describe('Vehicle Refueling Flow', () => {
   let vehicle: Vehicle;
@@ -120,6 +121,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T10:05:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         location: {
           coordinates: { latitude: 52.52, longitude: 13.405 },
           address: { formatted: 'Berlin, Germany' },
@@ -172,6 +174,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T10:01:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 38, // Small increase (3 liters)
           fuelLevelPercent: 54,
@@ -207,6 +210,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T11:00:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 40, // Decreased by 10 liters
           fuelLevelPercent: 60,
@@ -239,6 +243,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T10:10:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 40, // refueled 40 liters (>5 threshold)
           fuelLevelPercent: 60,
@@ -272,6 +277,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T10:00:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 45,
           fuelLevelPercent: 65,
@@ -320,6 +326,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T10:10:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         location: {
           coordinates: { latitude: 52.37, longitude: 4.9 },
           address: { formatted: 'Shell Gas Station, Amsterdam' },
@@ -366,6 +373,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T10:10:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 55, // Refueled by 35 liters
           fuelLevelPercent: 82,
@@ -417,6 +425,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T10:10:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 33, // Increased by 8 liters
           fuelLevelPercent: 49,
@@ -449,6 +458,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T10:01:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 30, // No change
           fuelLevelPercent: 45,
@@ -481,6 +491,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T10:10:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 35, // Exactly 5 liter increase
           fuelLevelPercent: 52,
@@ -541,6 +552,7 @@ describe('Vehicle Refueling Flow', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date('2025-11-04T10:05:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 40, // Refueled to 40 liters
           fuelLevelPercent: 60,

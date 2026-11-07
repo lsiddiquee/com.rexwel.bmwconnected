@@ -57,6 +57,36 @@ export interface VehicleStatus {
   lockState?: LockState;
 
   /**
+   * Whether the car is locked, with an explicit state for "never reported"
+   *
+   * Unlike `lockState`, which reads a missing value as unlocked, this is UNKNOWN until the car
+   * reports a recognised door status. Always set; the flow cards rely on it.
+   */
+  carLock: LockStatus;
+
+  /**
+   * Whether the charging flap is locked (UNKNOWN until the car reports it)
+   */
+  chargingFlap: LockStatus;
+
+  /**
+   * Whether a charging cable is plugged in, with an explicit state for "never reported"
+   *
+   * Unlike `electric.isChargerConnected`, which reads a missing value as not connected, this is
+   * UNKNOWN until the car reports a recognised charging port status. Also available when the
+   * status has no `electric` data.
+   */
+  chargingCable: CableStatus;
+
+  /**
+   * What the climate preconditioning is doing, with an explicit state for "never reported"
+   *
+   * Unlike `climate.activity`, which reads a missing value as INACTIVE, this is UNKNOWN until the
+   * car reports a recognised preconditioning activity.
+   */
+  climateActivity: ClimateActivity;
+
+  /**
    * Electric vehicle specific data
    */
   electric?: ElectricVehicleState;
@@ -144,13 +174,26 @@ export interface LockState {
 export type SecurityState = 'SECURED' | 'UNLOCKED' | 'SELECTIVE_LOCKED' | 'UNKNOWN';
 
 /**
+ * Whether something (the car, the charging flap) is locked. UNKNOWN means the car has not
+ * reported a usable value, which is not the same as unlocked.
+ */
+export type LockStatus = 'LOCKED' | 'UNLOCKED' | 'UNKNOWN';
+
+/**
+ * Whether a charging cable is plugged in. UNKNOWN means the car has not reported a usable value,
+ * which is not the same as disconnected.
+ */
+export type CableStatus = 'CONNECTED' | 'DISCONNECTED' | 'UNKNOWN';
+
+/**
  * Electric vehicle specific status
  */
 export interface ElectricVehicleState {
   /**
-   * Battery charge level percentage (0-100)
+   * Battery charge level percentage (0-100). Undefined when the car has not reported a battery
+   * level: that is not the same as an empty battery (0).
    */
-  chargeLevelPercent: number;
+  chargeLevelPercent?: number;
 
   /**
    * Remaining electric range in kilometers
@@ -183,10 +226,23 @@ export interface ElectricVehicleState {
   chargingConnectionType?: string;
 }
 
+/**
+ * What the car reports about charging, from BMW's `...electricEngine.charging.status`:
+ *
+ * - CHARGING: CHARGINGACTIVE
+ * - PAUSED: CHARGINGPAUSED
+ * - COMPLETE: CHARGINGENDED
+ * - NOT_CHARGING: NOCHARGING
+ * - INITIALIZING: INITIALIZATION (charging is being prepared)
+ * - ERROR: CHARGINGERROR
+ * - UNKNOWN: no value, or one that is not recognised
+ */
 export type ChargingStatus =
   | 'CHARGING'
   | 'NOT_CHARGING'
   | 'COMPLETE'
+  | 'PAUSED'
+  | 'INITIALIZING'
   | 'ERROR'
   | 'INVALID'
   | 'UNKNOWN';
