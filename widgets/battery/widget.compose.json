@@ -1,0 +1,30 @@
+{
+  "name": { "en": "Car battery", "nl": "Autobatterij" },
+  "height": 170,
+  "transparent": true,
+  "settings": [
+    { "id": "car", "type": "autocomplete", "title": { "en": "Car", "nl": "Auto" } },
+    {
+      "id": "style",
+      "type": "dropdown",
+      "title": { "en": "Style", "nl": "Stijl" },
+      "value": "battery",
+      "values": [
+        { "id": "battery", "title": { "en": "Battery", "nl": "Batterij" } },
+        { "id": "circle", "title": { "en": "Circle", "nl": "Cirkel" } },
+        { "id": "number", "title": { "en": "Large number", "nl": "Groot getal" } }
+      ]
+    },
+    {
+      "id": "background",
+      "type": "dropdown",
+      "title": { "en": "Background", "nl": "Achtergrond" },
+      "value": "dark",
+      "values": [
+        { "id": "dark", "title": { "en": "Dark", "nl": "Donker" } },
+        { "id": "light", "title": { "en": "Light", "nl": "Licht" } }
+      ]
+    }
+  ],
+  "api": { "getState": { "method": "GET", "path": "/state" } }
+}
