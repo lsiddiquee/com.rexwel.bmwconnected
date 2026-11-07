@@ -1,0 +1,18 @@
+{
+    "id": "charging_cable_connected",
+    "title": {
+        "en": "A charging cable was plugged in",
+        "nl": "Er is een laadkabel aangesloten"
+    },
+    "hint": {
+        "en": "Fires when a charging cable is plugged into the car, based on the charging port status BMW CarData reports. Needs 'vehicle.body.chargingPort.status' to be ticked in the stream selection of the BMW CarData portal.",
+        "nl": "Gaat af wanneer er een laadkabel op de auto wordt aangesloten, op basis van de laadpoortstatus die BMW CarData meldt. Hiervoor moet 'vehicle.body.chargingPort.status' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+    },
+    "args": [
+        {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+        }
+    ]
+}

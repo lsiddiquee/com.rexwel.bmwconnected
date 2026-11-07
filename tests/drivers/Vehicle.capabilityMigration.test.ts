@@ -19,6 +19,7 @@ import type { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { Capabilities } from '../../utils/Capabilities';
 import { createMockedVehicle } from '../helpers/vehicleTestHelper';
+import { UNKNOWN_FLOW_STATES } from '../../utils/FlowStates';
 
 describe('Vehicle Capability Migration Tests', () => {
   let vehicle: Vehicle;
@@ -32,6 +33,7 @@ describe('Vehicle Capability Migration Tests', () => {
     vin: 'TEST123456789',
     driveTrain,
     lastUpdatedAt: new Date('2025-10-29T10:00:00Z'),
+    ...UNKNOWN_FLOW_STATES,
   });
 
   beforeEach(() => {

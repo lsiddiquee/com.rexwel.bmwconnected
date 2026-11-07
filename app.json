@@ -84,6 +84,114 @@
   "flow": {
     "triggers": [
       {
+        "id": "car_locked",
+        "title": {
+          "en": "The car was locked",
+          "nl": "De auto is vergrendeld"
+        },
+        "hint": {
+          "en": "Fires when the car goes from unlocked to locked, based on the door status BMW CarData reports. BMW only sends this status now and then, so the flow can run late. Needs 'vehicle.cabin.door.status' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Gaat af wanneer de auto van ontgrendeld naar vergrendeld gaat, op basis van de deurstatus die BMW CarData meldt. BMW stuurt deze status maar af en toe, dus de flow kan te laat starten. Hiervoor moet 'vehicle.cabin.door.status' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "car_unlocked",
+        "title": {
+          "en": "The car was unlocked",
+          "nl": "De auto is ontgrendeld"
+        },
+        "hint": {
+          "en": "Fires when the car goes from locked to unlocked, based on the door status BMW CarData reports. BMW only sends this status now and then, so the flow can run late. Needs 'vehicle.cabin.door.status' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Gaat af wanneer de auto van vergrendeld naar ontgrendeld gaat, op basis van de deurstatus die BMW CarData meldt. BMW stuurt deze status maar af en toe, dus de flow kan te laat starten. Hiervoor moet 'vehicle.cabin.door.status' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "charging_cable_connected",
+        "title": {
+          "en": "A charging cable was plugged in",
+          "nl": "Er is een laadkabel aangesloten"
+        },
+        "hint": {
+          "en": "Fires when a charging cable is plugged into the car, based on the charging port status BMW CarData reports. Needs 'vehicle.body.chargingPort.status' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Gaat af wanneer er een laadkabel op de auto wordt aangesloten, op basis van de laadpoortstatus die BMW CarData meldt. Hiervoor moet 'vehicle.body.chargingPort.status' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "charging_cable_disconnected",
+        "title": {
+          "en": "The charging cable was unplugged",
+          "nl": "De laadkabel is losgekoppeld"
+        },
+        "hint": {
+          "en": "Fires when the charging cable is unplugged from the car, based on the charging port status BMW CarData reports. Needs 'vehicle.body.chargingPort.status' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Gaat af wanneer de laadkabel van de auto wordt losgekoppeld, op basis van de laadpoortstatus die BMW CarData meldt. Hiervoor moet 'vehicle.body.chargingPort.status' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "charging_flap_locked",
+        "title": {
+          "en": "The charging flap was locked",
+          "nl": "De laadklep is vergrendeld"
+        },
+        "hint": {
+          "en": "Fires when the charging flap goes from unlocked to locked, based on the data BMW CarData reports. Needs 'vehicle.body.flap.isLocked' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Gaat af wanneer de laadklep van ontgrendeld naar vergrendeld gaat, op basis van de gegevens die BMW CarData meldt. Hiervoor moet 'vehicle.body.flap.isLocked' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "charging_flap_unlocked",
+        "title": {
+          "en": "The charging flap was unlocked",
+          "nl": "De laadklep is ontgrendeld"
+        },
+        "hint": {
+          "en": "Fires when the charging flap goes from locked to unlocked, based on the data BMW CarData reports. Needs 'vehicle.body.flap.isLocked' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Gaat af wanneer de laadklep van vergrendeld naar ontgrendeld gaat, op basis van de gegevens die BMW CarData meldt. Hiervoor moet 'vehicle.body.flap.isLocked' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
         "id": "charging_status_change",
         "title": {
           "en": "Charging status changed",
@@ -111,8 +219,12 @@
       {
         "id": "climate_now_started",
         "title": {
-          "en": "Climate now started",
-          "nl": "Nu klimatiseren gestart"
+          "en": "Climate started",
+          "nl": "Klimatisering gestart"
+        },
+        "hint": {
+          "en": "Fires when the car's climate preconditioning starts, for example when it is started from the My BMW app. Needs 'vehicle.vehicle.preConditioning.activity' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Gaat af wanneer de voorklimatisering van de auto start, bijvoorbeeld wanneer die vanuit de My BMW-app wordt gestart. Hiervoor moet 'vehicle.vehicle.preConditioning.activity' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
         },
         "args": [
           {
@@ -125,9 +237,42 @@
       {
         "id": "climate_now_stopped",
         "title": {
-          "en": "Climate now stopped",
-          "nl": "Nu klimatiseren gestopt"
+          "en": "Climate stopped",
+          "nl": "Klimatisering gestopt"
         },
+        "hint": {
+          "en": "Fires when the car's climate preconditioning stops, for example when it was started from the My BMW app and has finished. Needs 'vehicle.vehicle.preConditioning.activity' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Gaat af wanneer de voorklimatisering van de auto stopt, bijvoorbeeld wanneer die vanuit de My BMW-app was gestart en klaar is. Hiervoor moet 'vehicle.vehicle.preConditioning.activity' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "climate_status_changed",
+        "title": {
+          "en": "Climate status changed",
+          "nl": "Klimaatstatus gewijzigd"
+        },
+        "hint": {
+          "en": "Fires whenever the car's climate preconditioning changes between heating, cooling, ventilation and inactive, for example when it is started from the My BMW app. Needs 'vehicle.vehicle.preConditioning.activity' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Gaat af wanneer de voorklimatisering van de auto wisselt tussen verwarmen, koelen, ventileren en inactief, bijvoorbeeld wanneer die vanuit de My BMW-app wordt gestart. Hiervoor moet 'vehicle.vehicle.preConditioning.activity' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+        },
+        "tokens": [
+          {
+            "name": "state",
+            "type": "string",
+            "title": {
+              "en": "State",
+              "nl": "Status"
+            },
+            "example": "Heating"
+          }
+        ],
         "args": [
           {
             "name": "device",
@@ -628,6 +773,42 @@
         "hint": {
           "en": "Checks whether the real-time car data stream is connected. While it is live, changes in the car reach Homey within seconds. Otherwise the app falls back to periodic API polling, which can be minutes or hours behind.",
           "nl": "Controleert of de realtime autodata-stream verbonden is. Zolang de stream live is, komen wijzigingen in de auto binnen enkele seconden in Homey aan. Anders valt de app terug op periodiek pollen van de API, wat minuten of uren achterloopt."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "car_is_locked",
+        "title": {
+          "en": "The car !{{is|isn't}} locked",
+          "nl": "De auto !{{is|is niet}} vergrendeld"
+        },
+        "hint": {
+          "en": "Checks whether the car is locked, based on the door status BMW CarData reports. BMW only sends this status now and then, so it can be out of date. The flow reports an error while the lock state isn't known yet. Needs 'vehicle.cabin.door.status' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Controleert of de auto vergrendeld is, op basis van de deurstatus die BMW CarData meldt. BMW stuurt deze status maar af en toe, dus hij kan verouderd zijn. Zolang de vergrendelstatus nog niet bekend is, geeft de flow een foutmelding. Hiervoor moet 'vehicle.cabin.door.status' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+        },
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          }
+        ]
+      },
+      {
+        "id": "charging_cable_is_connected",
+        "title": {
+          "en": "A charging cable !{{is|isn't}} plugged in",
+          "nl": "Er !{{is|is geen}} laadkabel aangesloten"
+        },
+        "hint": {
+          "en": "Checks whether a charging cable is plugged into the car, based on the charging port status BMW CarData reports. The flow reports an error while the cable state isn't known yet. Needs 'vehicle.body.chargingPort.status' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Controleert of er een laadkabel op de auto is aangesloten, op basis van de laadpoortstatus die BMW CarData meldt. Zolang de kabelstatus nog niet bekend is, geeft de flow een foutmelding. Hiervoor moet 'vehicle.body.chargingPort.status' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
         },
         "args": [
           {

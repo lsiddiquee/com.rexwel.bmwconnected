@@ -21,6 +21,7 @@ import type { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { Capabilities } from '../../utils/Capabilities';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { createMockedVehicle } from '../helpers/vehicleTestHelper';
+import { UNKNOWN_FLOW_STATES } from '../../utils/FlowStates';
 
 describe('Vehicle.updateCapabilitiesFromStatus', () => {
   let vehicle: Vehicle;
@@ -99,6 +100,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         doors: {
           combinedState: 'OPEN',
           leftFront: 'OPEN',
@@ -120,6 +122,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         windows: {
           combinedState: 'INTERMEDIATE',
           leftFront: 'INTERMEDIATE',
@@ -142,6 +145,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
       };
 
       await (vehicle as any).updateCapabilitiesFromStatus(status);
@@ -163,6 +167,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelPercent: 72,
           fuelLevelLiters: 36,
@@ -179,6 +184,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 36,
         },
@@ -199,6 +205,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         climate: { activity: 'HEATING' },
       };
 
@@ -215,6 +222,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
       };
 
       await (vehicle as any).updateCapabilitiesFromStatus(status);
@@ -233,6 +241,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-10-29T10:00:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         currentMileage: 15000,
         range: 350,
         location: {
@@ -292,6 +301,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-10-29T10:00:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         // currentMileage: undefined (missing)
         // range: undefined (missing)
         // location: undefined (missing)

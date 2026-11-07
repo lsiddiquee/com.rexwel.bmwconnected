@@ -17,6 +17,7 @@ import { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { TelematicCategory, getKeysByCategory } from '../../lib/types/TelematicKeys';
 import { createMockedVehicle } from '../helpers/vehicleTestHelper';
+import { UNKNOWN_FLOW_STATES } from '../../utils/FlowStates';
 
 // Mock TelematicKeys module
 jest.mock('../../lib/types/TelematicKeys', () => ({
@@ -91,6 +92,7 @@ describe('Vehicle Trip Completion Detection', () => {
       vin: 'TEST_VIN_123',
       driveTrain: DriveTrainType.PLUGIN_HYBRID,
       lastUpdatedAt: new Date('2025-01-15T10:00:00Z'),
+      ...UNKNOWN_FLOW_STATES,
       currentMileage: 15000,
       location: {
         coordinates: { latitude: 52.52, longitude: 13.405 },
