@@ -27,6 +27,9 @@ import { TelematicKey } from '../types/TelematicKeys';
 
 import type { DriveTrainType } from '../types/DriveTrainType';
 
+/** Kilometres in one mile */
+const KILOMETRES_PER_MILE = 1.609344;
+
 /**
  * Transform BMW CarData telematic data to VehicleStatus model
  */
@@ -94,22 +97,36 @@ export class TelematicDataTransformer {
    * Get mileage from telematic data
    */
   private static getMileage(dataMap: Record<string, TelematicDataPoint>): number {
-    const mileagePoint = dataMap[TelematicKey.VEHICLE_VEHICLE_TRAVELLEDDISTANCE];
-    if (mileagePoint && typeof mileagePoint.value === 'number') {
-      return mileagePoint.value;
+    return this.getKilometres(dataMap[TelematicKey.VEHICLE_VEHICLE_TRAVELLEDDISTANCE]) ?? 0;
+  }
+
+  /**
+   * Read a distance data point in kilometres.
+   *
+   * BMW sends distances in the unit the car is set to and says which in the point's `unit`: a UK
+   * car reports its mileage and range in miles. Everything downstream works in kilometres (the
+   * device's distance setting converts for display), so miles are converted here. A point without
+   * a unit is taken to be in kilometres, as BMW documents.
+   *
+   * @param point - The data point, if the car reported it
+   * @returns The distance in kilometres, or undefined when there is no numeric value
+   */
+  private static getKilometres(point: TelematicDataPoint | undefined): number | undefined {
+    if (!point || typeof point.value !== 'number' || !Number.isFinite(point.value)) {
+      return undefined;
     }
-    return 0;
+    const unit = point.unit?.trim().toLowerCase();
+    if (unit === 'miles' || unit === 'mile' || unit === 'mi') {
+      return Math.round(point.value * KILOMETRES_PER_MILE * 100) / 100;
+    }
+    return point.value;
   }
 
   /**
    * Get range from telematic data
    */
   private static getRange(dataMap: Record<string, TelematicDataPoint>): number | undefined {
-    const rangePoint = dataMap[TelematicKey.VEHICLE_DRIVETRAIN_LASTREMAININGRANGE];
-    if (rangePoint && typeof rangePoint.value === 'number') {
-      return rangePoint.value;
-    }
-    return undefined;
+    return this.getKilometres(dataMap[TelematicKey.VEHICLE_DRIVETRAIN_LASTREMAININGRANGE]);
   }
 
   /**
@@ -310,7 +327,7 @@ export class TelematicDataTransformer {
     }
 
     const chargeLevelPercent = socPoint && typeof socPoint.value === 'number' ? socPoint.value : 0;
-    const range = rangePoint && typeof rangePoint.value === 'number' ? rangePoint.value : 0;
+    const range = this.getKilometres(rangePoint) ?? 0;
 
     const isChargerConnected = chargerConnectedPoint
       ? String(chargerConnectedPoint.value).toUpperCase() === 'CONNECTED'
