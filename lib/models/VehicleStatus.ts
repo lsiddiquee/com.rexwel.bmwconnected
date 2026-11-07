@@ -190,9 +190,10 @@ export type CableStatus = 'CONNECTED' | 'DISCONNECTED' | 'UNKNOWN';
  */
 export interface ElectricVehicleState {
   /**
-   * Battery charge level percentage (0-100)
+   * Battery charge level percentage (0-100). Undefined when the car has not reported a battery
+   * level: that is not the same as an empty battery (0).
    */
-  chargeLevelPercent: number;
+  chargeLevelPercent?: number;
 
   /**
    * Remaining electric range in kilometers
@@ -225,10 +226,23 @@ export interface ElectricVehicleState {
   chargingConnectionType?: string;
 }
 
+/**
+ * What the car reports about charging, from BMW's `...electricEngine.charging.status`:
+ *
+ * - CHARGING: CHARGINGACTIVE
+ * - PAUSED: CHARGINGPAUSED
+ * - COMPLETE: CHARGINGENDED
+ * - NOT_CHARGING: NOCHARGING
+ * - INITIALIZING: INITIALIZATION (charging is being prepared)
+ * - ERROR: CHARGINGERROR
+ * - UNKNOWN: no value, or one that is not recognised
+ */
 export type ChargingStatus =
   | 'CHARGING'
   | 'NOT_CHARGING'
   | 'COMPLETE'
+  | 'PAUSED'
+  | 'INITIALIZING'
   | 'ERROR'
   | 'INVALID'
   | 'UNKNOWN';

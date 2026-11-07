@@ -73,6 +73,7 @@ describe('BMWConnectedDrive log level', () => {
           registerRunListener: jest.fn(),
           registerArgumentAutocompleteListener: jest.fn(),
         })),
+        getDeviceTriggerCard: jest.fn(() => ({ registerRunListener: jest.fn() })),
       },
     };
     fetchMock = jest.fn().mockResolvedValue({ ok: true, statusText: 'OK' });

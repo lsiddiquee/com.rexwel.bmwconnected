@@ -84,6 +84,53 @@
   "flow": {
     "triggers": [
       {
+        "id": "battery_level_above",
+        "title": {
+          "en": "Battery level changed and is above …",
+          "nl": "Batterijniveau gewijzigd en boven …"
+        },
+        "titleFormatted": {
+          "en": "Battery level changed and is above [[percentage]]%",
+          "nl": "Batterijniveau gewijzigd en boven [[percentage]]%"
+        },
+        "hint": {
+          "en": "Fires on every change of the battery level while the level is above the number you enter: with 80 it fires at 81, again at 82, and so on. It doesn't fire for 80 itself. Needs 'vehicle.drivetrain.batteryManagement.header' to be ticked in the stream selection of the BMW CarData portal.",
+          "nl": "Gaat af bij elke wijziging van het batterijniveau zolang het niveau boven het ingevoerde getal ligt: bij 80 gaat het af bij 81, opnieuw bij 82, enzovoort. Bij 80 zelf gaat het niet af. Hiervoor moet 'vehicle.drivetrain.batteryManagement.header' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+        },
+        "tokens": [
+          {
+            "name": "battery",
+            "type": "number",
+            "title": {
+              "en": "Battery level",
+              "nl": "Batterijniveau"
+            },
+            "example": 85
+          }
+        ],
+        "args": [
+          {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+          },
+          {
+            "name": "percentage",
+            "type": "number",
+            "title": {
+              "en": "Percentage",
+              "nl": "Percentage"
+            },
+            "placeholder": {
+              "en": "80"
+            },
+            "min": 0,
+            "max": 100,
+            "step": 1
+          }
+        ]
+      },
+      {
         "id": "car_locked",
         "title": {
           "en": "The car was locked",
@@ -205,7 +252,7 @@
               "en": "Charging status",
               "nl": "Laadstatus"
             },
-            "example": "NOCHARGING"
+            "example": "NOT_CHARGING"
           }
         ],
         "args": [
@@ -843,6 +890,13 @@
                 "title": {
                   "en": "Plugged in and charging",
                   "nl": "Aangesloten en aan het laden"
+                }
+              },
+              {
+                "id": "plugged_in_paused",
+                "title": {
+                  "en": "Plugged in, charging paused",
+                  "nl": "Aangesloten, laden gepauzeerd"
                 }
               },
               {

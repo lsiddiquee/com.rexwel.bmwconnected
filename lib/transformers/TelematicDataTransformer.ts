@@ -455,7 +455,11 @@ export class TelematicDataTransformer {
       return undefined;
     }
 
-    const chargeLevelPercent = socPoint && typeof socPoint.value === 'number' ? socPoint.value : 0;
+    // No reading is not an empty battery: leave the level undefined instead of making it 0
+    const chargeLevelPercent =
+      socPoint && typeof socPoint.value === 'number' && Number.isFinite(socPoint.value)
+        ? socPoint.value
+        : undefined;
     const range = this.getKilometres(rangePoint) ?? 0;
 
     const isChargerConnected = chargerConnectedPoint
@@ -485,15 +489,41 @@ export class TelematicDataTransformer {
 
   /**
    * Convert BMW charging status to ChargingStatus
+   *
+   * BMW documents these values for `vehicle.drivetrain.electricEngine.charging.status`, which are
+   * matched exactly first: NOCHARGING, INITIALIZATION (charging is being prepared), CHARGINGACTIVE,
+   * CHARGINGPAUSED, CHARGINGENDED and CHARGINGERROR. Other spellings are matched loosely
+   * afterwards, with error and pause checked before the generic "charging" match so that, for
+   * example, a paused charge is never reported as charging.
    */
   private static getChargingStatus(point: TelematicDataPoint | undefined): ChargingStatus {
-    // NOCHARGING, CHARGINGACTIVE, CHARGINGENDED
     if (!point) {
       return 'UNKNOWN';
     }
 
-    const value = String(point.value).toUpperCase();
+    const value = String(point.value).trim().toUpperCase();
 
+    switch (value) {
+      case 'CHARGINGACTIVE':
+        return 'CHARGING';
+      case 'CHARGINGPAUSED':
+        return 'PAUSED';
+      case 'CHARGINGENDED':
+        return 'COMPLETE';
+      case 'NOCHARGING':
+        return 'NOT_CHARGING';
+      case 'INITIALIZATION':
+        return 'INITIALIZING';
+      case 'CHARGINGERROR':
+        return 'ERROR';
+    }
+
+    if (value.includes('ERROR') || value.includes('FAULT')) {
+      return 'ERROR';
+    }
+    if (value.includes('PAUSE')) {
+      return 'PAUSED';
+    }
     if (
       value.includes('CHARGING') &&
       !value.includes('NOT') &&
@@ -502,18 +532,11 @@ export class TelematicDataTransformer {
     ) {
       return 'CHARGING';
     }
-    if (
-      value.includes('NOT_CHARGING') ||
-      value.includes('NOT CHARGING') ||
-      value === 'NOCHARGING'
-    ) {
+    if (value.includes('NOT_CHARGING') || value.includes('NOT CHARGING')) {
       return 'NOT_CHARGING';
     }
     if (value.includes('COMPLETE') || value.includes('FINISHED') || value.includes('ENDED')) {
       return 'COMPLETE';
-    }
-    if (value.includes('ERROR') || value.includes('FAULT')) {
-      return 'ERROR';
     }
 
     return 'UNKNOWN';

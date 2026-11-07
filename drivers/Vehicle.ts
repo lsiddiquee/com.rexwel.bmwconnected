@@ -10,7 +10,12 @@ import { ILogger } from '../lib';
 import { DeviceSettings } from '../utils/DeviceSettings';
 import { nameOf } from '../utils/Utils';
 import type { IVehicleClient } from '../lib/client/IVehicleClient';
-import type { CableStatus, LockStatus, VehicleStatus } from '../lib/models/VehicleStatus';
+import type {
+  CableStatus,
+  ChargingStatus,
+  LockStatus,
+  VehicleStatus,
+} from '../lib/models/VehicleStatus';
 import { DeviceCodeAuthProvider } from '../lib/auth/DeviceCodeAuthProvider';
 import { MqttStreamClient } from '../lib/streaming/MqttStreamClient';
 import type { StreamMessage } from '../lib/streaming/StreamMessage';
@@ -41,6 +46,12 @@ import {
   resolveCarDataTimeMs,
 } from '../utils/CarDataFreshness';
 import type { ConnectionState } from '../lib/streaming/IMqttClient';
+
+/**
+ * The values of the Homey ev_charging_state capability that the app sets. The system capability
+ * has a fifth value, plugged_in_discharging, which a car cannot report here.
+ */
+type EvChargingState = 'plugged_in_charging' | 'plugged_in_paused' | 'plugged_in' | 'plugged_out';
 
 export class Vehicle extends Device {
   currentVehicleState: VehicleStatus | null = null;
@@ -91,7 +102,7 @@ export class Vehicle extends Device {
   private _lastDataUpdateMs?: number;
   // Time (wall clock) the last-update value was last written to the device store (epoch ms)
   private _lastDataUpdatePersistedMs?: number;
-  // Lock, charging cable and climate states of the newest status handed to
+  // Lock, charging, charging cable, climate and battery states of the newest status handed to
   // updateCapabilitiesFromStatus. Recorded as soon as a status arrives, not when its update has
   // finished (unlike currentVehicleState), so overlapping updates see each other and a transition
   // is only announced once. Undefined until the first status arrives after the app starts: that
@@ -842,8 +853,9 @@ export class Vehicle extends Device {
   }
 
   /**
-   * The lock, charging cable and climate states of the newest status. Everything is UNKNOWN when
-   * there is no status yet or it comes from data written by an older version of the app.
+   * The lock, charging, charging cable, climate and battery states of the newest status.
+   * Everything is UNKNOWN (and there is no battery level) when there is no status yet or it comes
+   * from data written by an older version of the app.
    */
   private getFlowStates(): FlowStates {
     return this._flowStates ?? readFlowStates(this.currentVehicleState);
@@ -1094,8 +1106,8 @@ export class Vehicle extends Device {
    * Extracts data from VehicleStatus and updates corresponding Homey capabilities.
    * Only updates capabilities that have changed to avoid unnecessary events.
    *
-   * Also fires the lock, charging cable and climate flow triggers for the changes since the
-   * previous status (see {@link planStateTriggers}).
+   * Also fires the lock, charging status, charging cable, climate and battery level flow triggers
+   * for the changes since the previous status (see {@link planStateTriggers}).
    *
    * @param status - Vehicle status with telematic data
    * @param settingsOverride - Optional settings to use instead of reading from device (used during onSettings)
@@ -1120,7 +1132,8 @@ export class Vehicle extends Device {
   }
 
   /**
-   * Make the status the newest one for the lock, charging cable and climate flow cards.
+   * Make the status the newest one for the lock, charging, charging cable, climate and battery
+   * flow cards.
    *
    * Reads the previous states and records the new ones, in one synchronous step. There are no
    * previous states for the first status since the app started (or the device was paired), so it
@@ -1143,10 +1156,10 @@ export class Vehicle extends Device {
    * @param planned - The triggers to fire
    */
   private async fireStateTriggers(planned: PlannedTrigger[]): Promise<void> {
-    for (const { cardId, tokens } of planned) {
+    for (const { cardId, tokens, state } of planned) {
       try {
         const card = this.homey.flow.getDeviceTriggerCard(cardId);
-        await card.trigger(this, tokens, {});
+        await card.trigger(this, tokens, state ?? {});
       } catch (error) {
         this.logger?.error(
           `Failed to fire the ${cardId} trigger for vehicle ${this.deviceData.id}`,
@@ -1230,10 +1243,13 @@ export class Vehicle extends Device {
 
     // Update electric vehicle data
     if (status.electric) {
-      await this.setCapabilityValueSafe(
-        Capabilities.MEASURE_BATTERY,
-        status.electric.chargeLevelPercent
-      );
+      // No battery reading leaves the capability as it is: it is not an empty battery
+      if (status.electric.chargeLevelPercent !== undefined) {
+        await this.setCapabilityValueSafe(
+          Capabilities.MEASURE_BATTERY,
+          status.electric.chargeLevelPercent
+        );
+      }
 
       if (status.combustion) {
         // If it is only electric, we do not need a separate RANGE_BATTERY capability
@@ -1243,29 +1259,15 @@ export class Vehicle extends Device {
         );
       }
 
-      // Convert BMW charging status to Homey EV charging state
-      if (status.electric.chargingStatus) {
-        const oldChargingStatus = this.currentVehicleState?.electric?.chargingStatus;
-        const newChargingStatus = status.electric.chargingStatus;
-
-        await this.setCapabilityValueSafe(
-          Capabilities.EV_CHARGING_STATE,
-          this.convertChargingStatus(newChargingStatus)
-        );
-
-        // Trigger charging status change flow if status changed or first status update
-        if (!oldChargingStatus || oldChargingStatus !== newChargingStatus) {
-          const chargingStatusChangeFlowCard = this.homey.flow.getDeviceTriggerCard(
-            Flows.CHARGING_STATUS_CHANGE
-          );
-          await chargingStatusChangeFlowCard.trigger(
-            this,
-            {
-              charging_status: newChargingStatus ?? 'UNKNOWN',
-            },
-            {}
-          );
-        }
+      // Convert the charging cable and the BMW charging status to the Homey EV charging state.
+      // The charging status trigger is not fired here: it is planned together with the other
+      // state triggers (see claimStateTriggers) and fires once this update has finished.
+      const chargingState = this.convertChargingState(
+        status.chargingCable,
+        status.electric.chargingStatus
+      );
+      if (chargingState !== undefined) {
+        await this.setCapabilityValueSafe(Capabilities.EV_CHARGING_STATE, chargingState);
       }
 
       // TODO: Add these capabilities if needed
@@ -1999,41 +2001,39 @@ export class Vehicle extends Device {
   }
 
   /**
-   * Convert BMW charging status to Homey EV charging state
+   * Convert the charging cable and the BMW charging status to the Homey EV charging state
    *
-   * BMW statuses:
-   * - CHARGING: Actively charging
-   * - PLUGGED_IN: Connected to charger but not charging (e.g., scheduled charging, full battery)
-   * - WAITING_FOR_CHARGING: Connected, waiting to start (scheduled or target reached)
-   * - COMPLETE/FULLY_CHARGED/FINISHED_FULLY_CHARGED: Charging complete, still plugged in
-   * - FINISHED_NOT_FULL: Charging stopped before full, still plugged in
-   * - TARGET_REACHED: Reached charge target, still plugged in
-   * - NOT_CHARGING: Not connected to charger (unplugged)
-   * - INVALID/UNKNOWN: Unknown status
+   * The cable decides whether the car is plugged in. A car that is plugged in and waits for a
+   * scheduled (cheap-rate) start reports "not charging" with a connected cable, which is plugged
+   * in and not plugged out. The charging status then tells what it is doing:
    *
-   * Homey states: plugged_in_charging, plugged_in, plugged_out
+   * - Cable DISCONNECTED: plugged_out, whatever the charging status says
+   * - Cable CONNECTED: plugged_in_charging while CHARGING, plugged_in_paused while PAUSED,
+   *   plugged_in otherwise (waiting, initializing, complete, error, not charging, unknown)
+   * - Cable UNKNOWN: only a car that is CHARGING or PAUSED is certainly plugged in, so those give
+   *   plugged_in_charging and plugged_in_paused. Anything else cannot tell whether the cable is
+   *   plugged in, so there is no state and the capability is left as it is.
+   *
+   * @param chargingCable - Whether a charging cable is plugged in
+   * @param chargingStatus - What the car reports about charging
+   * @returns A value of the Homey ev_charging_state capability, or undefined to leave it as it is
    */
-  private convertChargingStatus(chargingStatus: string): string {
-    switch (chargingStatus) {
-      case 'CHARGING':
-        return 'plugged_in_charging';
-
-      // Connected to charger but not actively charging
-      case 'PLUGGED_IN':
-      case 'WAITING_FOR_CHARGING':
-      case 'COMPLETE':
-      case 'FULLY_CHARGED':
-      case 'FINISHED_FULLY_CHARGED':
-      case 'FINISHED_NOT_FULL':
-      case 'TARGET_REACHED':
-        return 'plugged_in';
-
-      // Not connected to charger
-      case 'NOT_CHARGING':
-      case 'INVALID':
-      default:
-        return 'plugged_out';
+  private convertChargingState(
+    chargingCable: CableStatus,
+    chargingStatus: ChargingStatus
+  ): EvChargingState | undefined {
+    if (chargingCable === 'DISCONNECTED') {
+      return 'plugged_out';
     }
+
+    if (chargingStatus === 'CHARGING') {
+      return 'plugged_in_charging';
+    }
+    if (chargingStatus === 'PAUSED') {
+      return 'plugged_in_paused';
+    }
+
+    return chargingCable === 'CONNECTED' ? 'plugged_in' : undefined;
   }
 
   private async resolveAddress(location: LocationType): Promise<void> {

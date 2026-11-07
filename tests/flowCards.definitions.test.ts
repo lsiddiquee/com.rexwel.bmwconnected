@@ -132,3 +132,140 @@ describe('climate trigger cards', () => {
     }
   });
 });
+
+describe('battery_level_above trigger card', () => {
+  const card = readCard('triggers', 'battery_level_above');
+
+  it('should_matchTheFlowsConstant', () => {
+    expect(Flows.BATTERY_LEVEL_ABOVE).toBe('battery_level_above');
+    expect(card.id).toBe(Flows.BATTERY_LEVEL_ABOVE);
+  });
+
+  it('should_beTitledInEnglishAndDutch', () => {
+    expect(card.title).toEqual({
+      en: 'Battery level changed and is above …',
+      nl: 'Batterijniveau gewijzigd en boven …',
+    });
+    expect(card.titleFormatted).toEqual({
+      en: 'Battery level changed and is above [[percentage]]%',
+      nl: 'Batterijniveau gewijzigd en boven [[percentage]]%',
+    });
+  });
+
+  it('should_takeABmwOrMiniDeviceAndAWholePercentageBetween0And100', () => {
+    expect(card.args).toEqual([
+      DEVICE_ARG[0],
+      expect.objectContaining({ name: 'percentage', type: 'number', min: 0, max: 100, step: 1 }),
+    ]);
+  });
+
+  it('should_passTheNewLevelAsANumberToken', () => {
+    expect(card.tokens).toHaveLength(1);
+    expect(card.tokens[0]).toMatchObject({ name: 'battery', type: 'number' });
+    expect(typeof card.tokens[0].example).toBe('number');
+  });
+
+  it('should_explainThatItFiresOnEveryChangeAboveTheNumber_butNotForTheNumberItself', () => {
+    expect(card.hint.en).toContain('every change');
+    expect(card.hint.en).toContain('80');
+    expect(card.hint.en).toContain('81');
+    expect(card.hint.en).toContain('82');
+    expect(card.hint.en).toContain("doesn't fire for 80 itself");
+    expect(card.hint.nl).toContain('elke wijziging');
+    expect(card.hint.nl).toContain('80');
+    expect(card.hint.nl).toContain('81');
+    expect(card.hint.nl).toContain('82');
+    expect(card.hint.nl).toContain('Bij 80 zelf gaat het niet af');
+  });
+
+  it('should_sayWhatToTickInTheBmwCarDataPortal', () => {
+    for (const language of ['en', 'nl'] as const) {
+      expect(card.hint[language]).toContain('BMW CarData');
+      expect(card.hint[language]).toContain('vehicle.drivetrain.batteryManagement.header');
+    }
+    expect(card.hint.en).toContain('stream selection');
+    expect(card.hint.nl).toContain('streamselectie');
+  });
+
+  it('should_notRequireACapabilityFilterBeyondTheDriver', () => {
+    expect(card.$filter).toBeUndefined();
+  });
+});
+
+describe('charging_status_change trigger card', () => {
+  const card = readCard('triggers', 'charging_status_change');
+
+  it('should_keepTheCardIdOfTheExistingFlows', () => {
+    // Users already have flows built on charging_status_change
+    expect(Flows.CHARGING_STATUS_CHANGE).toBe('charging_status_change');
+    expect(card.id).toBe('charging_status_change');
+  });
+
+  it('should_keepTheChargingStatusTokenAsAString', () => {
+    expect(card.tokens).toHaveLength(1);
+    expect(card.tokens[0]).toMatchObject({ name: 'charging_status', type: 'string' });
+  });
+
+  it('should_giveAnExampleThatTheTokenCanReallyHold', () => {
+    // The token carries the internal status, not the raw BMW value
+    expect(['CHARGING', 'NOT_CHARGING', 'COMPLETE', 'PAUSED', 'INITIALIZING', 'ERROR']).toContain(
+      card.tokens[0].example
+    );
+  });
+});
+
+describe('charging_status condition card', () => {
+  const card = readCard('conditions', 'charging_status');
+  const dropdown = card.args.find((arg: { name: string }) => arg.name === 'charging_state');
+
+  it('should_offerEveryPluggedInStateAndPluggedOut', () => {
+    expect(dropdown.values.map((value: { id: string }) => value.id)).toEqual([
+      'plugged_in_charging',
+      'plugged_in_paused',
+      'plugged_in',
+      'plugged_out',
+    ]);
+  });
+
+  it('should_onlyOfferValuesOfTheHomeyEvChargingStateCapability', () => {
+    // The system capability: plugged_in_charging, plugged_in_discharging, plugged_in_paused,
+    // plugged_in and plugged_out
+    const systemValues = [
+      'plugged_in_charging',
+      'plugged_in_discharging',
+      'plugged_in_paused',
+      'plugged_in',
+      'plugged_out',
+    ];
+
+    for (const value of dropdown.values) {
+      expect(systemValues).toContain(value.id);
+    }
+  });
+
+  it('should_titleThePausedOptionInEnglishAndDutch', () => {
+    const paused = dropdown.values.find(
+      (value: { id: string }) => value.id === 'plugged_in_paused'
+    );
+
+    expect(paused.title).toEqual({
+      en: 'Plugged in, charging paused',
+      nl: 'Aangesloten, laden gepauzeerd',
+    });
+  });
+
+  it('should_keepTheExistingOptionsUntouched', () => {
+    const byId = (id: string) =>
+      dropdown.values.find((value: { id: string }) => value.id === id).title;
+
+    expect(byId('plugged_in_charging')).toEqual({
+      en: 'Plugged in and charging',
+      nl: 'Aangesloten en aan het laden',
+    });
+    expect(byId('plugged_in')).toEqual({
+      en: 'Plugged in (not charging)',
+      nl: 'Aangesloten (niet aan het laden)',
+    });
+    expect(byId('plugged_out')).toEqual({ en: 'Not plugged in', nl: 'Niet aangesloten' });
+  });
+});
