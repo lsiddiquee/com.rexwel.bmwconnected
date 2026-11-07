@@ -6,6 +6,9 @@
 
 import { Vehicle } from '../../drivers/Vehicle';
 import { DeviceSettings } from '../../utils/DeviceSettings';
+import { createHomeyTimers } from '../__mocks__/homey';
+
+export { createHomeyTimers };
 
 export interface VehicleTestMocks {
   mockApp: any;
@@ -67,6 +70,8 @@ export function createMockedVehicle(
         trigger: jest.fn().mockResolvedValue(undefined),
       }),
     },
+    // Homey-managed timers delegate to the global ones, so fake timers drive them
+    ...createHomeyTimers(),
   } as any;
 
   // Mock underlying Homey Device methods that getters use
