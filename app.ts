@@ -243,6 +243,38 @@ export class BMWConnectedDrive extends Homey.App {
     this.homey.flow
       .getConditionCard(Flows.CAR_DATA_STREAM_LIVE_CONDITION)
       .registerRunListener((args: { device: Vehicle }) => args.device.isCarDataStreamLive());
+
+    // True when the car reports that it is locked. An unknown state is an error, not "unlocked":
+    // Homey reports the flow error instead of the flow guessing.
+    this.homey.flow
+      .getConditionCard(Flows.CAR_IS_LOCKED_CONDITION)
+      .registerRunListener((args: { device: Vehicle }) => {
+        const status = args.device.getCarLockStatus();
+        if (status === 'UNKNOWN') {
+          throw new Error(
+            "The car's lock state isn't known yet. Nothing you need to do: the app learns it as soon as " +
+              "BMW CarData reports it. If this keeps happening, check that 'vehicle.cabin.door.status' is " +
+              'ticked in the stream selection of the BMW CarData portal.'
+          );
+        }
+        return status === 'LOCKED';
+      });
+
+    // True when the car reports that a charging cable is plugged in. An unknown state is an error,
+    // not "unplugged".
+    this.homey.flow
+      .getConditionCard(Flows.CHARGING_CABLE_IS_CONNECTED_CONDITION)
+      .registerRunListener((args: { device: Vehicle }) => {
+        const status = args.device.getChargingCableStatus();
+        if (status === 'UNKNOWN') {
+          throw new Error(
+            "The charging cable state isn't known yet. Nothing you need to do: the app learns it as soon as " +
+              "BMW CarData reports it. If this keeps happening, check that 'vehicle.body.chargingPort.status' is " +
+              'ticked in the stream selection of the BMW CarData portal.'
+          );
+        }
+        return status === 'CONNECTED';
+      });
   }
 
   /**

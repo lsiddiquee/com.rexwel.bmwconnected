@@ -19,6 +19,7 @@ import { LocationType } from '../../utils/LocationType';
 import type { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { createMockedVehicle } from '../helpers/vehicleTestHelper';
+import { UNKNOWN_FLOW_STATES } from '../../utils/FlowStates';
 
 describe('Flow Trigger - Undefined/Null Prevention', () => {
   let vehicle: Vehicle;
@@ -499,6 +500,7 @@ describe('Flow Trigger - Undefined/Null Prevention', () => {
         vin: 'TEST_VIN',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelPercent: 20,
           fuelLevelLiters: 20, // Low fuel
@@ -521,6 +523,7 @@ describe('Flow Trigger - Undefined/Null Prevention', () => {
         vin: 'TEST_VIN',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelPercent: 80,
           fuelLevelLiters: 60, // +40 liters increase

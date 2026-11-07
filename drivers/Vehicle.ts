@@ -10,7 +10,7 @@ import { ILogger } from '../lib';
 import { DeviceSettings } from '../utils/DeviceSettings';
 import { nameOf } from '../utils/Utils';
 import type { IVehicleClient } from '../lib/client/IVehicleClient';
-import type { VehicleStatus } from '../lib/models/VehicleStatus';
+import type { CableStatus, LockStatus, VehicleStatus } from '../lib/models/VehicleStatus';
 import { DeviceCodeAuthProvider } from '../lib/auth/DeviceCodeAuthProvider';
 import { MqttStreamClient } from '../lib/streaming/MqttStreamClient';
 import type { StreamMessage } from '../lib/streaming/StreamMessage';
@@ -24,6 +24,7 @@ import {
 } from '../lib/types/DriveTrainType';
 import { UnitConverter } from '../utils/UnitConverter';
 import { Flows } from '../utils/Flows';
+import { FlowStates, PlannedTrigger, planStateTriggers, readFlowStates } from '../utils/FlowStates';
 import { STORE_KEY_LAST_DATA_UPDATE } from '../utils/StoreKeys';
 import {
   isStreamState,
@@ -90,6 +91,13 @@ export class Vehicle extends Device {
   private _lastDataUpdateMs?: number;
   // Time (wall clock) the last-update value was last written to the device store (epoch ms)
   private _lastDataUpdatePersistedMs?: number;
+  // Lock, charging cable and climate states of the newest status handed to
+  // updateCapabilitiesFromStatus. Recorded as soon as a status arrives, not when its update has
+  // finished (unlike currentVehicleState), so overlapping updates see each other and a transition
+  // is only announced once. Undefined until the first status arrives after the app starts: that
+  // status is only a baseline and fires nothing. Conditions read currentVehicleState (restored
+  // from the cache at startup) until then.
+  private _flowStates?: FlowStates;
 
   // Device state manager for persistence (required - init fails if unavailable)
   // Public to allow ConnectedDriver to access for repair/pairing operations
@@ -809,6 +817,39 @@ export class Vehicle extends Device {
   }
 
   /**
+   * Check whether the car is locked, as last reported by BMW CarData.
+   *
+   * Used by the `car_is_locked` flow condition. UNKNOWN (never reported, or not recognised) is a
+   * state of its own: it is not the same as unlocked, so the condition reports an error for it.
+   *
+   * @returns LOCKED, UNLOCKED, or UNKNOWN when the car has not reported a usable lock state
+   */
+  getCarLockStatus(): LockStatus {
+    return this.getFlowStates().carLock;
+  }
+
+  /**
+   * Check whether a charging cable is plugged in, as last reported by BMW CarData.
+   *
+   * Used by the `charging_cable_is_connected` flow condition. UNKNOWN (never reported, or not
+   * recognised) is a state of its own: it is not the same as disconnected, so the condition
+   * reports an error for it.
+   *
+   * @returns CONNECTED, DISCONNECTED, or UNKNOWN when the car has not reported a usable state
+   */
+  getChargingCableStatus(): CableStatus {
+    return this.getFlowStates().chargingCable;
+  }
+
+  /**
+   * The lock, charging cable and climate states of the newest status. Everything is UNKNOWN when
+   * there is no status yet or it comes from data written by an older version of the app.
+   */
+  private getFlowStates(): FlowStates {
+    return this._flowStates ?? readFlowStates(this.currentVehicleState);
+  }
+
+  /**
    * Handles incoming MQTT stream message
    *
    * Updates device state and capabilities from real-time telematic data.
@@ -1053,10 +1094,73 @@ export class Vehicle extends Device {
    * Extracts data from VehicleStatus and updates corresponding Homey capabilities.
    * Only updates capabilities that have changed to avoid unnecessary events.
    *
+   * Also fires the lock, charging cable and climate flow triggers for the changes since the
+   * previous status (see {@link planStateTriggers}).
+   *
    * @param status - Vehicle status with telematic data
    * @param settingsOverride - Optional settings to use instead of reading from device (used during onSettings)
    */
   private async updateCapabilitiesFromStatus(
+    status: VehicleStatus,
+    settingsOverride?: DeviceSettings
+  ): Promise<void> {
+    // Decide the triggers right away, before anything is awaited. The comparison cannot use
+    // currentVehicleState: it only becomes the new status once the update below has finished, so an
+    // update that overlaps (a quick MQTT batch, an API poll, a settings change) would still see the
+    // old status and announce the same transition again. At startup it also holds the status
+    // restored from the cache rather than one this run received.
+    const stateTriggers = this.claimStateTriggers(status);
+    try {
+      await this.applyStatusToCapabilities(status, settingsOverride);
+    } finally {
+      // The transition happened even if some other part of the update failed, and the state is
+      // already recorded, so it would never be announced later
+      await this.fireStateTriggers(stateTriggers);
+    }
+  }
+
+  /**
+   * Make the status the newest one for the lock, charging cable and climate flow cards.
+   *
+   * Reads the previous states and records the new ones, in one synchronous step. There are no
+   * previous states for the first status since the app started (or the device was paired), so it
+   * only becomes the baseline. The status restored from the cache at startup does not count: it
+   * can be hours old, and a change against it is not necessarily a change that just happened.
+   *
+   * @param status - The status that just arrived
+   * @returns The triggers to fire for the change, none for the first status
+   */
+  private claimStateTriggers(status: VehicleStatus): PlannedTrigger[] {
+    const previous = this._flowStates;
+    this._flowStates = readFlowStates(status);
+    return planStateTriggers(previous, this._flowStates);
+  }
+
+  /**
+   * Fire the planned flow triggers, one by one. A failing trigger is logged and does not stop the
+   * others or the status update.
+   *
+   * @param planned - The triggers to fire
+   */
+  private async fireStateTriggers(planned: PlannedTrigger[]): Promise<void> {
+    for (const { cardId, tokens } of planned) {
+      try {
+        const card = this.homey.flow.getDeviceTriggerCard(cardId);
+        await card.trigger(this, tokens, {});
+      } catch (error) {
+        this.logger?.error(
+          `Failed to fire the ${cardId} trigger for vehicle ${this.deviceData.id}`,
+          error instanceof Error ? error : undefined
+        );
+      }
+    }
+  }
+
+  /**
+   * Write the status to the Homey capabilities and the existing flow triggers, then make it the
+   * current vehicle state.
+   */
+  private async applyStatusToCapabilities(
     status: VehicleStatus,
     settingsOverride?: DeviceSettings
   ): Promise<void> {

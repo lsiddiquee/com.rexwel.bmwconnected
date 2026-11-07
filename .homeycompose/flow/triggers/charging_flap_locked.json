@@ -1,0 +1,18 @@
+{
+    "id": "charging_flap_locked",
+    "title": {
+        "en": "The charging flap was locked",
+        "nl": "De laadklep is vergrendeld"
+    },
+    "hint": {
+        "en": "Fires when the charging flap goes from unlocked to locked, based on the data BMW CarData reports. Needs 'vehicle.body.flap.isLocked' to be ticked in the stream selection of the BMW CarData portal.",
+        "nl": "Gaat af wanneer de laadklep van ontgrendeld naar vergrendeld gaat, op basis van de gegevens die BMW CarData meldt. Hiervoor moet 'vehicle.body.flap.isLocked' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+    },
+    "args": [
+        {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+        }
+    ]
+}

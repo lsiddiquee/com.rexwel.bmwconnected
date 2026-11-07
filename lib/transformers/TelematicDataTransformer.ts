@@ -13,6 +13,8 @@ import type {
   WindowsState,
   WindowState,
   LockState,
+  LockStatus,
+  CableStatus,
   ElectricVehicleState,
   ChargingStatus,
   CombustionVehicleState,
@@ -26,6 +28,7 @@ import type { TelematicDataPoint } from '../models/TelematicDataPoint';
 import { TelematicKey } from '../types/TelematicKeys';
 
 import type { DriveTrainType } from '../types/DriveTrainType';
+import type { ILogger } from '../types/ILogger';
 
 /** Kilometres in one mile */
 const KILOMETRES_PER_MILE = 1.609344;
@@ -40,12 +43,14 @@ export class TelematicDataTransformer {
    * @param vin - Vehicle Identification Number
    * @param driveTrain - Vehicle drive train type (from basic data)
    * @param data - Record of telematic data points
+   * @param logger - Optional logger, used to report values that are not recognised (at debug level)
    * @returns Generic VehicleStatus object
    */
   static transform(
     vin: string,
     driveTrain: DriveTrainType,
-    data: Record<string, TelematicDataPoint>
+    data: Record<string, TelematicDataPoint>,
+    logger?: ILogger
   ): VehicleStatus {
     // Find most recent timestamp
     const timestamps = Object.values(data)
@@ -67,6 +72,10 @@ export class TelematicDataTransformer {
     const doors = this.getDoors(dataMap);
     const windows = this.getWindows(dataMap);
     const lockState = this.getLockState(dataMap);
+    const carLock = this.getCarLock(dataMap, logger);
+    const chargingFlap = this.getChargingFlap(dataMap, logger);
+    const chargingCable = this.getChargingCable(dataMap, logger);
+    const climateActivity = this.getClimateActivityState(dataMap, logger);
     const electric = this.getElectricState(dataMap);
     const combustion = this.getCombustionState(dataMap);
     const climate = this.getClimateState(dataMap);
@@ -83,6 +92,10 @@ export class TelematicDataTransformer {
       doors,
       windows,
       lockState,
+      carLock,
+      chargingFlap,
+      chargingCable,
+      climateActivity,
       electric,
       combustion,
       climate,
@@ -302,6 +315,122 @@ export class TelematicDataTransformer {
       combinedSecurityState: isLocked ? 'SECURED' : 'UNLOCKED',
       isLocked,
     };
+  }
+
+  /**
+   * Get whether the car is locked from telematic data
+   *
+   * Unlike {@link getLockState}, a missing or unrecognised door status is UNKNOWN rather than
+   * unlocked. SECURED, LOCKED and SELECTIVE_LOCKED all count as locked.
+   */
+  private static getCarLock(
+    dataMap: Record<string, TelematicDataPoint>,
+    logger?: ILogger
+  ): LockStatus {
+    const point = dataMap[TelematicKey.VEHICLE_CABIN_DOOR_STATUS];
+    if (!point) {
+      return 'UNKNOWN';
+    }
+
+    const value = String(point.value).trim().toUpperCase();
+    if (value === 'SECURED' || value === 'LOCKED' || value === 'SELECTIVE_LOCKED') {
+      return 'LOCKED';
+    }
+    if (value === 'UNLOCKED') {
+      return 'UNLOCKED';
+    }
+
+    logger?.debug('Unexpected car lock value, treating the car lock state as unknown', {
+      key: TelematicKey.VEHICLE_CABIN_DOOR_STATUS,
+      value: point.value,
+    });
+    return 'UNKNOWN';
+  }
+
+  /**
+   * Get whether the charging flap is locked from telematic data
+   *
+   * The value format is not documented, so booleans and the strings true/false and
+   * LOCKED/UNLOCKED (any case) are accepted. A missing or unrecognised value is UNKNOWN.
+   */
+  private static getChargingFlap(
+    dataMap: Record<string, TelematicDataPoint>,
+    logger?: ILogger
+  ): LockStatus {
+    const point = dataMap[TelematicKey.VEHICLE_BODY_FLAP_ISLOCKED];
+    if (!point) {
+      return 'UNKNOWN';
+    }
+
+    const value = String(point.value).trim().toUpperCase();
+    if (value === 'TRUE' || value === 'LOCKED') {
+      return 'LOCKED';
+    }
+    if (value === 'FALSE' || value === 'UNLOCKED') {
+      return 'UNLOCKED';
+    }
+
+    logger?.debug('Unexpected charging flap value, treating the charging flap state as unknown', {
+      key: TelematicKey.VEHICLE_BODY_FLAP_ISLOCKED,
+      value: point.value,
+    });
+    return 'UNKNOWN';
+  }
+
+  /**
+   * Get whether a charging cable is plugged in from telematic data
+   *
+   * Unlike `electric.isChargerConnected`, a missing or unrecognised charging port status is
+   * UNKNOWN rather than not connected.
+   */
+  private static getChargingCable(
+    dataMap: Record<string, TelematicDataPoint>,
+    logger?: ILogger
+  ): CableStatus {
+    const point = dataMap[TelematicKey.VEHICLE_BODY_CHARGINGPORT_STATUS];
+    if (!point) {
+      return 'UNKNOWN';
+    }
+
+    const value = String(point.value).trim().toUpperCase();
+    if (value === 'CONNECTED') {
+      return 'CONNECTED';
+    }
+    if (value === 'DISCONNECTED') {
+      return 'DISCONNECTED';
+    }
+
+    logger?.debug('Unexpected charging cable value, treating the charging cable state as unknown', {
+      key: TelematicKey.VEHICLE_BODY_CHARGINGPORT_STATUS,
+      value: point.value,
+    });
+    return 'UNKNOWN';
+  }
+
+  /**
+   * Get what the climate preconditioning is doing from telematic data
+   *
+   * Only the preconditioning activity point counts (the comfort state says nothing about the
+   * activity). Unlike `climate.activity`, a missing or unrecognised value is UNKNOWN rather than
+   * INACTIVE; recognised values are matched exactly like {@link getClimateActivity}.
+   */
+  private static getClimateActivityState(
+    dataMap: Record<string, TelematicDataPoint>,
+    logger?: ILogger
+  ): ClimateActivity {
+    const point = dataMap[TelematicKey.VEHICLE_VEHICLE_PRECONDITIONING_ACTIVITY];
+    if (!point) {
+      return 'UNKNOWN';
+    }
+
+    const activity = this.getClimateActivity(point);
+    if (activity === 'UNKNOWN') {
+      logger?.debug('Unexpected climate activity value, treating the climate activity as unknown', {
+        key: TelematicKey.VEHICLE_VEHICLE_PRECONDITIONING_ACTIVITY,
+        value: point.value,
+      });
+    }
+    return activity;
   }
 
   /**

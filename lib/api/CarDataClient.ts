@@ -279,7 +279,12 @@ export class CarDataClient implements IVehicleClient {
 
       // Transform telematic data to VehicleStatus
       const { TelematicDataTransformer } = await import('../transformers/TelematicDataTransformer');
-      const status = TelematicDataTransformer.transform(vin, driveTrain, streamingData);
+      const status = TelematicDataTransformer.transform(
+        vin,
+        driveTrain,
+        streamingData,
+        this.logger
+      );
 
       this.logger?.info('Vehicle status retrieved with telematic data', { vin });
       return status;
@@ -290,6 +295,10 @@ export class CarDataClient implements IVehicleClient {
       vin,
       driveTrain,
       lastUpdatedAt: new Date(),
+      carLock: 'UNKNOWN',
+      chargingFlap: 'UNKNOWN',
+      chargingCable: 'UNKNOWN',
+      climateActivity: 'UNKNOWN',
     };
 
     this.logger?.info('Vehicle status retrieved (basic data only)', { vin });

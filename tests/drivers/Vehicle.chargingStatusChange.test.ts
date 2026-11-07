@@ -19,6 +19,7 @@ import type { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { Capabilities } from '../../utils/Capabilities';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { createMockedVehicle } from '../helpers/vehicleTestHelper';
+import { UNKNOWN_FLOW_STATES } from '../../utils/FlowStates';
 
 describe('Vehicle Charging Status Change Flow', () => {
   let vehicle: Vehicle;
@@ -106,6 +107,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 52,
           range: 208,
@@ -153,6 +155,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 55,
           range: 220,
@@ -183,6 +186,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T10:00:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 75,
           range: 300,
@@ -230,6 +234,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T11:00:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 100,
           range: 400,
@@ -270,6 +275,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T08:05:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 31,
           range: 124,
@@ -309,6 +315,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T09:30:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 100,
           range: 400,
@@ -348,6 +355,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 100,
           range: 400,
@@ -387,6 +395,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T11:05:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 61,
           range: 244,
@@ -428,6 +437,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         // No electric property
       };
 
@@ -461,6 +471,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 72,
           range: 288,
@@ -579,6 +590,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T09:05:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 51,
           range: 204,
@@ -621,6 +633,7 @@ describe('Vehicle Charging Status Change Flow', () => {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-11-05T10:30:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         electric: {
           chargeLevelPercent: 100,
           range: 400,

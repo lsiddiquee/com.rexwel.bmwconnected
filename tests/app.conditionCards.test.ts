@@ -78,6 +78,103 @@ describe('BMWConnectedDrive condition cards', () => {
     });
   });
 
+  describe.each([
+    {
+      cardId: Flows.CAR_IS_LOCKED_CONDITION,
+      expectedId: 'car_is_locked',
+      method: 'getCarLockStatus',
+      yes: 'LOCKED',
+      no: 'UNLOCKED',
+      unknownMessage: "The car's lock state isn't known yet",
+    },
+    {
+      cardId: Flows.CHARGING_CABLE_IS_CONNECTED_CONDITION,
+      expectedId: 'charging_cable_is_connected',
+      method: 'getChargingCableStatus',
+      yes: 'CONNECTED',
+      no: 'DISCONNECTED',
+      unknownMessage: "The charging cable state isn't known yet",
+    },
+  ])('$expectedId', ({ cardId, expectedId, method, yes, no, unknownMessage }) => {
+    const askTheDevice = (status: string) => {
+      const device = { [method]: jest.fn().mockReturnValue(status) };
+      return { device, run: () => runListeners.get(cardId)?.({ device }) };
+    };
+
+    it('should_registerARunListener_when_appStarts', () => {
+      expect(cardId).toBe(expectedId);
+      expect(getConditionCard).toHaveBeenCalledWith(cardId);
+      expect(runListeners.has(cardId)).toBe(true);
+    });
+
+    it('should_returnTrue_when_theDeviceReports_' + yes, () => {
+      const { device, run } = askTheDevice(yes);
+
+      expect(run()).toBe(true);
+      expect(device[method]).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_returnFalse_when_theDeviceReports_' + no, () => {
+      const { run } = askTheDevice(no);
+
+      expect(run()).toBe(false);
+    });
+
+    it('should_throwInsteadOfGuessing_when_theStateIsUnknown', () => {
+      const { run } = askTheDevice('UNKNOWN');
+
+      expect(run).toThrow(Error);
+      expect(run).toThrow(unknownMessage);
+    });
+
+    it('should_pointTheUserAtWhatToDoNext_when_theStateIsUnknown', () => {
+      const { run } = askTheDevice('UNKNOWN');
+
+      expect(run).toThrow(/nothing you need to do/i);
+    });
+
+    describe('card definition', () => {
+      const card = JSON.parse(
+        fs.readFileSync(
+          path.join(__dirname, `../.homeycompose/flow/conditions/${expectedId}.json`),
+          'utf8'
+        )
+      );
+
+      it('should_matchTheFlowsConstantAndTargetBmwAndMiniDevices', () => {
+        expect(card.id).toBe(cardId);
+        expect(card.args).toEqual([
+          { name: 'device', type: 'device', filter: 'driver_id=bmw|mini' },
+        ]);
+      });
+
+      it('should_explainWhereTheDataComesFromInEnglishAndDutch', () => {
+        expect(card.hint.en).toContain('BMW CarData');
+        expect(card.hint.en).toContain('stream selection');
+        expect(card.hint.nl).toContain('BMW CarData');
+        expect(card.hint.nl).toContain('streamselectie');
+      });
+    });
+  });
+
+  describe('card titles', () => {
+    const readCard = (id: string) =>
+      JSON.parse(
+        fs.readFileSync(path.join(__dirname, `../.homeycompose/flow/conditions/${id}.json`), 'utf8')
+      );
+
+    it('should_beTranslatedInEnglishAndDutch', () => {
+      expect(readCard('car_is_locked').title).toEqual({
+        en: "The car !{{is|isn't}} locked",
+        nl: 'De auto !{{is|is niet}} vergrendeld',
+      });
+      expect(readCard('charging_cable_is_connected').title).toEqual({
+        en: "A charging cable !{{is|isn't}} plugged in",
+        nl: 'Er !{{is|is geen}} laadkabel aangesloten',
+      });
+    });
+  });
+
   describe('car_data_fresh', () => {
     it('should_askTheDeviceWithTheMinutesAsNumber_when_conditionRuns', () => {
       const device = { isCarDataFresh: jest.fn().mockReturnValue(true) };

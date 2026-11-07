@@ -1,0 +1,18 @@
+{
+    "id": "car_is_locked",
+    "title": {
+        "en": "The car !{{is|isn't}} locked",
+        "nl": "De auto !{{is|is niet}} vergrendeld"
+    },
+    "hint": {
+        "en": "Checks whether the car is locked, based on the door status BMW CarData reports. BMW only sends this status now and then, so it can be out of date. The flow reports an error while the lock state isn't known yet. Needs 'vehicle.cabin.door.status' to be ticked in the stream selection of the BMW CarData portal.",
+        "nl": "Controleert of de auto vergrendeld is, op basis van de deurstatus die BMW CarData meldt. BMW stuurt deze status maar af en toe, dus hij kan verouderd zijn. Zolang de vergrendelstatus nog niet bekend is, geeft de flow een foutmelding. Hiervoor moet 'vehicle.cabin.door.status' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+    },
+    "args": [
+        {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+        }
+    ]
+}
