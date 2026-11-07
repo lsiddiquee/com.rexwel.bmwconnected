@@ -13,8 +13,8 @@ export type ConnectionState =
   | 'disconnected' // Not connected to broker
   | 'connecting' // Connection attempt in progress
   | 'connected' // Successfully connected and authenticated
-  | 'reconnecting' // Attempting to reconnect after disconnect
-  | 'error'; // Connection failed with unrecoverable error
+  | 'reconnecting' // Link is down and something will bring it back (see onStateChange)
+  | 'error'; // connect() itself failed
 
 /**
  * MQTT Quality of Service level
@@ -118,6 +118,23 @@ export interface IMqttClient {
    * @param handler - Callback function
    */
   onReconnect(handler: () => void): void;
+
+  /**
+   * Register handler for connection state changes
+   *
+   * Called every time the connection state actually changes value (never twice in a row with
+   * the same state). Semantics:
+   * - 'connecting': connect() is in progress
+   * - 'connected': the broker accepted the connection (also after automatic reconnects and
+   *   after the client's own credential recovery or renewal)
+   * - 'reconnecting': the link is down and something will bring it back: mqtt.js automatic
+   *   reconnect, credential recovery in progress, or waiting for a recovery retry
+   * - 'error': connect() itself failed (it throws and the owner decides what to do)
+   * - 'disconnected': the owner called disconnect()
+   *
+   * @param handler - Callback function with the new state
+   */
+  onStateChange(handler: (state: ConnectionState) => void): void;
 
   /**
    * Register handler for message event
