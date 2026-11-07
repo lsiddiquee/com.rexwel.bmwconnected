@@ -222,101 +222,79 @@ describe('Vehicle Helper Methods Tests', () => {
     });
   });
 
-  describe('convertChargingStatus', () => {
-    it('should_returnPluggedInCharging_when_statusIsCharging', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('CHARGING');
+  describe('convertChargingState', () => {
+    type Cable = 'CONNECTED' | 'DISCONNECTED' | 'UNKNOWN';
+    type Status =
+      | 'CHARGING'
+      | 'PAUSED'
+      | 'INITIALIZING'
+      | 'COMPLETE'
+      | 'NOT_CHARGING'
+      | 'ERROR'
+      | 'UNKNOWN';
 
-      // Assert
-      expect(result).toBe('plugged_in_charging');
+    // Expected Homey state per charging status, for each cable state. `undefined` means the
+    // capability is left as it is, because the plug state cannot be inferred.
+    const TABLE: Record<Status, Record<Cable, string | undefined>> = {
+      CHARGING: {
+        DISCONNECTED: 'plugged_out',
+        CONNECTED: 'plugged_in_charging',
+        UNKNOWN: 'plugged_in_charging',
+      },
+      PAUSED: {
+        DISCONNECTED: 'plugged_out',
+        CONNECTED: 'plugged_in_paused',
+        UNKNOWN: 'plugged_in_paused',
+      },
+      INITIALIZING: { DISCONNECTED: 'plugged_out', CONNECTED: 'plugged_in', UNKNOWN: undefined },
+      COMPLETE: { DISCONNECTED: 'plugged_out', CONNECTED: 'plugged_in', UNKNOWN: undefined },
+      NOT_CHARGING: { DISCONNECTED: 'plugged_out', CONNECTED: 'plugged_in', UNKNOWN: undefined },
+      ERROR: { DISCONNECTED: 'plugged_out', CONNECTED: 'plugged_in', UNKNOWN: undefined },
+      UNKNOWN: { DISCONNECTED: 'plugged_out', CONNECTED: 'plugged_in', UNKNOWN: undefined },
+    };
+
+    const rows = (Object.keys(TABLE) as Status[]).flatMap((status) =>
+      (Object.keys(TABLE[status]) as Cable[]).map(
+        (cable) => [cable, status, TABLE[status][cable]] as const
+      )
+    );
+
+    it('should_coverEveryCableAndChargingStatusCombination', () => {
+      expect(rows).toHaveLength(21);
     });
 
-    it('should_returnPluggedIn_when_statusIsPluggedIn', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('PLUGGED_IN');
-
-      // Assert
-      expect(result).toBe('plugged_in');
+    it.each(rows)('should_map_cable_%s_and_status_%s_to_%s', (cable, status, expected) => {
+      expect(vehicle['convertChargingState'](cable, status)).toBe(expected);
     });
 
-    it('should_returnPluggedIn_when_statusIsWaitingForCharging', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('WAITING_FOR_CHARGING');
-
-      // Assert
-      expect(result).toBe('plugged_in');
+    it('should_returnPluggedInNotPluggedOut_when_theCableIsConnectedAndTheCarIsWaitingForAScheduledStart', () => {
+      // A car plugged in and waiting for a cheap-rate start reports NOCHARGING and a connected
+      // cable. It used to show as plugged out.
+      expect(vehicle['convertChargingState']('CONNECTED', 'NOT_CHARGING')).toBe('plugged_in');
     });
 
-    it('should_returnPluggedIn_when_statusIsComplete', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('COMPLETE');
-
-      // Assert
-      expect(result).toBe('plugged_in');
+    it('should_returnPluggedOut_when_theCableIsDisconnectedEvenIfTheStatusSaysCharging', () => {
+      expect(vehicle['convertChargingState']('DISCONNECTED', 'CHARGING')).toBe('plugged_out');
     });
 
-    it('should_returnPluggedIn_when_statusIsFullyCharged', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('FULLY_CHARGED');
-
-      // Assert
-      expect(result).toBe('plugged_in');
+    it('should_treatAnUnrecognisedCable_asUnknown', () => {
+      // A status restored from data written by an older version of the app has no cable field
+      expect(vehicle['convertChargingState'](undefined as any, 'CHARGING')).toBe(
+        'plugged_in_charging'
+      );
+      expect(vehicle['convertChargingState'](undefined as any, 'NOT_CHARGING')).toBeUndefined();
     });
 
-    it('should_returnPluggedIn_when_statusIsFinishedFullyCharged', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('FINISHED_FULLY_CHARGED');
+    it('should_onlyReturnValuesOfTheHomeyEvChargingStateCapability', () => {
+      // plugged_in_discharging is the fifth value of the system capability; never used here
+      const allowed = ['plugged_in_charging', 'plugged_in_paused', 'plugged_in', 'plugged_out'];
 
-      // Assert
-      expect(result).toBe('plugged_in');
-    });
-
-    it('should_returnPluggedIn_when_statusIsFinishedNotFull', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('FINISHED_NOT_FULL');
-
-      // Assert
-      expect(result).toBe('plugged_in');
-    });
-
-    it('should_returnPluggedIn_when_statusIsTargetReached', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('TARGET_REACHED');
-
-      // Assert
-      expect(result).toBe('plugged_in');
-    });
-
-    it('should_returnPluggedOut_when_statusIsNotCharging', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('NOT_CHARGING');
-
-      // Assert
-      expect(result).toBe('plugged_out');
-    });
-
-    it('should_returnPluggedOut_when_statusIsInvalid', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('INVALID');
-
-      // Assert
-      expect(result).toBe('plugged_out');
-    });
-
-    it('should_returnPluggedOut_when_statusIsUnknown', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('UNKNOWN');
-
-      // Assert
-      expect(result).toBe('plugged_out');
-    });
-
-    it('should_returnPluggedOut_when_statusIsUnrecognized', () => {
-      // Act
-      const result = vehicle['convertChargingStatus']('SOME_NEW_STATUS');
-
-      // Assert
-      expect(result).toBe('plugged_out');
+      for (const [cable, status] of rows) {
+        const result = vehicle['convertChargingState'](cable, status);
+        if (result !== undefined) {
+          expect(allowed).toContain(result);
+        }
+      }
     });
   });
 

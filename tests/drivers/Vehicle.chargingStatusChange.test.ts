@@ -1,9 +1,10 @@
 /**
  * Vehicle Charging Status Change Flow Tests
  *
- * Tests for the charging status change detection and flow trigger logic.
- * Validates that the charging_status_change flow card is triggered when
- * the charging status changes or on first status update.
+ * Tests for the charging_status_change trigger. It follows the same rules as the lock, charging
+ * cable and climate triggers: it fires for a real change between two KNOWN charging statuses, never
+ * for the first status since the app started, never from or to UNKNOWN, and never twice for the
+ * same change.
  */
 
 // Mock geolocation-utils
@@ -15,635 +16,396 @@ jest.mock('geolocation-utils', () => ({
 jest.mock('semver');
 
 import { Vehicle } from '../../drivers/Vehicle';
-import type { VehicleStatus } from '../../lib/models/VehicleStatus';
+import type { ChargingStatus, VehicleStatus } from '../../lib/models/VehicleStatus';
 import { Capabilities } from '../../utils/Capabilities';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { createMockedVehicle } from '../helpers/vehicleTestHelper';
 
-describe('Vehicle Charging Status Change Flow', () => {
+/** Build a status with a charging status; the cable is plugged in unless overridden */
+const status = (
+  chargingStatus: ChargingStatus | undefined,
+  overrides: Partial<VehicleStatus> = {},
+  chargeLevelPercent = 50
+): VehicleStatus => ({
+  vin: 'WBY12345678901234',
+  driveTrain: DriveTrainType.ELECTRIC,
+  lastUpdatedAt: new Date('2026-11-04T10:00:00Z'),
+  carLock: 'UNKNOWN',
+  chargingFlap: 'UNKNOWN',
+  chargingCable: 'CONNECTED',
+  climateActivity: 'UNKNOWN',
+  electric: {
+    chargeLevelPercent,
+    range: 200,
+    isChargerConnected: true,
+    chargingStatus: chargingStatus as ChargingStatus,
+  },
+  ...overrides,
+});
+
+describe('Vehicle charging status change flow', () => {
   let vehicle: Vehicle;
-  let mockApp: any;
-  let mockChargingStatusChangeFlowCard: any;
+  let mockLogger: any;
+  let chargingStatusChangeCard: { trigger: jest.Mock };
+  let otherCard: { trigger: jest.Mock };
   let setCapabilityValueSafeSpy: jest.SpyInstance;
 
+  const update = (next: VehicleStatus) => (vehicle as any).updateCapabilitiesFromStatus(next);
+
+  /**
+   * Receive a status first, so the next one has something to be compared with. The first status
+   * since the app started is only a baseline: it never fires anything.
+   */
+  const givenPreviousStatus = async (previous: VehicleStatus) => {
+    await update(previous);
+    expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
+    chargingStatusChangeCard.trigger.mockClear();
+    setCapabilityValueSafeSpy.mockClear();
+  };
+
   beforeEach(() => {
-    // Create vehicle instance using helper
     const result = createMockedVehicle();
     vehicle = result.vehicle;
-    mockApp = result.mocks.mockApp;
+    mockLogger = result.mocks.mockLogger;
 
-    // Mock charging status change flow card
-    mockChargingStatusChangeFlowCard = {
-      trigger: jest.fn().mockResolvedValue(undefined),
-    };
+    chargingStatusChangeCard = { trigger: jest.fn().mockResolvedValue(undefined) };
+    otherCard = { trigger: jest.fn().mockResolvedValue(undefined) };
 
-    // Set up vehicle.homey with flow card mock
-    const mockHomey = {
-      app: mockApp,
+    vehicle.homey = {
+      app: result.mocks.mockApp,
       flow: {
-        getDeviceTriggerCard: jest.fn((cardId: string) => {
-          if (cardId === 'charging_status_change') {
-            return mockChargingStatusChangeFlowCard;
-          }
-          return { trigger: jest.fn() };
-        }),
+        getDeviceTriggerCard: jest.fn((cardId: string) =>
+          cardId === 'charging_status_change' ? chargingStatusChangeCard : otherCard
+        ),
       },
-      settings: {
-        get: jest.fn().mockReturnValue(null), // No geofences configured
-      },
-    };
-    vehicle.homey = mockHomey as any;
+      settings: { get: jest.fn().mockReturnValue(null) },
+    } as any;
 
-    // Mock state manager
-    const mockStateManager = {
+    vehicle['stateManager'] = {
       getLastLocation: jest.fn().mockReturnValue(null),
       setLastLocation: jest.fn().mockResolvedValue(undefined),
       getLastFlowTriggeredLocation: jest.fn().mockReturnValue(null),
       setLastFlowTriggeredLocation: jest.fn().mockResolvedValue(undefined),
       getIsDriving: jest.fn().mockReturnValue(false),
-      getVehicleStatus: jest.fn().mockReturnValue({
-        vin: 'TEST_VIN',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date(),
-      }),
-      getClientId: jest.fn().mockReturnValue('test-client-id'),
-      getContainerId: jest.fn().mockReturnValue('test-container-id'),
-      getDriveTrain: jest.fn().mockReturnValue(DriveTrainType.ELECTRIC),
     } as any;
-    vehicle['stateManager'] = mockStateManager;
 
-    // Mock setCapabilityValueSafe
     setCapabilityValueSafeSpy = jest
       .spyOn(vehicle as any, 'setCapabilityValueSafe')
       .mockResolvedValue(true);
-
-    // Mock other methods to prevent side effects
     jest.spyOn(vehicle as any, 'shouldTriggerLocationFlows').mockReturnValue(false);
     jest.spyOn(vehicle as any, 'triggerLocationFlows').mockResolvedValue(undefined);
+
+    vehicle.currentVehicleState = null;
   });
 
   afterEach(() => {
     jest.restoreAllMocks();
   });
 
-  describe('Charging Status Change Detection', () => {
-    it('should_triggerChargingStatusChangeFlow_when_statusChanges', async () => {
-      // Arrange - Set initial state with NOT_CHARGING status
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:00:00Z'),
-        electric: {
-          chargeLevelPercent: 50,
-          range: 200,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
-        },
-      } as VehicleStatus;
+  describe('changes between two known statuses', () => {
+    it.each([
+      ['NOT_CHARGING', 'CHARGING'],
+      ['CHARGING', 'NOT_CHARGING'],
+      ['CHARGING', 'COMPLETE'],
+      ['COMPLETE', 'NOT_CHARGING'],
+      ['CHARGING', 'PAUSED'],
+      ['PAUSED', 'CHARGING'],
+      ['NOT_CHARGING', 'INITIALIZING'],
+      ['INITIALIZING', 'CHARGING'],
+      ['CHARGING', 'ERROR'],
+      ['ERROR', 'NOT_CHARGING'],
+    ] as const)('should_fireOnceWithTheNewStatus_when_goingFrom_%s_to_%s', async (from, to) => {
+      await givenPreviousStatus(status(from));
 
-      // New status - changed to CHARGING
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
-        electric: {
-          chargeLevelPercent: 52,
-          range: 208,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING',
-        },
-      };
+      await update(status(to));
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
-
-      // Assert - Verify charging status change flow was triggered
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledTimes(1);
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledWith(
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledTimes(1);
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledWith(
         vehicle,
-        {
-          charging_status: 'CHARGING',
-        },
+        { charging_status: to },
         {}
-      );
-
-      // Verify EV charging state capability was updated
-      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
-        Capabilities.EV_CHARGING_STATE,
-        'plugged_in_charging' // Converted value
       );
     });
 
-    it('should_notTriggerChargingStatusChangeFlow_when_statusUnchanged', async () => {
-      // Arrange - Set initial state with CHARGING status
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:00:00Z'),
-        electric: {
-          chargeLevelPercent: 50,
-          range: 200,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING',
-        },
-      } as VehicleStatus;
+    it('should_passTheInternalStatusAndNotTheHomeyStateOrTheRawBmwValue_asTheToken', async () => {
+      await givenPreviousStatus(status('CHARGING'));
 
-      // New status - same CHARGING status, just higher battery level
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
-        electric: {
-          chargeLevelPercent: 55,
-          range: 220,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING', // Same status
-        },
-      };
+      await update(status('COMPLETE'));
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      const tokens = chargingStatusChangeCard.trigger.mock.calls[0][1];
+      expect(tokens).toEqual({ charging_status: 'COMPLETE' });
+      expect(tokens.charging_status).not.toBe('plugged_in');
+      expect(tokens.charging_status).not.toBe('CHARGINGENDED');
+    });
 
-      // Assert - Verify charging status change flow was NOT triggered
-      expect(mockChargingStatusChangeFlowCard.trigger).not.toHaveBeenCalled();
+    it('should_notFire_when_theStatusIsTheSameAndOnlyTheBatteryLevelChanges', async () => {
+      await givenPreviousStatus(status('CHARGING', {}, 50));
 
-      // Verify EV charging state capability was still updated
+      await update(status('CHARGING', {}, 55));
+
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
+      // The capability is still written
       expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
         Capabilities.EV_CHARGING_STATE,
         'plugged_in_charging'
       );
     });
 
-    it('should_triggerChargingStatusChangeFlow_when_noPreviousStatus', async () => {
-      // Arrange - No previous vehicle state (first update after pairing/initialization)
-      vehicle.currentVehicleState = null;
+    it('should_fireOnEveryChange_when_theStatusChangesSeveralTimes', async () => {
+      await givenPreviousStatus(status('NOT_CHARGING'));
 
-      // New status - first status update
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:00:00Z'),
-        electric: {
-          chargeLevelPercent: 75,
-          range: 300,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING',
-        },
-      };
+      await update(status('CHARGING'));
+      await update(status('COMPLETE'));
+      await update(status('NOT_CHARGING'));
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
-
-      // Assert - Verify charging status change flow was triggered (first status notification)
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledTimes(1);
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledWith(
-        vehicle,
-        {
-          charging_status: 'CHARGING',
-        },
-        {}
-      );
-
-      // Verify EV charging state capability was updated
-      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
-        Capabilities.EV_CHARGING_STATE,
-        'plugged_in_charging'
-      );
+      expect(chargingStatusChangeCard.trigger.mock.calls.map((call) => call[1])).toEqual([
+        { charging_status: 'CHARGING' },
+        { charging_status: 'COMPLETE' },
+        { charging_status: 'NOT_CHARGING' },
+      ]);
     });
 
-    it('should_updateEVChargingStateCapability_when_statusChanges', async () => {
-      // Arrange
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:00:00Z'),
-        electric: {
-          chargeLevelPercent: 80,
-          range: 320,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING',
-        },
-      } as VehicleStatus;
+    it('should_notFire_when_onlyTheCableChanges', async () => {
+      await givenPreviousStatus(status('NOT_CHARGING', { chargingCable: 'DISCONNECTED' }));
 
-      // New status - charging completed
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T11:00:00Z'),
-        electric: {
-          chargeLevelPercent: 100,
-          range: 400,
-          isChargerConnected: true,
-          chargingStatus: 'COMPLETE',
-        },
-      };
+      await update(status('NOT_CHARGING', { chargingCable: 'CONNECTED' }));
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
+    });
 
-      // Assert - Verify both flow and capability were updated
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledTimes(1);
-      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
-        Capabilities.EV_CHARGING_STATE,
-        'plugged_in' // COMPLETE converts to plugged_in
-      );
+    it('should_fireOnTheSecondStatus_when_theFirstOneHadAKnownStatus', async () => {
+      await update(status('NOT_CHARGING'));
+
+      await update(status('CHARGING'));
+
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('Different Status Transitions', () => {
-    it('should_triggerFlow_when_changingFrom_NOTCHARGING_to_CHARGING', async () => {
-      // Arrange - Vehicle not charging
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T08:00:00Z'),
-        electric: {
-          chargeLevelPercent: 30,
-          range: 120,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
-        },
-      } as VehicleStatus;
+  describe('when the status is not known or there is nothing to compare with', () => {
+    it.each(['NOT_CHARGING', 'CHARGING', 'COMPLETE', 'PAUSED', 'INITIALIZING', 'ERROR'] as const)(
+      'should_notFire_when_itIsTheFirstStatusSinceStartupAndItIs_%s',
+      async (first) => {
+        vehicle.currentVehicleState = null;
 
-      // New status - plugged in and charging
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T08:05:00Z'),
-        electric: {
-          chargeLevelPercent: 31,
-          range: 124,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING',
-        },
-      };
+        await update(status(first));
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+        expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
+      }
+    );
 
-      // Assert
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledTimes(1);
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledWith(
-        vehicle,
-        { charging_status: 'CHARGING' },
-        {}
-      );
-    });
+    it('should_notFire_when_theFirstStatusDiffersFromTheStatusRestoredFromTheCache', async () => {
+      // currentVehicleState is restored from the cache at startup and can be hours old: it is not
+      // a previous status to compare the first message with
+      vehicle.currentVehicleState = status('NOT_CHARGING');
 
-    it('should_triggerFlow_when_changingFrom_CHARGING_to_COMPLETE', async () => {
-      // Arrange - Vehicle actively charging
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T09:00:00Z'),
-        electric: {
-          chargeLevelPercent: 95,
-          range: 380,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING',
-        },
-      } as VehicleStatus;
+      await update(status('CHARGING'));
 
-      // New status - charging complete
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T09:30:00Z'),
-        electric: {
-          chargeLevelPercent: 100,
-          range: 400,
-          isChargerConnected: true,
-          chargingStatus: 'COMPLETE',
-        },
-      };
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      // From here on changes are announced
+      await update(status('COMPLETE'));
 
-      // Assert
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledTimes(1);
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledWith(
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledTimes(1);
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledWith(
         vehicle,
         { charging_status: 'COMPLETE' },
         {}
       );
     });
 
-    it('should_triggerFlow_when_changingFrom_COMPLETE_to_NOTCHARGING', async () => {
-      // Arrange - Charging complete, still plugged in
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:00:00Z'),
-        electric: {
-          chargeLevelPercent: 100,
-          range: 400,
-          isChargerConnected: true,
-          chargingStatus: 'COMPLETE',
-        },
-      } as VehicleStatus;
+    it('should_notFire_when_thePreviousStatusIsUnknownAndTheNewOneIsKnown', async () => {
+      await givenPreviousStatus(status('UNKNOWN'));
 
-      // New status - unplugged
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
-        electric: {
-          chargeLevelPercent: 100,
-          range: 400,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
-        },
-      };
+      await update(status('CHARGING'));
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
-
-      // Assert
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledTimes(1);
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledWith(
-        vehicle,
-        { charging_status: 'NOT_CHARGING' },
-        {}
-      );
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
     });
 
-    it('should_triggerFlow_when_changingFrom_CHARGING_to_NOTCHARGING', async () => {
-      // Arrange - Vehicle actively charging
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T11:00:00Z'),
-        electric: {
-          chargeLevelPercent: 60,
-          range: 240,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING',
-        },
-      } as VehicleStatus;
+    it('should_notFire_when_thePreviousStatusIsKnownAndTheNewOneIsUnknown', async () => {
+      await givenPreviousStatus(status('CHARGING'));
 
-      // New status - unplugged while charging (interrupted)
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T11:05:00Z'),
-        electric: {
-          chargeLevelPercent: 61,
-          range: 244,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
-        },
-      };
+      await update(status('UNKNOWN'));
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
-
-      // Assert
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledTimes(1);
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledWith(
-        vehicle,
-        { charging_status: 'NOT_CHARGING' },
-        {}
-      );
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
     });
-  });
 
-  describe('Edge Cases', () => {
-    it('should_notTriggerFlow_when_electricDataMissing', async () => {
-      // Arrange - Previous state with electric data
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:00:00Z'),
-        electric: {
-          chargeLevelPercent: 70,
-          range: 280,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
-        },
-      } as VehicleStatus;
+    it('should_notFire_when_theNewStatusHasNoChargingStatus', async () => {
+      await givenPreviousStatus(status('NOT_CHARGING'));
 
-      // New status - no electric data (incomplete API response)
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
-        // No electric property
-      };
+      await update(status(undefined));
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
+    });
 
-      // Assert - No flow trigger when electric data missing
-      expect(mockChargingStatusChangeFlowCard.trigger).not.toHaveBeenCalled();
+    it('should_notFire_when_theNewStatusHasAnInvalidChargingStatus', async () => {
+      await givenPreviousStatus(status('NOT_CHARGING'));
+
+      await update(status('INVALID'));
+
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
+    });
+
+    it('should_notFire_when_theElectricDataIsMissing', async () => {
+      await givenPreviousStatus(status('NOT_CHARGING'));
+
+      await update(status('NOT_CHARGING', { electric: undefined }));
+
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
       expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
         Capabilities.EV_CHARGING_STATE,
         expect.anything()
       );
     });
 
-    it('should_notTriggerFlow_when_chargingStatusMissing', async () => {
-      // Arrange
-      vehicle.currentVehicleState = {
+    it('should_notFireOnTheWayBackFromUnknown_butFireOnTheNextRealChange', async () => {
+      await givenPreviousStatus(status('CHARGING'));
+      await update(status('UNKNOWN'));
+      await update(status('CHARGING'));
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
+
+      await update(status('COMPLETE'));
+
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_notFire_when_theStatusIsAnOlderPersistedStatusWithoutTheElectricFields', async () => {
+      await givenPreviousStatus(status('CHARGING'));
+      const olderShape = {
         vin: 'WBY12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:00:00Z'),
-        electric: {
-          chargeLevelPercent: 70,
-          range: 280,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
-        },
-      } as VehicleStatus;
+        lastUpdatedAt: new Date('2026-11-04T10:05:00Z'),
+      } as unknown as VehicleStatus;
 
-      // New status - electric data present but no chargingStatus field
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
-        electric: {
-          chargeLevelPercent: 72,
-          range: 288,
-          isChargerConnected: false,
-          chargingStatus: undefined as any, // Missing/undefined
-        },
-      };
+      await expect(update(olderShape)).resolves.toBeUndefined();
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
+    });
+  });
 
-      // Assert - No flow trigger when chargingStatus missing
-      expect(mockChargingStatusChangeFlowCard.trigger).not.toHaveBeenCalled();
+  describe('never firing twice', () => {
+    it('should_fireExactlyOnce_when_oneUpdateChangesTheStatus', async () => {
+      // The status used to be announced from two places
+      await givenPreviousStatus(status('NOT_CHARGING'));
+
+      await update(status('CHARGING'));
+
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_fireOnlyOnce_when_theSameNewStatusIsAppliedAgain', async () => {
+      await givenPreviousStatus(status('NOT_CHARGING'));
+      const charging = status('CHARGING');
+
+      await update(charging);
+      await update({ ...charging, lastUpdatedAt: new Date('2026-11-04T10:05:00Z') });
+      await update({ ...charging, lastUpdatedAt: new Date('2026-11-04T10:10:00Z') });
+
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_fireOnlyOnce_when_twoUpdatesOverlapAndCarryTheSameNewStatus', async () => {
+      // The first update is still busy (waiting on a capability write) when the second starts, so
+      // currentVehicleState has not been replaced yet
+      await givenPreviousStatus(status('NOT_CHARGING'));
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      setCapabilityValueSafeSpy.mockImplementation(() => gate.then(() => true));
+      const charging = status('CHARGING', { currentMileage: 1000 });
+
+      const first = update(charging);
+      const second = update({ ...charging, lastUpdatedAt: new Date('2026-11-04T10:00:01Z') });
+      release();
+      await Promise.all([first, second]);
+
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_notFireTwice_when_aSettingsUpdateRunsWhileAnMqttUpdateIsBusy', async () => {
+      await givenPreviousStatus(status('NOT_CHARGING'));
+      let release: () => void = () => undefined;
+      const gate = new Promise<void>((resolve) => (release = resolve));
+      setCapabilityValueSafeSpy.mockImplementation(() => gate.then(() => true));
+      const charging = status('CHARGING', { currentMileage: 1000 });
+
+      const fromMqtt = update(charging);
+      const fromSettings = (vehicle as any).updateCapabilitiesFromStatus(charging, {
+        distanceUnit: 'imperial',
+      });
+      release();
+      await Promise.all([fromMqtt, fromSettings]);
+
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('together with the EV charging state capability', () => {
+    it('should_writeTheCapabilityBeforeTheTriggerFires', async () => {
+      // A flow started by the trigger that reads the capability sees the new state
+      await givenPreviousStatus(status('NOT_CHARGING'));
+
+      await update(status('CHARGING'));
+
+      const capabilityWrite = setCapabilityValueSafeSpy.mock.calls.findIndex(
+        ([name]) => name === Capabilities.EV_CHARGING_STATE
+      );
+      expect(capabilityWrite).toBeGreaterThanOrEqual(0);
+      expect(setCapabilityValueSafeSpy.mock.invocationCallOrder[capabilityWrite]).toBeLessThan(
+        chargingStatusChangeCard.trigger.mock.invocationCallOrder[0]
+      );
+    });
+
+    it('should_stillFire_when_anEarlierStepOfTheUpdateThrows', async () => {
+      // The change has happened whether or not the rest of the update worked
+      await givenPreviousStatus(status('NOT_CHARGING'));
+      setCapabilityValueSafeSpy.mockRejectedValue(new Error('capability write failed'));
+
+      await expect(update(status('CHARGING', { currentMileage: 500 }))).rejects.toThrow(
+        'capability write failed'
+      );
+
+      expect(chargingStatusChangeCard.trigger).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_logAndKeepGoing_when_theTriggerRejects', async () => {
+      await givenPreviousStatus(status('NOT_CHARGING'));
+      chargingStatusChangeCard.trigger.mockRejectedValue(new Error('flow engine down'));
+
+      await expect(update(status('CHARGING'))).resolves.toBeUndefined();
+
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('charging_status_change'),
+        expect.objectContaining({ message: 'flow engine down' })
+      );
+    });
+
+    it('should_showPluggedIn_when_theCarIsPluggedInAndWaitingForAScheduledStart', async () => {
+      // NOCHARGING with a connected cable used to show as plugged out
+      await update(status('NOT_CHARGING', { chargingCable: 'CONNECTED' }));
+
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
+        Capabilities.EV_CHARGING_STATE,
+        'plugged_in'
+      );
+    });
+
+    it('should_leaveTheCapabilityAsItIs_when_theCableIsUnknownAndTheCarIsNotCharging', async () => {
+      await update(status('NOT_CHARGING', { chargingCable: 'UNKNOWN' }));
+
       expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
         Capabilities.EV_CHARGING_STATE,
         expect.anything()
       );
     });
 
-    it('should_handleMultipleStatusChanges_consecutively', async () => {
-      // Arrange - Start with NOT_CHARGING
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T08:00:00Z'),
-        electric: {
-          chargeLevelPercent: 40,
-          range: 160,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
-        },
-      } as VehicleStatus;
+    it('should_notTouchTheCapabilityOrTheTrigger_when_theElectricDataIsMissingOnTheFirstStatus', async () => {
+      await update(status('CHARGING', { electric: undefined }));
 
-      // Act 1 - Change to CHARGING
-      const status1: VehicleStatus = {
-        ...vehicle.currentVehicleState,
-        lastUpdatedAt: new Date('2025-11-05T08:05:00Z'),
-        electric: {
-          chargeLevelPercent: 41,
-          range: 164,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING',
-        },
-      };
-      await (vehicle as any).updateCapabilitiesFromStatus(status1);
-
-      // Assert 1
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledTimes(1);
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenLastCalledWith(
-        vehicle,
-        { charging_status: 'CHARGING' },
-        {}
-      );
-
-      // Act 2 - Change to COMPLETE
-      const status2: VehicleStatus = {
-        ...status1,
-        lastUpdatedAt: new Date('2025-11-05T10:00:00Z'),
-        electric: {
-          chargeLevelPercent: 100,
-          range: 400,
-          isChargerConnected: true,
-          chargingStatus: 'COMPLETE',
-        },
-      };
-      await (vehicle as any).updateCapabilitiesFromStatus(status2);
-
-      // Assert 2
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledTimes(2);
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenLastCalledWith(
-        vehicle,
-        { charging_status: 'COMPLETE' },
-        {}
-      );
-
-      // Act 3 - Change to NOT_CHARGING (unplugged)
-      const status3: VehicleStatus = {
-        ...status2,
-        lastUpdatedAt: new Date('2025-11-05T10:05:00Z'),
-        electric: {
-          chargeLevelPercent: 100,
-          range: 400,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
-        },
-      };
-      await (vehicle as any).updateCapabilitiesFromStatus(status3);
-
-      // Assert 3
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledTimes(3);
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenLastCalledWith(
-        vehicle,
-        { charging_status: 'NOT_CHARGING' },
-        {}
-      );
-    });
-  });
-
-  describe('Integration with Capability Updates', () => {
-    it('should_updateBothCapabilityAndTriggerFlow_when_statusChanges', async () => {
-      // Arrange
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T09:00:00Z'),
-        electric: {
-          chargeLevelPercent: 50,
-          range: 200,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
-        },
-      } as VehicleStatus;
-
-      // New status - plugged in
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T09:05:00Z'),
-        electric: {
-          chargeLevelPercent: 51,
-          range: 204,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING',
-        },
-      };
-
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
-
-      // Assert - Both capability and flow should be updated
-      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
+      expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
         Capabilities.EV_CHARGING_STATE,
-        'plugged_in_charging'
+        expect.anything()
       );
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledWith(
-        vehicle,
-        { charging_status: 'CHARGING' },
-        {}
-      );
-    });
-
-    it('should_passRawChargingStatus_toFlowToken', async () => {
-      // Arrange - Test that flow receives raw BMW status, not converted Homey state
-      vehicle.currentVehicleState = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:00:00Z'),
-        electric: {
-          chargeLevelPercent: 99,
-          range: 396,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING',
-        },
-      } as VehicleStatus;
-
-      // New status - charging complete
-      const newStatus: VehicleStatus = {
-        vin: 'WBY12345678901234',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date('2025-11-05T10:30:00Z'),
-        electric: {
-          chargeLevelPercent: 100,
-          range: 400,
-          isChargerConnected: true,
-          chargingStatus: 'COMPLETE', // Raw BMW status
-        },
-      };
-
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
-
-      // Assert - Flow should receive raw 'COMPLETE', not 'plugged_in'
-      expect(mockChargingStatusChangeFlowCard.trigger).toHaveBeenCalledWith(
-        vehicle,
-        { charging_status: 'COMPLETE' }, // Raw BMW status
-        {}
-      );
-
-      // But capability should receive converted Homey state
-      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
-        Capabilities.EV_CHARGING_STATE,
-        'plugged_in' // Converted Homey state
-      );
+      expect(chargingStatusChangeCard.trigger).not.toHaveBeenCalled();
     });
   });
 });

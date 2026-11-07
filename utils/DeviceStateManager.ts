@@ -379,7 +379,8 @@ export class DeviceStateManager {
     const transformed = TelematicDataTransformer.transform(
       storeData.vin,
       storeData.driveTrain,
-      storeData.telematicCache
+      storeData.telematicCache,
+      this.logger
     );
 
     // Return transformed status

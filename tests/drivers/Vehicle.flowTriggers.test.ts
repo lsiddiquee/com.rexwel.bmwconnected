@@ -19,6 +19,7 @@ import { LocationType } from '../../utils/LocationType';
 import type { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { createMockedVehicle } from '../helpers/vehicleTestHelper';
+import { UNKNOWN_FLOW_STATES } from '../../utils/FlowStates';
 
 describe('Flow Trigger - Undefined/Null Prevention', () => {
   let vehicle: Vehicle;
@@ -116,82 +117,47 @@ describe('Flow Trigger - Undefined/Null Prevention', () => {
   // ==================================================================================
 
   describe('charging_status_change trigger', () => {
-    it('should_use_fallback_UNKNOWN_when_chargingStatus_becomes_undefined', async () => {
-      // Arrange - Start with a valid charging status, then it becomes undefined
-      // This tests that if chargingStatus somehow becomes undefined, the fallback works
-      vehicle.currentVehicleState = {
+    const chargingStatus = (value: string, level = 80): VehicleStatus =>
+      ({
         vin: 'TEST_VIN',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        carLock: 'UNKNOWN',
+        chargingFlap: 'UNKNOWN',
+        chargingCable: 'CONNECTED',
+        climateActivity: 'UNKNOWN',
         electric: {
-          chargeLevelPercent: 80,
+          chargeLevelPercent: level,
           range: 300,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
+          isChargerConnected: true,
+          chargingStatus: value as any,
         },
-      } as VehicleStatus;
+      }) as VehicleStatus;
 
-      // New status - chargingStatus field exists but evaluates to a value that needs fallback
-      const newStatus: VehicleStatus = {
-        vin: 'TEST_VIN',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date(),
-        electric: {
-          chargeLevelPercent: 85,
-          range: 310,
-          isChargerConnected: false,
-          // Note: In the actual implementation, if chargingStatus is undefined,
-          // the entire block is skipped. This test validates that IF the flow
-          // is triggered with undefined, the ?? 'UNKNOWN' fallback prevents crashes.
-          chargingStatus: 'INVALID' as any, // INVALID status should use fallback
-        },
-      } as VehicleStatus;
+    it('should_notTrigger_when_chargingStatusBecomesUndefinedOrInvalid', async () => {
+      // The trigger only fires between two known statuses, so it can never be invoked with an
+      // undefined or null token. An invalid or missing status reads as UNKNOWN and fires nothing.
+      await (vehicle as any).updateCapabilitiesFromStatus(chargingStatus('NOT_CHARGING'));
 
-      // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await (vehicle as any).updateCapabilitiesFromStatus(chargingStatus('INVALID', 85));
+      await (vehicle as any).updateCapabilitiesFromStatus(
+        chargingStatus(undefined as unknown as string, 86)
+      );
 
-      // Assert - Flow triggered (status changed from NOT_CHARGING to INVALID)
       const flowCard = mockFlowCards.get('charging_status_change');
-      expect(flowCard?.trigger).toHaveBeenCalled();
-
-      // Verify the trigger was called with a valid string (not undefined/null)
-      const callArgs = (flowCard?.trigger as jest.Mock).mock.calls[0];
-      expect(callArgs[1].charging_status).toBeDefined();
-      expect(callArgs[1].charging_status).not.toBeNull();
-      expect(typeof callArgs[1].charging_status).toBe('string');
+      expect(flowCard?.trigger).not.toHaveBeenCalled();
     });
 
     it('should_pass_valid_string_when_chargingStatus_is_defined', async () => {
-      // Arrange
-      vehicle.currentVehicleState = {
-        vin: 'TEST_VIN',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date(),
-        electric: {
-          chargeLevelPercent: 80,
-          range: 300,
-          isChargerConnected: false,
-          chargingStatus: 'NOT_CHARGING',
-        },
-      } as VehicleStatus;
-
-      const newStatus: VehicleStatus = {
-        vin: 'TEST_VIN',
-        driveTrain: DriveTrainType.ELECTRIC,
-        lastUpdatedAt: new Date(),
-        electric: {
-          chargeLevelPercent: 85,
-          range: 310,
-          isChargerConnected: true,
-          chargingStatus: 'CHARGING', // Valid value
-        },
-      } as VehicleStatus;
+      // Arrange - the first status is only the baseline
+      await (vehicle as any).updateCapabilitiesFromStatus(chargingStatus('NOT_CHARGING'));
 
       // Act
-      await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await (vehicle as any).updateCapabilitiesFromStatus(chargingStatus('CHARGING', 85));
 
       // Assert - Flow triggered with actual value
       const flowCard = mockFlowCards.get('charging_status_change');
+      expect(flowCard?.trigger).toHaveBeenCalledTimes(1);
       expect(flowCard?.trigger).toHaveBeenCalledWith(
         vehicle,
         {
@@ -199,6 +165,9 @@ describe('Flow Trigger - Undefined/Null Prevention', () => {
         },
         {}
       );
+
+      const callArgs = (flowCard?.trigger as jest.Mock).mock.calls[0];
+      expect(typeof callArgs[1].charging_status).toBe('string');
     });
   });
 
@@ -499,6 +468,7 @@ describe('Flow Trigger - Undefined/Null Prevention', () => {
         vin: 'TEST_VIN',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelPercent: 20,
           fuelLevelLiters: 20, // Low fuel
@@ -521,6 +491,7 @@ describe('Flow Trigger - Undefined/Null Prevention', () => {
         vin: 'TEST_VIN',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelPercent: 80,
           fuelLevelLiters: 60, // +40 liters increase

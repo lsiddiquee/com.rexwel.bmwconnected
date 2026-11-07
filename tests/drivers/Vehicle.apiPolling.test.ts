@@ -355,6 +355,26 @@ describe('Vehicle API Polling', () => {
       expect(vehicle['executePoll']).toHaveBeenCalledTimes(2); // Immediate + 1 interval
     });
 
+    it('should_useOverrideSettings_when_settingsNotPersistedYet', () => {
+      // Arrange: Homey has not persisted the new settings yet (onSettings), so the device still
+      // reports polling disabled with the old interval
+      mockSettings.apiPollingEnabled = false;
+      mockSettings.apiPollingInterval = 60;
+      const newSettings = { ...mockSettings, apiPollingEnabled: true, apiPollingInterval: 720 };
+
+      // Act
+      vehicle['startApiPolling'](newSettings);
+
+      // Assert
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Starting API polling for vehicle TEST_VIN_123 (interval: 720 minutes)'
+      );
+      jest.advanceTimersByTime(60 * 60 * 1000);
+      expect(vehicle['executePoll']).toHaveBeenCalledTimes(1); // Immediate only, not after 60 min
+      jest.advanceTimersByTime(660 * 60 * 1000);
+      expect(vehicle['executePoll']).toHaveBeenCalledTimes(2); // Immediate + 1 interval of 720 min
+    });
+
     it('should_stopExistingTimer_when_startingNewPolling', () => {
       // Arrange
       const mockStopPolling = jest.fn();

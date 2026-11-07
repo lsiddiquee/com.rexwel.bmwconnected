@@ -1,0 +1,10 @@
+{
+  "type": "string",
+  "title": {
+    "en": "Last car data",
+    "nl": "Laatste autodata"
+  },
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor"
+}
