@@ -12,7 +12,7 @@
                 "en": "Charging status",
                 "nl": "Laadstatus"
             },
-            "example": "NOCHARGING"
+            "example": "NOT_CHARGING"
         }
     ],
     "args": [{

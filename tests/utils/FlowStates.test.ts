@@ -28,6 +28,7 @@ describe('FlowStates', () => {
         chargingFlap: 'UNLOCKED',
         chargingCable: 'CONNECTED',
         climateActivity: 'HEATING',
+        electric: { chargingStatus: 'PAUSED', chargeLevelPercent: 85 },
         vin: 'ignored',
       } as any);
 
@@ -36,7 +37,59 @@ describe('FlowStates', () => {
         chargingFlap: 'UNLOCKED',
         chargingCable: 'CONNECTED',
         climateActivity: 'HEATING',
+        chargingStatus: 'PAUSED',
+        batteryLevel: 85,
       });
+    });
+
+    it.each([
+      'CHARGING',
+      'NOT_CHARGING',
+      'COMPLETE',
+      'PAUSED',
+      'INITIALIZING',
+      'ERROR',
+      'UNKNOWN',
+    ] as const)('should_readTheChargingStatus_%s_fromTheElectricState', (chargingStatus) => {
+      const result = readFlowStates({ electric: { chargingStatus } });
+
+      expect(result.chargingStatus).toBe(chargingStatus);
+    });
+
+    it.each([
+      ['a status of another type', 'LOCKED'],
+      ['the legacy INVALID status', 'INVALID'],
+      ['a raw BMW value', 'CHARGINGACTIVE'],
+      ['a number', 3],
+      ['undefined', undefined],
+      ['null', null],
+    ])('should_readUnknownChargingStatus_when_theValueIs_%s', (_name, chargingStatus) => {
+      expect(readFlowStates({ electric: { chargingStatus } }).chargingStatus).toBe('UNKNOWN');
+    });
+
+    it('should_readUnknownChargingStatus_when_thereIsNoElectricState', () => {
+      expect(readFlowStates({ electric: undefined }).chargingStatus).toBe('UNKNOWN');
+      expect(readFlowStates({ electric: null }).chargingStatus).toBe('UNKNOWN');
+      expect(readFlowStates({}).chargingStatus).toBe('UNKNOWN');
+    });
+
+    it.each([0, 1, 49.5, 100])('should_readTheBatteryLevel_%s_fromTheElectricState', (level) => {
+      expect(readFlowStates({ electric: { chargeLevelPercent: level } }).batteryLevel).toBe(level);
+    });
+
+    it.each([
+      ['undefined', undefined],
+      ['null', null],
+      ['a numeric string', '85'],
+      ['NaN', Number.NaN],
+      ['Infinity', Number.POSITIVE_INFINITY],
+    ])('should_readNoBatteryLevel_when_theValueIs_%s', (_name, chargeLevelPercent) => {
+      expect(readFlowStates({ electric: { chargeLevelPercent } }).batteryLevel).toBeUndefined();
+    });
+
+    it('should_readNoBatteryLevel_when_thereIsNoElectricState', () => {
+      expect(readFlowStates({ electric: undefined }).batteryLevel).toBeUndefined();
+      expect(readFlowStates(undefined).batteryLevel).toBeUndefined();
     });
 
     it.each([null, undefined])('should_readUnknown_when_statusIs_%p', (status) => {
@@ -60,9 +113,16 @@ describe('FlowStates', () => {
         chargingFlap: 'SECURED', // a state of another type
         chargingCable: 7,
         climateActivity: undefined,
+        electric: { chargingStatus: 'bogus', chargeLevelPercent: 'high' },
       });
 
       expect(result).toEqual(states({ carLock: 'LOCKED' }));
+    });
+
+    it('should_haveAnUnknownChargingStatusAndNoBatteryLevel_when_nothingIsKnown', () => {
+      expect(UNKNOWN_FLOW_STATES.chargingStatus).toBe('UNKNOWN');
+      expect(UNKNOWN_FLOW_STATES.batteryLevel).toBeUndefined();
+      expect('batteryLevel' in UNKNOWN_FLOW_STATES).toBe(true);
     });
 
     it('should_returnAFreshObject_when_nothingIsKnown', () => {
@@ -170,6 +230,132 @@ describe('FlowStates', () => {
       const next = states({ carLock: 'LOCKED', chargingCable: 'CONNECTED' });
 
       expect(cardIds(previous, next)).toEqual([Flows.CHARGING_CABLE_CONNECTED]);
+    });
+
+    describe('charging status', () => {
+      const KNOWN = [
+        'CHARGING',
+        'NOT_CHARGING',
+        'COMPLETE',
+        'PAUSED',
+        'INITIALIZING',
+        'ERROR',
+      ] as const;
+      const pairs = KNOWN.flatMap((from) =>
+        KNOWN.filter((to) => to !== from).map((to) => [from, to] as const)
+      );
+
+      it('should_haveEveryOrderedPairOfDistinctKnownStatuses', () => {
+        expect(pairs).toHaveLength(30);
+      });
+
+      it.each(pairs)(
+        'should_fireChargingStatusChanged_when_chargingStatusGoesFrom_%s_to_%s',
+        (from, to) => {
+          const planned = planStateTriggers(
+            states({ chargingStatus: from }),
+            states({ chargingStatus: to })
+          );
+
+          expect(planned).toEqual([
+            { cardId: Flows.CHARGING_STATUS_CHANGE, tokens: { charging_status: to } },
+          ]);
+        }
+      );
+
+      it.each(KNOWN)('should_fireNothing_when_chargingStatusStaysAt_%s', (status) => {
+        expect(
+          planStateTriggers(states({ chargingStatus: status }), states({ chargingStatus: status }))
+        ).toEqual([]);
+      });
+
+      it.each(KNOWN)('should_fireNothing_when_chargingStatusGoesBetweenUNKNOWNAnd_%s', (known) => {
+        expect(
+          planStateTriggers(
+            states({ chargingStatus: 'UNKNOWN' }),
+            states({ chargingStatus: known })
+          )
+        ).toEqual([]);
+        expect(
+          planStateTriggers(
+            states({ chargingStatus: known }),
+            states({ chargingStatus: 'UNKNOWN' })
+          )
+        ).toEqual([]);
+      });
+
+      it('should_fireNothing_when_chargingStatusStaysUnknown', () => {
+        expect(planStateTriggers(states(), states())).toEqual([]);
+      });
+
+      it.each(KNOWN)('should_fireNothing_when_thereIsNoPreviousStatusAndItIs_%s', (status) => {
+        expect(planStateTriggers(undefined, states({ chargingStatus: status }))).toEqual([]);
+      });
+
+      it('should_fireAfterTheCableCard_when_bothChange', () => {
+        const planned = cardIds(
+          states({ chargingCable: 'DISCONNECTED', chargingStatus: 'NOT_CHARGING' }),
+          states({ chargingCable: 'CONNECTED', chargingStatus: 'CHARGING' })
+        );
+
+        expect(planned).toEqual([Flows.CHARGING_CABLE_CONNECTED, Flows.CHARGING_STATUS_CHANGE]);
+      });
+
+      it('should_useTheCardIdOfTheExistingChargingStatusCard', () => {
+        expect(Flows.CHARGING_STATUS_CHANGE).toBe('charging_status_change');
+      });
+    });
+
+    describe('battery level', () => {
+      it.each([
+        [80, 81],
+        [81, 82],
+        [81, 79],
+        [0, 1],
+        [100, 99],
+        [50.5, 50.6],
+      ])('should_fireBatteryLevelAbove_when_theLevelGoesFrom_%s_to_%s', (from, to) => {
+        const planned = planStateTriggers(
+          states({ batteryLevel: from }),
+          states({ batteryLevel: to })
+        );
+
+        // The level is not filtered here: every flow compares it with its own percentage
+        expect(planned).toEqual([
+          {
+            cardId: Flows.BATTERY_LEVEL_ABOVE,
+            tokens: { battery: to },
+            state: { level: to },
+          },
+        ]);
+      });
+
+      it.each([0, 80, 100])('should_fireNothing_when_theLevelStaysAt_%s', (level) => {
+        expect(
+          planStateTriggers(states({ batteryLevel: level }), states({ batteryLevel: level }))
+        ).toEqual([]);
+      });
+
+      it('should_fireNothing_when_thereIsNoPreviousStatus', () => {
+        expect(planStateTriggers(undefined, states({ batteryLevel: 85 }))).toEqual([]);
+      });
+
+      it.each([0, 81])('should_fireNothing_when_theLevelGoesBetweenUnknownAnd_%s', (level) => {
+        expect(
+          planStateTriggers(states({ batteryLevel: undefined }), states({ batteryLevel: level }))
+        ).toEqual([]);
+        expect(
+          planStateTriggers(states({ batteryLevel: level }), states({ batteryLevel: undefined }))
+        ).toEqual([]);
+      });
+
+      it('should_fireNothing_when_theLevelStaysUnknown', () => {
+        expect(planStateTriggers(states(), states())).toEqual([]);
+      });
+
+      it('should_useTheCardIdOfTheBatteryLevelAboveCard', () => {
+        expect(Flows.BATTERY_LEVEL_ABOVE).toBe('battery_level_above');
+      });
     });
 
     describe('climate', () => {

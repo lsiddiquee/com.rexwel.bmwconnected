@@ -17,6 +17,7 @@ export const Flows = {
   CLIMATE_NOW_STARTED: 'climate_now_started',
   CLIMATE_NOW_STOPPED: 'climate_now_stopped',
   CLIMATE_STATUS_CHANGED: 'climate_status_changed',
+  BATTERY_LEVEL_ABOVE: 'battery_level_above',
 
   // Condition cards
   GEOFENCE_CONDITION: 'geofence',

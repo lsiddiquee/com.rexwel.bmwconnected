@@ -780,6 +780,121 @@ describe('TelematicDataTransformer', () => {
     });
   });
 
+  describe('Charging status', () => {
+    const transformCharging = (value: number | string | boolean | undefined) =>
+      TelematicDataTransformer.transform(TEST_VIN, DriveTrainType.ELECTRIC, {
+        [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(60),
+        ...(value === undefined
+          ? {}
+          : {
+              [TelematicKey.VEHICLE_DRIVETRAIN_ELECTRICENGINE_CHARGING_STATUS]:
+                createDataPoint(value),
+            }),
+      }).electric?.chargingStatus;
+
+    it.each([
+      ['CHARGINGACTIVE', 'CHARGING'],
+      ['CHARGINGPAUSED', 'PAUSED'],
+      ['CHARGINGENDED', 'COMPLETE'],
+      ['NOCHARGING', 'NOT_CHARGING'],
+      ['INITIALIZATION', 'INITIALIZING'],
+      ['CHARGINGERROR', 'ERROR'],
+    ])('should_mapTheDocumentedBmwValue_%s_to_%s', (value, expected) => {
+      expect(transformCharging(value)).toBe(expected);
+    });
+
+    it.each([
+      ['chargingactive', 'CHARGING'],
+      [' CHARGINGPAUSED ', 'PAUSED'],
+      ['ChargingEnded', 'COMPLETE'],
+      ['noCharging', 'NOT_CHARGING'],
+    ])('should_matchTheDocumentedBmwValueIgnoringCaseAndSpaces_%p_to_%s', (value, expected) => {
+      expect(transformCharging(value)).toBe(expected);
+    });
+
+    it('should_notMapPausedOrErrorToCharging_when_theValueContainsTheWordCharging', () => {
+      // The fuzzy match used to turn these two into CHARGING
+      expect(transformCharging('CHARGINGPAUSED')).not.toBe('CHARGING');
+      expect(transformCharging('CHARGINGERROR')).not.toBe('CHARGING');
+    });
+
+    it('should_notMapInitializationToUnknown', () => {
+      expect(transformCharging('INITIALIZATION')).not.toBe('UNKNOWN');
+    });
+
+    it.each([
+      ['CHARGING', 'CHARGING'],
+      ['NOT_CHARGING', 'NOT_CHARGING'],
+      ['NOT CHARGING', 'NOT_CHARGING'],
+      ['COMPLETE', 'COMPLETE'],
+      ['FINISHED', 'COMPLETE'],
+      ['FINISHED_FULLY_CHARGED', 'COMPLETE'],
+    ])('should_stillMapOtherSpellingsOf_%s_to_%s', (value, expected) => {
+      expect(transformCharging(value)).toBe(expected);
+    });
+
+    it.each([
+      ['CHARGING_PAUSED', 'PAUSED'],
+      ['PAUSED', 'PAUSED'],
+      ['CHARGING_PAUSE', 'PAUSED'],
+      ['CHARGING_ERROR', 'ERROR'],
+      ['ERROR', 'ERROR'],
+      ['FAULT', 'ERROR'],
+      ['CHARGING_FAULT', 'ERROR'],
+    ])('should_checkErrorAndPauseBeforeTheGenericChargingMatch_%s_to_%s', (value, expected) => {
+      expect(transformCharging(value)).toBe(expected);
+    });
+
+    it.each(['SOMETHING_NEW', '', 'INVALID', 'UNKNOWN', 7, true])(
+      'should_mapToUnknown_when_theValueIs_%p',
+      (value) => {
+        expect(transformCharging(value)).toBe('UNKNOWN');
+      }
+    );
+
+    it('should_mapToUnknown_when_theChargingStatusPointIsMissing', () => {
+      expect(transformCharging(undefined)).toBe('UNKNOWN');
+    });
+  });
+
+  describe('Battery level', () => {
+    const transformBattery = (data: Record<string, TelematicDataPoint>) =>
+      TelematicDataTransformer.transform(TEST_VIN, DriveTrainType.ELECTRIC, data).electric;
+
+    it('should_keepZeroAsAValidLevel_when_theHeaderIsZero', () => {
+      const electric = transformBattery({
+        [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(0),
+      });
+
+      expect(electric?.chargeLevelPercent).toBe(0);
+    });
+
+    it('should_leaveTheLevelUndefined_when_theHeaderIsMissing', () => {
+      // Only the range is known: the electric state exists, the battery level is not known
+      const electric = transformBattery({
+        [TelematicKey.VEHICLE_DRIVETRAIN_ELECTRICENGINE_KOMBIREMAININGELECTRICRANGE]:
+          createDataPoint(280, 'km'),
+      });
+
+      expect(electric).toBeDefined();
+      expect(electric?.chargeLevelPercent).toBeUndefined();
+      expect(electric?.range).toBe(280);
+    });
+
+    it.each(['85', 'unknown', true, Number.NaN, Number.POSITIVE_INFINITY])(
+      'should_leaveTheLevelUndefined_when_theHeaderIs_%p',
+      (value) => {
+        const electric = transformBattery({
+          [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(value),
+          [TelematicKey.VEHICLE_DRIVETRAIN_ELECTRICENGINE_KOMBIREMAININGELECTRICRANGE]:
+            createDataPoint(280, 'km'),
+        });
+
+        expect(electric?.chargeLevelPercent).toBeUndefined();
+      }
+    );
+  });
+
   describe('Combustion Vehicle Data Extraction', () => {
     it('should_extractFuelLevel_when_combustionVehicle', () => {
       // Arrange

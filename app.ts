@@ -168,6 +168,9 @@ export class BMWConnectedDrive extends Homey.App {
     // Register condition cards only (read-only)
     // All action cards for remote services have been removed due to BMW CarData API limitations
     this.registerConditionCards();
+
+    // Trigger cards whose flows each filter on their own argument
+    this.registerTriggerCards();
   }
 
   /**
@@ -201,32 +204,64 @@ export class BMWConnectedDrive extends Homey.App {
         return [];
       }
     );
+    // Inside/outside a geofence. Not knowing where the car is, is an error, not "outside": Homey
+    // inverts the result for the "outside" variant, so a guess would make that variant say yes.
     geofenceCard.registerRunListener(async (args: any, _state: any) => {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       const device = args.device as Vehicle;
       const currentLocation = device.stateManager.getLastLocation();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-member-access
-      return currentLocation && args.geo_fence.id && currentLocation.label === args.geo_fence.id;
+      if (!currentLocation) {
+        throw new Error(
+          "The car's location isn't known yet. Nothing you need to do: the app learns it as soon as " +
+            'BMW CarData reports it. If this keeps happening, check that ' +
+            "'vehicle.cabin.infotainment.navigation.currentLocation.latitude' and " +
+            "'vehicle.cabin.infotainment.navigation.currentLocation.longitude' are ticked in the " +
+            'stream selection of the BMW CarData portal.'
+        );
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+      const geofenceLabel = args.geo_fence?.id as string | undefined;
+      return Boolean(geofenceLabel) && currentLocation.label === geofenceLabel;
     });
 
+    // Battery charge less than a percentage. An unknown level is an error, not "not less than":
+    // the "more than or equal to" variant is the inverted result, so a guess would make it say yes.
+    // 0 is a valid level.
     this.homey.flow
       .getConditionCard(Flows.BATTERY_PERCENTAGE_CONDITION)
       .registerRunListener(async (args: any, _: any) => {
-        const battery_percentage = await Capabilities.GetCapabilityValueSafe<number>(
+        const level = await Capabilities.GetCapabilityValueSafe<unknown>(
           args.device,
           Capabilities.MEASURE_BATTERY
         );
-        return battery_percentage && battery_percentage < args.battery_charge_test;
+        if (typeof level !== 'number' || !Number.isFinite(level)) {
+          throw new Error(
+            "The battery level isn't known yet. Nothing you need to do: the app learns it as soon as " +
+              "BMW CarData reports it. If this keeps happening, check that 'vehicle.drivetrain.batteryManagement.header' " +
+              'is ticked in the stream selection of the BMW CarData portal.'
+          );
+        }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+        return level < Number(args.battery_charge_test);
       });
 
+    // Charging state is a given Homey state. An unknown state is an error, not "not that state".
     this.homey.flow
       .getConditionCard(Flows.CHARGING_STATUS_CONDITION)
       .registerRunListener(async (args: any, _: any) => {
-        // Get the current Homey charging state (plugged_in_charging, plugged_in, plugged_out)
+        // The Homey charging state (plugged_in_charging, plugged_in_paused, plugged_in, plugged_out)
         const currentChargingState = await Capabilities.GetCapabilityValueSafe<string>(
           args.device,
           Capabilities.EV_CHARGING_STATE
         );
+        if (!currentChargingState) {
+          throw new Error(
+            "The charging state isn't known yet. Nothing you need to do: the app learns it as soon as " +
+              "BMW CarData reports it. If this keeps happening, check that 'vehicle.body.chargingPort.status' and " +
+              "'vehicle.drivetrain.electricEngine.charging.status' are ticked in the stream selection of the BMW " +
+              'CarData portal.'
+          );
+        }
 
         // Compare with the Homey-standard charging state from flow card
         return currentChargingState === args.charging_state;
@@ -274,6 +309,23 @@ export class BMWConnectedDrive extends Homey.App {
           );
         }
         return status === 'CONNECTED';
+      });
+  }
+
+  /**
+   * Register the run listeners of trigger cards.
+   *
+   * A device trigger runs the flows that use it for the device. A card that has a filter of its
+   * own, such as a percentage, is fired for every change and Homey asks the run listener, once per
+   * flow with that flow's own arguments, whether the flow runs.
+   */
+  private registerTriggerCards() {
+    // Battery level changed and is above a percentage: the state carries the new level, the flow
+    // runs when it is strictly above the percentage of that flow (80 runs for 81, not for 80)
+    this.homey.flow
+      .getDeviceTriggerCard(Flows.BATTERY_LEVEL_ABOVE)
+      .registerRunListener((args: { percentage: number }, state: { level: number }) => {
+        return state.level > Number(args.percentage);
       });
   }
 

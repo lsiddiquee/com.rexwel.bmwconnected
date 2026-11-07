@@ -185,4 +185,206 @@ describe('BMWConnectedDrive condition cards', () => {
       expect(device.isCarDataFresh).toHaveBeenCalledWith(30);
     });
   });
+
+  /**
+   * Homey inverts the result of a condition for its "isn't" variant, so a condition that returns
+   * false or undefined when it does not know the answer makes the inverted card say yes. These
+   * conditions therefore throw when the data is unknown.
+   */
+  describe('battery_percentage', () => {
+    const batteryDevice = (level: unknown, hasCapability = true) => ({
+      hasCapability: jest.fn().mockReturnValue(hasCapability),
+      getCapabilityValue: jest.fn().mockResolvedValue(level),
+    });
+    const run = (level: unknown, test: number, hasCapability = true) => {
+      const device = batteryDevice(level, hasCapability);
+      return {
+        device,
+        result: () =>
+          runListeners.get(Flows.BATTERY_PERCENTAGE_CONDITION)?.({
+            device,
+            battery_charge_test: test,
+          }) as Promise<boolean>,
+      };
+    };
+
+    it('should_registerARunListener_when_appStarts', () => {
+      expect(getConditionCard).toHaveBeenCalledWith(Flows.BATTERY_PERCENTAGE_CONDITION);
+      expect(runListeners.has(Flows.BATTERY_PERCENTAGE_CONDITION)).toBe(true);
+    });
+
+    it.each([
+      [40, 50, true],
+      [49, 50, true],
+      [50, 50, false],
+      [51, 50, false],
+      [100, 50, false],
+      [99.5, 100, true],
+    ])('should_compareTheLevel_%s_withTheTest_%s_and_return_%s', async (level, test, expected) => {
+      const { device, result } = run(level, test);
+
+      await expect(result()).resolves.toBe(expected);
+      expect(device.getCapabilityValue).toHaveBeenCalledWith('measure_battery');
+    });
+
+    it('should_treatZeroAsAValidLevel_when_theBatteryIsEmpty', async () => {
+      // 0 used to be falsy, so an empty battery was neither "less than" nor an error
+      await expect(run(0, 10).result()).resolves.toBe(true);
+      await expect(run(0, 0).result()).resolves.toBe(false);
+    });
+
+    it.each([
+      ['undefined', undefined],
+      ['null', null],
+      ['NaN', Number.NaN],
+      ['Infinity', Number.POSITIVE_INFINITY],
+      ['a numeric string', '50'],
+      ['an object', {}],
+    ])('should_throwInsteadOfGuessing_when_theLevelIs_%s', async (_name, level) => {
+      await expect(run(level, 50).result()).rejects.toThrow(Error);
+      await expect(run(level, 50).result()).rejects.toThrow("The battery level isn't known yet");
+    });
+
+    it('should_throwInsteadOfGuessing_when_theDeviceHasNoBatteryCapability', async () => {
+      const { device, result } = run(undefined, 50, false);
+
+      await expect(result()).rejects.toThrow("The battery level isn't known yet");
+      expect(device.getCapabilityValue).not.toHaveBeenCalled();
+    });
+
+    it('should_pointTheUserAtWhatToDoNext_when_theLevelIsUnknown', async () => {
+      await expect(run(undefined, 50).result()).rejects.toThrow(/nothing you need to do/i);
+      await expect(run(undefined, 50).result()).rejects.toThrow(
+        'vehicle.drivetrain.batteryManagement.header'
+      );
+    });
+  });
+
+  describe('charging_status', () => {
+    const run = (state: unknown, expectedState: string, hasCapability = true) => {
+      const device = {
+        hasCapability: jest.fn().mockReturnValue(hasCapability),
+        getCapabilityValue: jest.fn().mockResolvedValue(state),
+      };
+      return {
+        device,
+        result: () =>
+          runListeners.get(Flows.CHARGING_STATUS_CONDITION)?.({
+            device,
+            charging_state: expectedState,
+          }) as Promise<boolean>,
+      };
+    };
+
+    it('should_registerARunListener_when_appStarts', () => {
+      expect(getConditionCard).toHaveBeenCalledWith(Flows.CHARGING_STATUS_CONDITION);
+      expect(runListeners.has(Flows.CHARGING_STATUS_CONDITION)).toBe(true);
+    });
+
+    it.each(['plugged_in_charging', 'plugged_in_paused', 'plugged_in', 'plugged_out'])(
+      'should_returnTrue_when_theChargingStateIs_%s_andIsTheSelectedOne',
+      async (state) => {
+        const { device, result } = run(state, state);
+
+        await expect(result()).resolves.toBe(true);
+        expect(device.getCapabilityValue).toHaveBeenCalledWith('ev_charging_state');
+      }
+    );
+
+    it.each([
+      ['plugged_in', 'plugged_in_paused'],
+      ['plugged_in_paused', 'plugged_in'],
+      ['plugged_out', 'plugged_in'],
+      ['plugged_in_charging', 'plugged_out'],
+    ])('should_returnFalse_when_theChargingStateIs_%s_andTheSelectedOneIs_%s', async (a, b) => {
+      await expect(run(a, b).result()).resolves.toBe(false);
+    });
+
+    it.each([
+      ['undefined', undefined],
+      ['null', null],
+      ['an empty string', ''],
+    ])('should_throwInsteadOfGuessing_when_theChargingStateIs_%s', async (_name, state) => {
+      await expect(run(state, 'plugged_out').result()).rejects.toThrow(Error);
+      await expect(run(state, 'plugged_out').result()).rejects.toThrow(
+        "The charging state isn't known yet"
+      );
+    });
+
+    it('should_throwInsteadOfGuessing_when_theDeviceHasNoChargingStateCapability', async () => {
+      const { device, result } = run('plugged_in', 'plugged_in', false);
+
+      await expect(result()).rejects.toThrow("The charging state isn't known yet");
+      expect(device.getCapabilityValue).not.toHaveBeenCalled();
+    });
+
+    it('should_pointTheUserAtWhatToDoNext_when_theChargingStateIsUnknown', async () => {
+      await expect(run(undefined, 'plugged_in').result()).rejects.toThrow(
+        /nothing you need to do/i
+      );
+      await expect(run(undefined, 'plugged_in').result()).rejects.toThrow(
+        'vehicle.body.chargingPort.status'
+      );
+    });
+  });
+
+  describe('geofence', () => {
+    const run = (location: unknown, geoFence: unknown = { id: 'Home', name: 'Home' }) => {
+      const device = { stateManager: { getLastLocation: jest.fn().mockReturnValue(location) } };
+      return {
+        device,
+        result: () =>
+          runListeners.get(Flows.GEOFENCE_CONDITION)?.({
+            device,
+            geo_fence: geoFence,
+          }) as Promise<boolean>,
+      };
+    };
+
+    it('should_registerARunListener_when_appStarts', () => {
+      expect(getConditionCard).toHaveBeenCalledWith(Flows.GEOFENCE_CONDITION);
+      expect(runListeners.has(Flows.GEOFENCE_CONDITION)).toBe(true);
+    });
+
+    it('should_returnTrue_when_theCarIsInsideTheSelectedGeofence', async () => {
+      const { device, result } = run({ label: 'Home', latitude: 1, longitude: 2, address: '' });
+
+      await expect(result()).resolves.toBe(true);
+      expect(device.stateManager.getLastLocation).toHaveBeenCalledTimes(1);
+    });
+
+    it.each([
+      ['inside another geofence', 'Work'],
+      ['outside every geofence', ''],
+    ])('should_returnFalse_when_theCarIs_%s', async (_name, label) => {
+      const { result } = run({ label, latitude: 1, longitude: 2, address: '' });
+
+      await expect(result()).resolves.toBe(false);
+    });
+
+    it('should_returnFalse_when_noGeofenceIsSelected', async () => {
+      const { result } = run({ label: 'Home', latitude: 1, longitude: 2, address: '' }, { id: '' });
+
+      await expect(result()).resolves.toBe(false);
+    });
+
+    it.each([
+      ['undefined', undefined],
+      ['null', null],
+    ])('should_throwInsteadOfGuessing_when_theLastLocationIs_%s', async (_name, location) => {
+      const { result } = run(location);
+
+      await expect(result()).rejects.toThrow(Error);
+      await expect(result()).rejects.toThrow("The car's location isn't known yet");
+    });
+
+    it('should_pointTheUserAtWhatToDoNext_when_theLocationIsUnknown', async () => {
+      const { result } = run(undefined);
+
+      await expect(result()).rejects.toThrow(/nothing you need to do/i);
+      await expect(result()).rejects.toThrow(
+        'vehicle.cabin.infotainment.navigation.currentLocation.latitude'
+      );
+    });
+  });
 });
