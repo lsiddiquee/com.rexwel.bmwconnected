@@ -29,6 +29,9 @@
       {
         "name": "Sander Schutten",
         "email": "sander@dotnetstudio.nl"
+      },
+      {
+        "name": "Danee de Kruijff"
       }
     ],
     "translators": [
@@ -66,6 +69,14 @@
     "getClientTokens": {
       "method": "GET",
       "path": "/getClientTokens"
+    },
+    "getWidgetImage": {
+      "method": "GET",
+      "path": "/getWidgetImage"
+    },
+    "setWidgetImage": {
+      "method": "POST",
+      "path": "/setWidgetImage"
     }
   },
   "bugs": {
