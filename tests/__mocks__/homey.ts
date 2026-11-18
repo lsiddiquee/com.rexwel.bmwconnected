@@ -3,12 +3,32 @@
  * Used by tests to avoid requiring the actual Homey runtime
  */
 
+/**
+ * Timer functions of the Homey manager (`this.homey.setTimeout` etc.).
+ *
+ * The real ones are aliases of the global timers that also dispose the timers when the app stops,
+ * so the mock simply delegates to the global functions. The global is looked up on every call, so
+ * timers installed by `jest.useFakeTimers()` after the mock was created are driven by fake time.
+ *
+ * @returns Object with `setTimeout`, `clearTimeout`, `setInterval` and `clearInterval`
+ */
+export function createHomeyTimers() {
+  return {
+    setTimeout: (callback: (...args: any[]) => void, ms?: number, ...args: any[]) =>
+      setTimeout(callback, ms, ...args),
+    clearTimeout: (timeoutId: any) => clearTimeout(timeoutId),
+    setInterval: (callback: (...args: any[]) => void, ms?: number, ...args: any[]) =>
+      setInterval(callback, ms, ...args),
+    clearInterval: (intervalId: any) => clearInterval(intervalId),
+  };
+}
+
 export class Device {
   homey: any;
   data: any;
 
   constructor() {
-    this.homey = {};
+    this.homey = { ...createHomeyTimers() };
     this.data = {};
   }
 
@@ -77,7 +97,7 @@ export class App {
   homey: any;
 
   constructor() {
-    this.homey = {};
+    this.homey = { ...createHomeyTimers() };
   }
 
   log(..._args: any[]): void {
@@ -93,7 +113,7 @@ export class Driver {
   homey: any;
 
   constructor() {
-    this.homey = {};
+    this.homey = { ...createHomeyTimers() };
   }
 
   log(..._args: any[]): void {

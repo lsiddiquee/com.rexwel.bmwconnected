@@ -1,0 +1,17 @@
+{
+  "type": "enum",
+  "title": {
+    "en": "Car data stream",
+    "nl": "Autodata-stream"
+  },
+  "values": [
+    { "id": "connected", "title": { "en": "Live", "nl": "Live" } },
+    { "id": "connecting", "title": { "en": "Connecting", "nl": "Verbinden" } },
+    { "id": "reconnecting", "title": { "en": "Reconnecting", "nl": "Opnieuw verbinden" } },
+    { "id": "disabled", "title": { "en": "Off", "nl": "Uit" } },
+    { "id": "unavailable", "title": { "en": "Unavailable", "nl": "Niet beschikbaar" } }
+  ],
+  "getable": true,
+  "setable": false,
+  "uiComponent": "sensor"
+}

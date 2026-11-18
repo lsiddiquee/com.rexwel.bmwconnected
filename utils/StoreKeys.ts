@@ -34,3 +34,9 @@ export const STORE_KEY_CLIENT_ID = 'clientId';
  * Container ID for telematic data access
  */
 export const STORE_KEY_CONTAINER_ID = 'containerId';
+
+/**
+ * Time of the last real car data update (MQTT message or successful REST poll),
+ * in epoch milliseconds. Cached state restored at startup does not count.
+ */
+export const STORE_KEY_LAST_DATA_UPDATE = 'lastCarDataUpdate';

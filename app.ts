@@ -145,15 +145,15 @@ export class BMWConnectedDrive extends Homey.App {
 
     // Initialize logger based on configuration
     // If Loki URL is provided, use LokiLogger; otherwise use standard Logger
+    // Both read the level through getCurrentLogLevel on every log call: saving the settings
+    // replaces the configuration object, so a level change applies without restarting the app.
     if (configuration.lokiUrl && configuration.lokiUrl.trim() !== '') {
       this.logger = new LokiLogger(this.homey, configuration.lokiUrl, () =>
-        configuration.logEnabled ? configuration.logLevel : LogLevel.ERROR
+        this.getCurrentLogLevel()
       );
       this.logger.info(`Initialized with Loki logger at ${configuration.lokiUrl}`);
     } else {
-      this.logger = new Logger(this.homey, () =>
-        configuration.logEnabled ? configuration.logLevel : LogLevel.ERROR
-      );
+      this.logger = new Logger(this.homey, () => this.getCurrentLogLevel());
       this.logger.info('Initialized with standard logger');
     }
 
@@ -168,6 +168,18 @@ export class BMWConnectedDrive extends Homey.App {
     // Register condition cards only (read-only)
     // All action cards for remote services have been removed due to BMW CarData API limitations
     this.registerConditionCards();
+  }
+
+  /**
+   * Get the log level from the configuration as it is right now.
+   *
+   * Must not capture the configuration object: the settings page replaces it when saving.
+   *
+   * @returns The configured level, or ERROR (errors only) when logging is disabled
+   */
+  private getCurrentLogLevel(): LogLevel {
+    const configuration = ConfigurationManager.getConfiguration(this.homey);
+    return configuration?.logEnabled ? configuration.logLevel : LogLevel.ERROR;
   }
 
   private registerConditionCards() {

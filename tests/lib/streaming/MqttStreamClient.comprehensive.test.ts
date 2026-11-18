@@ -91,8 +91,8 @@ describe('MqttStreamClient Comprehensive Tests', () => {
     // Clean up event listeners
     mockMqttClient.removeAllListeners();
 
-    // Disconnect client if it exists and is connected
-    if (client && client.isConnected()) {
+    // Always stop the client: it may hold a pending connect, renewal or recovery timer
+    if (client) {
       await client.disconnect();
     }
   });
