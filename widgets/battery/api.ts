@@ -12,8 +12,8 @@ type Homey = Driver['homey'];
  * The state of the "Car battery" widget: the battery level, charging state and range of the car
  * picked in the widget settings.
  *
- * @param query.deviceId - The data id of the car. The first car is used when it is missing or unknown
- * @returns The state, null when the app has no cars
+ * @param query.deviceId - The data id of the car. The first car is used when it is missing or empty
+ * @returns The state, null when the app has no cars or no car has that id
  */
 export async function getState({
   homey,

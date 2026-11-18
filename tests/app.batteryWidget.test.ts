@@ -84,8 +84,10 @@ describe('BMWConnectedDrive battery widget', () => {
       expect(app.getBatteryWidgetState(undefined)).toMatchObject({ deviceId: 'VIN_I4' });
     });
 
-    it('should_fallBackToTheFirstCar_when_noCarHasThatId', () => {
-      expect(app.getBatteryWidgetState('REMOVED_CAR')).toMatchObject({ deviceId: 'VIN_I4' });
+    it('should_returnNull_when_noCarHasThePickedId', () => {
+      expect(app.getBatteryWidgetState('REMOVED_CAR')).toBeNull();
+      expect(i4.getBatteryWidgetState).not.toHaveBeenCalled();
+      expect(mini.getBatteryWidgetState).not.toHaveBeenCalled();
     });
 
     it('should_fallBackToTheFirstCar_when_theIdIsEmpty', () => {

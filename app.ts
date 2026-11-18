@@ -191,13 +191,15 @@ export class BMWConnectedDrive extends Homey.App {
    * Get what the "Car battery" dashboard widget shows for a car.
    *
    * @param deviceId - The data id of the car (the widget's "car" setting). When it is missing or
-   *   no car has it (the car was removed), the first car is used
-   * @returns The widget state, or null when the app has no cars
+   *   empty (no car picked yet), the first car is used. A picked car is never swapped for another
+   * @returns The widget state, or null when the app has no cars or no car has the picked id (the
+   *   car was removed)
    */
   getBatteryWidgetState(deviceId?: string): BatteryWidgetState | null {
     const vehicles = this.getVehicles();
-    const vehicle =
-      vehicles.find((item) => (item.getData() as DeviceData).id === deviceId) ?? vehicles[0];
+    const vehicle = deviceId
+      ? vehicles.find((item) => (item.getData() as DeviceData).id === deviceId)
+      : vehicles[0];
     return vehicle ? vehicle.getBatteryWidgetState() : null;
   }
 
