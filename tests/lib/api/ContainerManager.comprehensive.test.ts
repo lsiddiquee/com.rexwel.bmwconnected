@@ -14,7 +14,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { ContainerManager, type ContainerManagerOptions } from '../../../lib/api/ContainerManager';
 import type { IHttpClient, HttpResponse } from '../../../lib/http/IHttpClient';
 import type { ILogger } from '../../../lib/types/ILogger';
-import { ApiError } from '../../../lib/types/errors';
+import { ApiError, RateLimitError } from '../../../lib/types/errors';
 
 describe('ContainerManager - Simplified Architecture Tests', () => {
   let containerManager: ContainerManager;
@@ -158,10 +158,12 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
 
       // Assert
       expect(containerId).toBe('container_123');
+      // Name embeds the identifier (issue #108) so subsequent pairings can
+      // discover and reuse this container via listContainers().
       expect(mockHttpClient.post).toHaveBeenCalledWith(
         'https://api-cardata.bmwgroup.com/customers/containers',
         {
-          name: 'Test Container',
+          name: 'Test Container (VIN123)',
           purpose: 'Testing telematic data',
           technicalDescriptors: [
             'vehicle.fuel_level',
@@ -211,7 +213,7 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       expect(mockHttpClient.post).toHaveBeenCalledWith(
         'https://api-cardata.bmwgroup.com/customers/containers',
         expect.objectContaining({
-          name: 'Test Container',
+          name: 'Test Container (VIN456)',
           purpose: 'Testing telematic data',
         }),
         expect.any(Object)
@@ -283,6 +285,317 @@ describe('ContainerManager - Simplified Architecture Tests', () => {
       await expect(containerManager.getOrCreateContainer('VIN_ERROR')).rejects.toThrow(
         'API failure'
       );
+    });
+  });
+
+  describe('Container Reuse via List Lookup (issue #108)', () => {
+    // Bug: Every pairing attempt called POST /customers/containers, producing
+    // duplicate containers on BMW's side and never reusing the one we'd already
+    // created for that client. v1.0.18 must list first, match by stable name,
+    // and only POST when no match exists.
+    beforeEach(() => {
+      containerManager = new ContainerManager(managerOptions);
+      mockGetAccessToken.mockResolvedValue('valid_access_token');
+    });
+
+    it('should_includeIdentifier_when_creatingContainerName', async () => {
+      // Arrange - no existing containers, no cache
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([]));
+      mockHttpClient.post.mockResolvedValue(
+        createHttpResponse({ containerId: 'new_container_xyz' })
+      );
+
+      // Act
+      await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert - POSTed request body must embed the identifier in the name so
+      // we can find it again on the next pairing.
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+      const [, body] = mockHttpClient.post.mock.calls[0] as [string, { name: string }, unknown];
+      expect(body.name).toContain('HOMEY-6f3c3e2a');
+    });
+
+    it('should_reuseExistingContainer_when_listContainsMatchingName', async () => {
+      // Arrange - BMW already has a Homey container for this client
+      const existing = {
+        containerId: 'existing_container_abc',
+        name: 'Test Container (HOMEY-6f3c3e2a)',
+        purpose: 'Testing telematic data',
+        technicalDescriptors: managerOptions.telematicKeys as string[],
+      };
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([existing]));
+
+      // Act
+      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert
+      expect(containerId).toBe('existing_container_abc');
+      // Must NOT POST a duplicate container.
+      expect(mockHttpClient.post).not.toHaveBeenCalled();
+      // Must cache the reused container so subsequent calls skip the list too.
+      expect(containerManager.getCachedContainerId('HOMEY-6f3c3e2a')).toBe(
+        'existing_container_abc'
+      );
+    });
+
+    it('should_createNewContainer_when_listHasNoMatchingName', async () => {
+      // Arrange - BMW has containers, but none look like ours (different
+      // managed-app prefix) so we must not touch them.
+      const otherContainer = {
+        containerId: 'someone_elses_container',
+        name: 'Some Other App (foo-bar)',
+        purpose: 'Testing telematic data',
+        technicalDescriptors: ['vehicle.fuel_level'],
+      };
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([otherContainer]));
+      mockHttpClient.post.mockResolvedValue(
+        createHttpResponse({ containerId: 'freshly_created_container' })
+      );
+
+      // Act
+      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert
+      expect(containerId).toBe('freshly_created_container');
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+      // Foreign containers must never be deleted.
+      expect(mockHttpClient.delete).not.toHaveBeenCalled();
+    });
+
+    it('should_createContainer_when_listEndpointFails', async () => {
+      // Arrange - listing failed (e.g. transient API hiccup); we should still
+      // be able to fall through to creation rather than block pairing entirely.
+      mockHttpClient.get.mockRejectedValue(new Error('Network glitch'));
+      mockHttpClient.post.mockResolvedValue(
+        createHttpResponse({ containerId: 'created_despite_list_failure' })
+      );
+
+      // Act
+      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert
+      expect(containerId).toBe('created_despite_list_failure');
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+    });
+
+    // Issue #108: when BMW returns CU-429 from the list-containers endpoint,
+    // the user has already exhausted their 50-request/24h quota. Falling
+    // through to createContainer() burns ANOTHER quota request and guarantees
+    // a second CU-429. We must short-circuit so pairing fails fast with the
+    // accurate rate-limit message and the user's remaining quota is preserved.
+    it('should_propagateRateLimitError_when_listContainersHitsCu429', async () => {
+      // Arrange - listing returns RateLimitError (BMW's CU-429)
+      mockHttpClient.get.mockRejectedValue(
+        new RateLimitError(
+          'BMW CarData daily rate limit reached (50 requests / 24h per user)',
+          3600
+        )
+      );
+      mockHttpClient.post.mockResolvedValue(
+        createHttpResponse({ containerId: 'should_not_be_created' })
+      );
+
+      // Act
+      const error = await containerManager
+        .getOrCreateContainer('HOMEY-6f3c3e2a')
+        .catch((e: unknown) => e);
+
+      // Assert - rate-limit propagated unchanged; create never attempted
+      expect(error).toBeInstanceOf(RateLimitError);
+      expect(mockHttpClient.post).not.toHaveBeenCalled();
+    });
+
+    it('should_listOnlyOnce_when_calledConcurrentlyForSameIdentifier', async () => {
+      // Arrange - two pair sessions for the same client race against each other.
+      // They must share a single in-flight lookup+create promise so BMW sees
+      // at most one POST per client per app lifetime.
+      let resolveList: (value: HttpResponse<unknown>) => void = () => {};
+      mockHttpClient.get.mockReturnValue(
+        new Promise((resolve) => {
+          resolveList = resolve as (value: HttpResponse<unknown>) => void;
+        })
+      );
+      mockHttpClient.post.mockResolvedValue(
+        createHttpResponse({ containerId: 'race_winner_container' })
+      );
+
+      // Act - kick off two concurrent calls
+      const p1 = containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+      const p2 = containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+      resolveList(createHttpResponse([]));
+      const [id1, id2] = await Promise.all([p1, p2]);
+
+      // Assert
+      expect(id1).toBe('race_winner_container');
+      expect(id2).toBe('race_winner_container');
+      expect(mockHttpClient.get).toHaveBeenCalledTimes(1);
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Orphan Container Cleanup (issue #108 - max containers reached)', () => {
+    // Bug: pre-1.0.18 created a fresh container on every pair attempt with the
+    // identical literal name 'Test Container' (no identifier suffix), so users
+    // who loop-paired filled their BMW per-user container slot quota.
+    //
+    // 1.0.20 cleanup is intentionally PROGRESSIVE and CONSERVATIVE: each DELETE
+    // burns 1 of the user's 50-per-24h request quota, so we only delete when
+    // we strictly need to free a slot — i.e. when we're about to create. And
+    // we only delete ONE orphan per pair attempt; subsequent pair attempts
+    // progressively reclaim the rest.
+    beforeEach(() => {
+      containerManager = new ContainerManager(managerOptions);
+      mockGetAccessToken.mockResolvedValue('valid_access_token');
+    });
+
+    it('should_notDeleteAnyOrphans_when_matchExistsForReuse', async () => {
+      // Arrange - reuse path: match found, several orphans present. Deleting
+      // them would burn quota for no functional gain (we already have our
+      // container), so cleanup must be skipped entirely.
+      const match = {
+        containerId: 'current_container',
+        name: 'Test Container (HOMEY-6f3c3e2a)',
+        purpose: 'p',
+        technicalDescriptors: [],
+      };
+      const legacy1 = {
+        containerId: 'legacy_one',
+        name: 'Test Container',
+        purpose: 'p',
+        technicalDescriptors: [],
+      };
+      const legacy2 = {
+        containerId: 'legacy_two',
+        name: 'Test Container',
+        purpose: 'p',
+        technicalDescriptors: [],
+      };
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([legacy1, match, legacy2]));
+
+      // Act
+      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert
+      expect(containerId).toBe('current_container');
+      expect(mockHttpClient.post).not.toHaveBeenCalled();
+      expect(mockHttpClient.delete).not.toHaveBeenCalled();
+    });
+
+    it('should_deleteExactlyOneOrphan_when_creatingNewContainer', async () => {
+      // Arrange - no match, multiple orphans. We must delete only ONE to free
+      // a slot, then create. Subsequent pair attempts will clean the rest.
+      const orphan1 = {
+        containerId: 'orphan_one',
+        name: 'Test Container',
+        purpose: 'p',
+        technicalDescriptors: [],
+      };
+      const orphan2 = {
+        containerId: 'orphan_two',
+        name: 'Test Container (HOMEY-deadbeef)',
+        purpose: 'p',
+        technicalDescriptors: [],
+      };
+      const orphan3 = {
+        containerId: 'orphan_three',
+        name: 'Test Container',
+        purpose: 'p',
+        technicalDescriptors: [],
+      };
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([orphan1, orphan2, orphan3]));
+      mockHttpClient.delete.mockResolvedValue(createHttpResponse(undefined));
+      mockHttpClient.post.mockResolvedValue(createHttpResponse({ containerId: 'freshly_created' }));
+
+      // Act
+      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert - exactly one delete, then create.
+      expect(containerId).toBe('freshly_created');
+      expect(mockHttpClient.delete).toHaveBeenCalledTimes(1);
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_proceedWithCreate_when_orphanDeleteFailsNonRateLimit', async () => {
+      // Arrange - lone orphan; delete fails with a 500 (not rate limit). We
+      // still attempt create (BMW may have already freed the slot, or quota
+      // wasn't the problem in the first place); a real CU-429 on create will
+      // surface cleanly.
+      const orphan = {
+        containerId: 'orphan_one',
+        name: 'Test Container',
+        purpose: 'p',
+        technicalDescriptors: [],
+      };
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([orphan]));
+      mockHttpClient.delete.mockRejectedValueOnce(new Error('500 server error'));
+      mockHttpClient.post.mockResolvedValue(createHttpResponse({ containerId: 'freshly_created' }));
+
+      // Act
+      const containerId = await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert
+      expect(containerId).toBe('freshly_created');
+      expect(mockHttpClient.delete).toHaveBeenCalledTimes(1);
+      expect(mockHttpClient.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('should_propagateRateLimit_when_orphanDeleteHitsRateLimit', async () => {
+      // Arrange - lone orphan; delete hits CU-429. The subsequent create
+      // would also fail (same quota), so propagate the rate-limit error
+      // instead of burning another request.
+      const orphan = {
+        containerId: 'orphan_one',
+        name: 'Test Container',
+        purpose: 'p',
+        technicalDescriptors: [],
+      };
+      mockHttpClient.get.mockResolvedValue(createHttpResponse([orphan]));
+      mockHttpClient.delete.mockRejectedValueOnce(new RateLimitError('rate limited', 3600));
+
+      // Act + Assert
+      await expect(containerManager.getOrCreateContainer('HOMEY-6f3c3e2a')).rejects.toBeInstanceOf(
+        RateLimitError
+      );
+      expect(mockHttpClient.delete).toHaveBeenCalledTimes(1);
+      expect(mockHttpClient.post).not.toHaveBeenCalled();
+    });
+
+    it('should_logContainerInventory_when_listingDuringResolve', async () => {
+      // Diagnostics: every list call must log full inventory so user-submitted
+      // logs include the full container set without another API round-trip.
+      const containers = [
+        {
+          containerId: 'c1',
+          name: 'Test Container (HOMEY-6f3c3e2a)',
+          purpose: 'p',
+          technicalDescriptors: [],
+        },
+        {
+          containerId: 'c2',
+          name: 'Some Other App (foo)',
+          purpose: 'p',
+          technicalDescriptors: [],
+        },
+      ];
+      mockHttpClient.get.mockResolvedValue(createHttpResponse(containers));
+
+      // Act
+      await containerManager.getOrCreateContainer('HOMEY-6f3c3e2a');
+
+      // Assert - the inventory log must include both containerId+name for each.
+      const inventoryCall = mockLogger.info.mock.calls.find(
+        (call) => call[0] === 'Container inventory'
+      );
+      expect(inventoryCall).toBeDefined();
+      const ctx = inventoryCall![1] as {
+        total: number;
+        containers: Array<{ containerId: string; name: string }>;
+      };
+      expect(ctx.total).toBe(2);
+      expect(ctx.containers).toEqual([
+        { containerId: 'c1', name: 'Test Container (HOMEY-6f3c3e2a)' },
+        { containerId: 'c2', name: 'Some Other App (foo)' },
+      ]);
     });
   });
 

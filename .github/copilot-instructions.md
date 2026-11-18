@@ -8,23 +8,76 @@ This is a Homey smart home application for BMW and Mini vehicles. The app integr
 
 ## Technology Stack
 
-- **Platform**: Homey Apps SDK v3
-- **Language**: TypeScript 4.8.4
-- **Target**: ES2019 (Node 12 compatibility required by Homey)
-- **Build Tool**: TypeScript Compiler (tsc)
-- **Linting**: ESLint 9 with flat config
-- **Formatting**: Prettier with single quotes, 2 spaces
+> Single source of truth for runtime, language, and tooling. Keep aligned with
+> [package.json](../package.json) — **when they disagree, package.json wins**.
+
+### Platform
+
+- **Homey Apps SDK**: v3 (`"sdk": 3` in `.homeycompose/app.json`)
+- **Homey compatibility**: `>=12.9.0` (Homey Pro 2023 minimum)
+- **Node.js**: 22.x (configured via `@tsconfig/node22`)
+- **Module system**: CommonJS (`module: commonjs`, `moduleResolution: node`)
+
+### Language & Compiler
+
+- **TypeScript**: 5.9.x (`typescript: ^5.9.3`)
+- **Target**: whatever `@tsconfig/node22` resolves to (ES2023). Do not hand-roll
+  ES2019 polyfills or downlevel constructs for new code.
+- **Strict mode**: enabled. No implicit `any`, prefer `unknown` + narrowing.
+
+### Runtime Dependencies
+
+- `mqtt` ^5.14 — BMW CarData streaming client
+- `semver` ^7.7 — version comparison for migration guards
+- `geolocation-utils` ^1.2 — distance / bearing helpers
+- `source-map-support` ^0.5 — stack traces in production logs
+
+### Dev Tooling
+
+| Tool                | Version | Purpose                                  |
+| ------------------- | ------- | ---------------------------------------- |
+| `jest`              | ^29.7   | Unit + integration test runner           |
+| `ts-jest`           | ^29.2   | TS transform for Jest                    |
+| `eslint`            | ^9.37   | Flat-config linter                       |
+| `typescript-eslint` | ^8.46   | TS-aware ESLint rules                    |
+| `prettier`          | ^3.6    | Code formatter (2 spaces, single quotes) |
+| `markdownlint-cli2` | ^0.18   | Markdown linter                          |
+| `husky`             | ^9.1    | Git hooks (pre-commit runs `validate`)   |
+| `copyfiles`         | ^2.4    | Shared pair/repair view copying          |
+
+### Scripts
+
+- `npm run build` — TypeScript compile
+- `npm test` / `npm run test:coverage` — Jest (coverage thresholds in `jest.config.js`)
+- `npm run validate` — `format:check && lint && lint:md` (must pass before commit)
+- `npm run fix` — auto-fix formatter + linters
+- `homey app build` — composes `app.json` from `.homeycompose/` and writes `.homeybuild/`
+- `homey app publish` — submits to the Homey App Store
+
+### Generated / Do-Not-Edit Files
+
+- `app.json` — generated from `.homeycompose/` by `homey app build`. Kept in
+  git for at-a-glance review of capabilities / flows. The Homey CLI writes it
+  **without** a trailing newline; `.editorconfig` has an `[app.json]` override
+  to match, so don't "fix" the missing newline.
+- `build/`, `.homeybuild/`, `coverage/` — build artifacts
+- `drivers/{bmw,mini}/{pair,repair}/*` — copied from `shared/pair_repair/` by `prebuild`
+
+To change pairing flow, edit `shared/pair_repair/` (not the driver copies).
+To change app metadata or capabilities, edit `.homeycompose/` (not `app.json`).
 
 ## TypeScript Guidelines
 
-Follow the guidelines in `.github/instructions/typescript-4-es2019.instructions.md`:
-
-- Target ES2019 (not ES2022) due to Node 12 requirement
-- Use strict TypeScript settings
-- Avoid any type; prefer unknown with type narrowing
+- Strict TypeScript settings (see compiler options above)
+- Avoid `any`; prefer `unknown` with type narrowing
 - Use async/await with proper error handling
-- Follow PascalCase for classes/interfaces, camelCase for everything else
-- No I prefix for interfaces unless it improves clarity
+- PascalCase for classes/interfaces, camelCase for everything else
+- No `I` prefix on interfaces unless it disambiguates (legacy `IHttpClient`,
+  `ILogger`, `ITokenStore` kept for backward compatibility — new interfaces drop it)
+
+> The older `.github/instructions/typescript-4-es2019.instructions.md` file
+> targeted Node 12 / TS 4.x and is **superseded** for new code. Its style rules
+> (strict types, no `any`, async/await) still apply, but syntax targets ES2023+.
 
 ## Project-Specific Patterns
 

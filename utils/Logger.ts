@@ -31,18 +31,26 @@ export class Logger implements ILogger {
     this.log(LogLevel.WARN, message, context);
   }
   error(message: string, error?: Error, context?: LogContext): void {
-    this.log(LogLevel.ERROR, message, {
-      ...context,
-      error: error ? error.message : undefined,
-      stack: error ? error.stack : undefined,
-    });
+    this.log(LogLevel.ERROR, message, this.mergeErrorContext(error, context));
   }
   fatal(message: string, error?: Error, context?: LogContext): void {
-    this.log(LogLevel.FATAL, message, {
+    this.log(LogLevel.FATAL, message, this.mergeErrorContext(error, context));
+  }
+
+  /**
+   * Merge an optional Error object with a caller-supplied context, preserving
+   * any `error` / `stack` fields the caller already provided in `context` when
+   * no Error object is passed. Issue #108: the previous implementation
+   * unconditionally overwrote those keys with `undefined`, silently dropping
+   * diagnostic data passed only via the context.
+   */
+  private mergeErrorContext(error?: Error, context?: LogContext): LogContext | undefined {
+    if (!error) return context;
+    return {
       ...context,
-      error: error ? error.message : undefined,
-      stack: error ? error.stack : undefined,
-    });
+      error: error.message,
+      stack: error.stack,
+    };
   }
   setLevel(_level: LogLevel): void {
     throw new Error('Method not implemented.');

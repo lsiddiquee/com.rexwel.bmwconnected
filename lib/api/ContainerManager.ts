@@ -9,7 +9,7 @@
 
 import type { IHttpClient } from '../http/IHttpClient';
 import type { ILogger } from '../types/ILogger';
-import { ApiError } from '../types/errors';
+import { ApiError, RateLimitError } from '../types/errors';
 import { ESSENTIAL_KEYS } from '../types/TelematicKeys';
 
 /**
@@ -140,6 +140,12 @@ export class ContainerManager {
   private readonly containerPurpose: string;
   private readonly telematicKeys: readonly string[];
   private readonly containerCache = new Map<string, string>();
+  /**
+   * In-flight `getOrCreateContainer` promises, keyed by identifier. Used to
+   * de-duplicate concurrent pair sessions for the same client so BMW only ever
+   * sees a single list+create round-trip per identifier. Issue #108.
+   */
+  private readonly inFlightLookups = new Map<string, Promise<string>>();
 
   /**
    * Creates a new ContainerManager instance
@@ -171,8 +177,13 @@ export class ContainerManager {
    *
    * Flow:
    * 1. Check in-memory cache
-   * 2. Create new container if not found
-   * 3. Cache container ID
+   * 2. List containers on BMW and reuse one whose name embeds the identifier
+   *    (so we don't pile up duplicate containers across pairings — issue #108)
+   * 3. Create new container only if no match found
+   * 4. Cache container ID
+   *
+   * Concurrent calls for the same identifier share the same in-flight promise
+   * so we never issue duplicate list/create round-trips.
    *
    * @param identifier - Unique identifier (VIN, client ID prefix, or custom key)
    * @returns Container ID
@@ -181,11 +192,93 @@ export class ContainerManager {
   async getOrCreateContainer(identifier: string): Promise<string> {
     this.logger?.debug('Getting or creating container', { identifier });
 
-    // Check in-memory cache first
+    // Check in-memory cache first - fast path, no de-duplication needed.
     const cachedId = this.containerCache.get(identifier);
     if (cachedId) {
       this.logger?.debug('Using cached container ID', { identifier, containerId: cachedId });
       return cachedId;
+    }
+
+    // De-duplicate concurrent calls (e.g. quick double-click during pairing).
+    const inFlight = this.inFlightLookups.get(identifier);
+    if (inFlight) {
+      this.logger?.debug('Reusing in-flight container lookup', { identifier });
+      return inFlight;
+    }
+
+    const lookup = this.resolveContainer(identifier).finally(() => {
+      this.inFlightLookups.delete(identifier);
+    });
+    this.inFlightLookups.set(identifier, lookup);
+    return lookup;
+  }
+
+  /**
+   * Resolves a container for the given identifier by:
+   * 1. Listing existing containers and matching on name (so duplicates aren't
+   *    created on each pairing attempt — issue #108).
+   * 2. Falling back to creating a fresh container with an identifier-embedded
+   *    name so the next pairing finds it via step 1.
+   *
+   * @param identifier - Unique identifier (VIN, client ID prefix, custom key)
+   * @returns Container ID
+   * @private
+   */
+  private async resolveContainer(identifier: string): Promise<string> {
+    const expectedName = this.buildContainerName(identifier);
+
+    // Try to reuse a previously-created container. We swallow listing failures
+    // here so a transient list-endpoint hiccup doesn't block pairing — we'll
+    // attempt to create instead and let that error surface if it also fails.
+    try {
+      const existing = await this.listContainers();
+      // Log every container the user has on BMW's side so that user-submitted
+      // diagnostic logs include the full inventory — useful for triaging
+      // container-quota issues without needing another API round-trip.
+      this.logger?.info('Container inventory', {
+        identifier,
+        expectedName,
+        total: existing.length,
+        containers: existing.map((c) => ({ containerId: c.containerId, name: c.name })),
+      });
+      const match = existing.find((c) => c.name === expectedName);
+      if (match) {
+        // Reuse path: don't touch orphans. Each DELETE costs 1 of the user's
+        // 50-per-24h request quota, so we only spend that quota when it's
+        // strictly necessary to free a container slot (i.e. before a create).
+        this.logger?.info('Reusing existing container', {
+          identifier,
+          containerId: match.containerId,
+        });
+        this.containerCache.set(identifier, match.containerId);
+        return match.containerId;
+      }
+      // No match — we're about to create. Pre-1.0.18 created an unsuffixed
+      // container on every pair attempt (issue #108), so users can hit BMW's
+      // per-user container slot quota. Delete ONE orphan to free a slot;
+      // subsequent pair attempts will progressively clean the rest. This
+      // keeps request-quota usage to "create + at most one delete" per pair.
+      const orphan = existing.find((c) => this.isOurContainer(c.name));
+      if (orphan) {
+        await this.cleanupOneOrphan(orphan);
+      }
+    } catch (error) {
+      // Issue #108: when BMW returns CU-429 (daily rate limit), falling back
+      // to createContainer() burns another request from an already-exhausted
+      // quota and guarantees a second failure. Propagate the rate-limit error
+      // so pairing fails fast with the accurate message and preserves what's
+      // left of the user's 50/24h quota.
+      if (error instanceof RateLimitError) {
+        this.logger?.warn('Container list lookup hit BMW rate limit - not falling back to create', {
+          identifier,
+          error: error.message,
+        });
+        throw error;
+      }
+      this.logger?.warn('Container list lookup failed - falling back to create', {
+        identifier,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     // Create new container
@@ -200,6 +293,50 @@ export class ContainerManager {
   }
 
   /**
+   * Builds the BMW-visible container name for an identifier, embedding the
+   * identifier so the container is discoverable via listContainers() on
+   * subsequent pair attempts.
+   */
+  private buildContainerName(identifier: string): string {
+    return `${this.containerName} (${identifier})`;
+  }
+
+  /**
+   * Whether a container was created by this app. Matches both the legacy
+   * pre-1.0.18 naming (exact `containerName`, no suffix) and the current
+   * `containerName (identifier)` scheme. Used to decide what's safe to delete
+   * during proactive cleanup (issue #108).
+   */
+  private isOurContainer(name: string | undefined): boolean {
+    if (!name) return false;
+    return name === this.containerName || name.startsWith(`${this.containerName} (`);
+  }
+
+  /**
+   * Deletes a single orphaned Homey container to free up one slot before
+   * createContainer(). RateLimitError propagates (the caller's create will
+   * also fail, so abort early); other delete failures are logged but
+   * swallowed so create still gets attempted.
+   */
+  private async cleanupOneOrphan(orphan: ApiContainerResponse): Promise<void> {
+    this.logger?.info('Deleting one orphan Homey container to free quota slot', {
+      containerId: orphan.containerId,
+      name: orphan.name,
+    });
+    try {
+      await this.deleteContainer(orphan.containerId);
+    } catch (error) {
+      if (error instanceof RateLimitError) {
+        throw error;
+      }
+      this.logger?.warn('Failed to delete orphan container - continuing with create', {
+        containerId: orphan.containerId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
    * Creates a new container via BMW CarData API
    *
    * @param identifier - Unique identifier (for logging/tracking only)
@@ -211,7 +348,7 @@ export class ContainerManager {
     const accessToken = await this.getAccessToken();
 
     const request: ApiContainerRequest = {
-      name: this.containerName,
+      name: this.buildContainerName(identifier),
       purpose: this.containerPurpose,
       technicalDescriptors: [...this.telematicKeys],
     };
