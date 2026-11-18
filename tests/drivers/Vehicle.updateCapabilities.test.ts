@@ -21,6 +21,7 @@ import type { VehicleStatus } from '../../lib/models/VehicleStatus';
 import { Capabilities } from '../../utils/Capabilities';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import { createMockedVehicle } from '../helpers/vehicleTestHelper';
+import { UNKNOWN_FLOW_STATES } from '../../utils/FlowStates';
 
 describe('Vehicle.updateCapabilitiesFromStatus', () => {
   let vehicle: Vehicle;
@@ -82,9 +83,6 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
     // Mock location handling methods (now inline in updateCapabilitiesFromStatus)
     checkGeofenceSpy = jest.spyOn(vehicle as any, 'checkGeofence').mockResolvedValue(undefined);
 
-    // Mock convertChargingStatus
-    jest.spyOn(vehicle as any, 'convertChargingStatus').mockReturnValue('charging');
-
     // Initialize current state as null (first update)
     vehicle.currentVehicleState = null;
   });
@@ -99,6 +97,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         doors: {
           combinedState: 'OPEN',
           leftFront: 'OPEN',
@@ -120,6 +119,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         windows: {
           combinedState: 'INTERMEDIATE',
           leftFront: 'INTERMEDIATE',
@@ -142,6 +142,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
       };
 
       await (vehicle as any).updateCapabilitiesFromStatus(status);
@@ -163,6 +164,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelPercent: 72,
           fuelLevelLiters: 36,
@@ -179,6 +181,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.COMBUSTION,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         combustion: {
           fuelLevelLiters: 36,
         },
@@ -199,6 +202,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         climate: { activity: 'HEATING' },
       };
 
@@ -215,6 +219,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
       };
 
       await (vehicle as any).updateCapabilitiesFromStatus(status);
@@ -233,6 +238,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-10-29T10:00:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         currentMileage: 15000,
         range: 350,
         location: {
@@ -266,7 +272,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
       expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.MEASURE_BATTERY, 85);
       expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
         Capabilities.EV_CHARGING_STATE,
-        expect.any(String)
+        'plugged_in_charging'
       );
 
       // Verify location was updated (checkGeofence called with new location)
@@ -292,6 +298,7 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         vin: 'WBA12345678901234',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date('2025-10-29T10:00:00Z'),
+        ...UNKNOWN_FLOW_STATES,
         // currentMileage: undefined (missing)
         // range: undefined (missing)
         // location: undefined (missing)
@@ -336,5 +343,113 @@ describe('Vehicle.updateCapabilitiesFromStatus', () => {
         expect.stringContaining('Updated capabilities from status')
       );
     });
+  });
+
+  describe('Battery level', () => {
+    const electricStatus = (
+      electric: Partial<NonNullable<VehicleStatus['electric']>>
+    ): VehicleStatus => ({
+      vin: 'WBA12345678901234',
+      driveTrain: DriveTrainType.ELECTRIC,
+      lastUpdatedAt: new Date('2026-11-04T10:00:00Z'),
+      ...UNKNOWN_FLOW_STATES,
+      electric: {
+        range: 300,
+        isChargerConnected: false,
+        chargingStatus: 'NOT_CHARGING',
+        ...electric,
+      },
+    });
+
+    it('should_notUpdateMeasureBattery_when_theBatteryLevelIsMissing', async () => {
+      // The battery management header was not in the data: there is no reading, not a 0% one
+      await (vehicle as any).updateCapabilitiesFromStatus(
+        electricStatus({ chargeLevelPercent: undefined })
+      );
+
+      expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
+        Capabilities.MEASURE_BATTERY,
+        expect.anything()
+      );
+      expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
+        Capabilities.MEASURE_BATTERY,
+        undefined
+      );
+    });
+
+    it('should_keepWritingTheOtherCapabilities_when_theBatteryLevelIsMissing', async () => {
+      await (vehicle as any).updateCapabilitiesFromStatus({
+        ...electricStatus({ chargeLevelPercent: undefined, chargingStatus: 'CHARGING' }),
+        chargingCable: 'CONNECTED',
+        currentMileage: 4321,
+      });
+
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.MILEAGE, 4321);
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
+        Capabilities.EV_CHARGING_STATE,
+        'plugged_in_charging'
+      );
+    });
+
+    it('should_updateMeasureBatteryToZero_when_theBatteryIsReallyEmpty', async () => {
+      await (vehicle as any).updateCapabilitiesFromStatus(
+        electricStatus({ chargeLevelPercent: 0 })
+      );
+
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.MEASURE_BATTERY, 0);
+    });
+
+    it('should_updateMeasureBattery_when_theBatteryLevelIsKnown', async () => {
+      await (vehicle as any).updateCapabilitiesFromStatus(
+        electricStatus({ chargeLevelPercent: 64 })
+      );
+
+      expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(Capabilities.MEASURE_BATTERY, 64);
+    });
+  });
+
+  describe('EV charging state', () => {
+    const status = (
+      chargingCable: VehicleStatus['chargingCable'],
+      chargingStatus: NonNullable<VehicleStatus['electric']>['chargingStatus']
+    ): VehicleStatus => ({
+      vin: 'WBA12345678901234',
+      driveTrain: DriveTrainType.ELECTRIC,
+      lastUpdatedAt: new Date('2026-11-04T10:00:00Z'),
+      ...UNKNOWN_FLOW_STATES,
+      chargingCable,
+      electric: { chargeLevelPercent: 50, range: 200, isChargerConnected: false, chargingStatus },
+    });
+
+    it.each([
+      ['CONNECTED', 'NOT_CHARGING', 'plugged_in'],
+      ['CONNECTED', 'CHARGING', 'plugged_in_charging'],
+      ['CONNECTED', 'PAUSED', 'plugged_in_paused'],
+      ['DISCONNECTED', 'NOT_CHARGING', 'plugged_out'],
+      ['UNKNOWN', 'CHARGING', 'plugged_in_charging'],
+      ['UNKNOWN', 'PAUSED', 'plugged_in_paused'],
+    ] as const)(
+      'should_setEvChargingState_when_cable_%s_and_status_%s_gives_%s',
+      async (cable, chargingStatus, expected) => {
+        await (vehicle as any).updateCapabilitiesFromStatus(status(cable, chargingStatus));
+
+        expect(setCapabilityValueSafeSpy).toHaveBeenCalledWith(
+          Capabilities.EV_CHARGING_STATE,
+          expected
+        );
+      }
+    );
+
+    it.each(['NOT_CHARGING', 'COMPLETE', 'INITIALIZING', 'ERROR', 'UNKNOWN'] as const)(
+      'should_leaveEvChargingStateAsItIs_when_theCableIsUnknownAndTheStatusIs_%s',
+      async (chargingStatus) => {
+        await (vehicle as any).updateCapabilitiesFromStatus(status('UNKNOWN', chargingStatus));
+
+        expect(setCapabilityValueSafeSpy).not.toHaveBeenCalledWith(
+          Capabilities.EV_CHARGING_STATE,
+          expect.anything()
+        );
+      }
+    );
   });
 });

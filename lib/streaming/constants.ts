@@ -100,6 +100,61 @@ export const RECONNECT_DELAYS = {
 } as const;
 
 /**
+ * Retry schedule for a failed credential recovery (milliseconds)
+ *
+ * When reconnecting with fresh credentials fails (e.g. BMW's token endpoint is briefly
+ * unavailable), the client keeps retrying: first wait is STEPS[0], then STEPS[1], and so on.
+ * Once the steps are exhausted every further retry waits MAX. A successful reconnect restarts
+ * the schedule.
+ */
+export const RECOVERY_RETRY_DELAYS = {
+  /**
+   * Delay before each of the first retries: 30 s, 60 s, 120 s, 240 s, 480 s
+   */
+  STEPS: [30000, 60000, 120000, 240000, 480000] as readonly number[],
+
+  /**
+   * Delay between all later retries (milliseconds)
+   */
+  MAX: 900000, // 15 minutes
+} as const;
+
+/**
+ * Proactive credential renewal configuration
+ *
+ * The broker password is the OAuth id_token, which expires roughly an hour after it was issued.
+ * mqtt.js keeps reusing the original password when it reconnects, so the client reconnects
+ * with fresh credentials shortly before the token used for the connection expires.
+ */
+export const CREDENTIAL_RENEWAL = {
+  /**
+   * How long before the token expires the renewal is scheduled (milliseconds)
+   * Must be below the auth provider's 60 s refresh buffer so that fetching credentials at that
+   * moment really refreshes the token.
+   */
+  LEAD_TIME: 45000, // 45 seconds
+
+  /**
+   * Minimum delay before a renewal fires (milliseconds)
+   * Protects against reconnect loops when a token is already (almost) expired.
+   */
+  MIN_DELAY: 30000, // 30 seconds
+
+  /**
+   * Maximum delay of the renewal timer (milliseconds)
+   * Node.js timers overflow above 2^31 - 1 ms and then fire after 1 ms, so a bogus far-future
+   * expiry must not be passed through unchanged.
+   */
+  MAX_DELAY: 24 * 60 * 60 * 1000, // 24 hours
+} as const;
+
+/**
+ * Maximum time to wait for mqtt.js to finish ending a client (milliseconds)
+ * A client that never reports back must not block recovery forever.
+ */
+export const CLIENT_END_TIMEOUT = 5000; // 5 seconds
+
+/**
  * Message validation constants
  */
 export const MESSAGE_VALIDATION = {

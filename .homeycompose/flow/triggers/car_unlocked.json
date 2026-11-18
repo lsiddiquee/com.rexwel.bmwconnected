@@ -1,0 +1,18 @@
+{
+    "id": "car_unlocked",
+    "title": {
+        "en": "The car was unlocked",
+        "nl": "De auto is ontgrendeld"
+    },
+    "hint": {
+        "en": "Fires when the car goes from locked to unlocked, based on the door status BMW CarData reports. BMW only sends this status now and then, so the flow can run late. Needs 'vehicle.cabin.door.status' to be ticked in the stream selection of the BMW CarData portal.",
+        "nl": "Gaat af wanneer de auto van vergrendeld naar ontgrendeld gaat, op basis van de deurstatus die BMW CarData meldt. BMW stuurt deze status maar af en toe, dus de flow kan te laat starten. Hiervoor moet 'vehicle.cabin.door.status' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+    },
+    "args": [
+        {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+        }
+    ]
+}

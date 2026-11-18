@@ -15,6 +15,7 @@ import * as geo from 'geolocation-utils';
 import { createMockedVehicle } from '../helpers/vehicleTestHelper';
 import { DriveTrainType } from '../../lib/types/DriveTrainType';
 import type { VehicleStatus } from '../../lib/models/VehicleStatus';
+import { UNKNOWN_FLOW_STATES } from '../../utils/FlowStates';
 
 // Mock geolocation-utils
 jest.mock('geolocation-utils');
@@ -417,6 +418,7 @@ describe('Vehicle Location Flows', () => {
         vin: 'TEST_VIN',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         location: {
           coordinates: {
             latitude: 52.53,
@@ -485,6 +487,7 @@ describe('Vehicle Location Flows', () => {
         vin: 'TEST_VIN',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         location: {
           coordinates: {
             latitude: 52.5201, // Small movement
@@ -533,6 +536,7 @@ describe('Vehicle Location Flows', () => {
         vin: 'TEST_VIN',
         driveTrain: DriveTrainType.ELECTRIC,
         lastUpdatedAt: new Date(),
+        ...UNKNOWN_FLOW_STATES,
         location: {
           coordinates: {
             latitude: 52.53,

@@ -1,13 +1,19 @@
 {
     "id": "climate_now_stopped",
     "title": {
-        "en": "Climate now stopped",
-        "nl": "Nu klimatiseren gestopt"
+        "en": "Climate stopped",
+        "nl": "Klimatisering gestopt"
     },
-    "args": [{
-        "name": "device",
-        "type": "device",
-        "filter": "driver_id=bmw|mini"
-    }],
-    "$filter": "capabilities=climate_now_capability"
+    "hint": {
+        "en": "Fires when the car's climate preconditioning stops, for example when it was started from the My BMW app and has finished. Needs 'vehicle.vehicle.preConditioning.activity' to be ticked in the stream selection of the BMW CarData portal.",
+        "nl": "Gaat af wanneer de voorklimatisering van de auto stopt, bijvoorbeeld wanneer die vanuit de My BMW-app was gestart en klaar is. Hiervoor moet 'vehicle.vehicle.preConditioning.activity' zijn aangevinkt in de streamselectie van het BMW CarData-portaal."
+    },
+    "args": [
+        {
+            "name": "device",
+            "type": "device",
+            "filter": "driver_id=bmw|mini"
+        }
+    ],
+    "$filter": "capabilities=climate_status_capability"
 }

@@ -387,6 +387,22 @@ describe('CarDataClient - Comprehensive Tests', () => {
       );
     });
 
+    it('should_reportLockCableAndClimateAsUnknown_when_basicDataOnly', async () => {
+      // Arrange - no container, so no telematic data to read the states from
+      mockHttpClient.get.mockResolvedValue(
+        createHttpResponse({ brand: 'BMW', modelName: 'iX3', driveTrain: 'BEV', series: 'I' })
+      );
+
+      // Act
+      const status = await carDataClient.getVehicleStatus('VIN123');
+
+      // Assert - never guessed: the car has not told us anything yet
+      expect(status.carLock).toBe('UNKNOWN');
+      expect(status.chargingFlap).toBe('UNKNOWN');
+      expect(status.chargingCable).toBe('UNKNOWN');
+      expect(status.climateActivity).toBe('UNKNOWN');
+    });
+
     it('should_throwError_when_404Response', async () => {
       // Arrange
       const notFoundError = new Error('Not Found');

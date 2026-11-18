@@ -124,6 +124,22 @@ describe('Vehicle.onSettings', () => {
       expect(mockLogger.info).toHaveBeenCalledWith('API polling interval changed to 45 minutes');
       expect(mockLogger.info).toHaveBeenCalledWith('API polling enabled');
     });
+
+    it('should_passNewSettingsToStartApiPolling_when_settingsNotPersistedYet', async () => {
+      // Arrange: the device still reports the old values; only newSettings has the new ones
+      mockSettings.apiPollingEnabled = false;
+      mockSettings.apiPollingInterval = 60;
+      const newSettings = { ...mockSettings, apiPollingEnabled: true, apiPollingInterval: 720 };
+      const changedKeys = ['apiPollingEnabled', 'apiPollingInterval'];
+
+      // Act
+      await vehicle.onSettings({ newSettings, changedKeys });
+
+      // Assert
+      expect(vehicle['startApiPolling']).toHaveBeenCalledWith(
+        expect.objectContaining({ apiPollingEnabled: true, apiPollingInterval: 720 })
+      );
+    });
   });
 
   describe('MQTT Streaming Settings', () => {
