@@ -9,6 +9,7 @@ import { TelematicDataTransformer } from '../../../lib/transformers/TelematicDat
 import type { TelematicDataPoint } from '../../../lib/models/TelematicDataPoint';
 import { TelematicKey } from '../../../lib/types/TelematicKeys';
 import { DriveTrainType } from '../../../lib/types/DriveTrainType';
+import type { ILogger } from '../../../lib/types/ILogger';
 
 describe('TelematicDataTransformer', () => {
   const TEST_VIN = 'WBA12345678901234';
@@ -388,6 +389,323 @@ describe('TelematicDataTransformer', () => {
     });
   });
 
+  describe('Car lock, charging flap, charging cable and climate states', () => {
+    const transformKeys = (
+      data: Record<string, TelematicDataPoint>,
+      logger?: { debug: jest.Mock }
+    ) =>
+      TelematicDataTransformer.transform(
+        TEST_VIN,
+        DriveTrainType.ELECTRIC,
+        data,
+        logger as unknown as ILogger | undefined
+      );
+
+    describe('carLock', () => {
+      it.each(['SECURED', 'LOCKED', 'SELECTIVE_LOCKED', 'secured', ' Locked '])(
+        'should_mapToLocked_when_doorStatusIs_%s',
+        (value) => {
+          const result = transformKeys({
+            [TelematicKey.VEHICLE_CABIN_DOOR_STATUS]: createDataPoint(value),
+          });
+
+          expect(result.carLock).toBe('LOCKED');
+        }
+      );
+
+      it.each(['UNLOCKED', 'unlocked'])('should_mapToUnlocked_when_doorStatusIs_%s', (value) => {
+        const result = transformKeys({
+          [TelematicKey.VEHICLE_CABIN_DOOR_STATUS]: createDataPoint(value),
+        });
+
+        expect(result.carLock).toBe('UNLOCKED');
+      });
+
+      it.each(['AJAR', '', 'INVALID', 7, true])(
+        'should_mapToUnknownAndLogAtDebug_when_doorStatusIsUnexpected_%p',
+        (value) => {
+          const logger = { debug: jest.fn() };
+
+          const result = transformKeys(
+            { [TelematicKey.VEHICLE_CABIN_DOOR_STATUS]: createDataPoint(value) },
+            logger
+          );
+
+          expect(result.carLock).toBe('UNKNOWN');
+          expect(logger.debug).toHaveBeenCalledTimes(1);
+          expect(logger.debug).toHaveBeenCalledWith(
+            expect.stringContaining('car lock'),
+            expect.objectContaining({
+              key: TelematicKey.VEHICLE_CABIN_DOOR_STATUS,
+              value,
+            })
+          );
+        }
+      );
+
+      it('should_mapToUnknownWithoutLogging_when_doorStatusMissing', () => {
+        const logger = { debug: jest.fn() };
+
+        const result = transformKeys(
+          { [TelematicKey.VEHICLE_VEHICLE_TRAVELLEDDISTANCE]: createDataPoint(100) },
+          logger
+        );
+
+        expect(result.carLock).toBe('UNKNOWN');
+        expect(logger.debug).not.toHaveBeenCalled();
+      });
+
+      it('should_leaveTheLossyLockStateUntouched_when_doorStatusMissing', () => {
+        // lockState collapses "never reported" into unlocked; the new field must not
+        const result = transformKeys({});
+
+        expect(result.lockState?.isLocked).toBe(false);
+        expect(result.carLock).toBe('UNKNOWN');
+      });
+
+      it('should_keepLockStateAndCarLockConsistent_when_selectiveLocked', () => {
+        const result = transformKeys({
+          [TelematicKey.VEHICLE_CABIN_DOOR_STATUS]: createDataPoint('SELECTIVE_LOCKED'),
+        });
+
+        expect(result.lockState?.isLocked).toBe(true);
+        expect(result.carLock).toBe('LOCKED');
+      });
+    });
+
+    describe('chargingFlap', () => {
+      it.each([true, 'true', 'TRUE', 'LOCKED', 'locked', ' Locked '])(
+        'should_mapToLocked_when_flapIsLockedIs_%p',
+        (value) => {
+          const result = transformKeys({
+            [TelematicKey.VEHICLE_BODY_FLAP_ISLOCKED]: createDataPoint(value),
+          });
+
+          expect(result.chargingFlap).toBe('LOCKED');
+        }
+      );
+
+      it.each([false, 'false', 'FALSE', 'UNLOCKED', 'Unlocked'])(
+        'should_mapToUnlocked_when_flapIsLockedIs_%p',
+        (value) => {
+          const result = transformKeys({
+            [TelematicKey.VEHICLE_BODY_FLAP_ISLOCKED]: createDataPoint(value),
+          });
+
+          expect(result.chargingFlap).toBe('UNLOCKED');
+        }
+      );
+
+      it.each(['MAYBE', '', 'null', 42, 0])(
+        'should_mapToUnknownAndLogAtDebug_when_flapIsLockedIsUnexpected_%p',
+        (value) => {
+          const logger = { debug: jest.fn() };
+
+          const result = transformKeys(
+            { [TelematicKey.VEHICLE_BODY_FLAP_ISLOCKED]: createDataPoint(value) },
+            logger
+          );
+
+          expect(result.chargingFlap).toBe('UNKNOWN');
+          expect(logger.debug).toHaveBeenCalledTimes(1);
+          expect(logger.debug).toHaveBeenCalledWith(
+            expect.stringContaining('charging flap'),
+            expect.objectContaining({ key: TelematicKey.VEHICLE_BODY_FLAP_ISLOCKED, value })
+          );
+        }
+      );
+
+      it('should_mapToUnknownWithoutLogging_when_flapIsLockedMissing', () => {
+        const logger = { debug: jest.fn() };
+
+        const result = transformKeys({}, logger);
+
+        expect(result.chargingFlap).toBe('UNKNOWN');
+        expect(logger.debug).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('chargingCable', () => {
+      it.each(['CONNECTED', 'connected'])(
+        'should_mapToConnected_when_chargingPortStatusIs_%s',
+        (value) => {
+          const result = transformKeys({
+            [TelematicKey.VEHICLE_BODY_CHARGINGPORT_STATUS]: createDataPoint(value),
+          });
+
+          expect(result.chargingCable).toBe('CONNECTED');
+        }
+      );
+
+      it.each(['DISCONNECTED', 'Disconnected'])(
+        'should_mapToDisconnected_when_chargingPortStatusIs_%s',
+        (value) => {
+          const result = transformKeys({
+            [TelematicKey.VEHICLE_BODY_CHARGINGPORT_STATUS]: createDataPoint(value),
+          });
+
+          expect(result.chargingCable).toBe('DISCONNECTED');
+        }
+      );
+
+      it.each(['INVALID', '', 'PLUGGED', false])(
+        'should_mapToUnknownAndLogAtDebug_when_chargingPortStatusIsUnexpected_%p',
+        (value) => {
+          const logger = { debug: jest.fn() };
+
+          const result = transformKeys(
+            { [TelematicKey.VEHICLE_BODY_CHARGINGPORT_STATUS]: createDataPoint(value) },
+            logger
+          );
+
+          expect(result.chargingCable).toBe('UNKNOWN');
+          expect(logger.debug).toHaveBeenCalledTimes(1);
+          expect(logger.debug).toHaveBeenCalledWith(
+            expect.stringContaining('charging cable'),
+            expect.objectContaining({ key: TelematicKey.VEHICLE_BODY_CHARGINGPORT_STATUS, value })
+          );
+        }
+      );
+
+      it('should_mapToUnknownWithoutLogging_when_chargingPortStatusMissing', () => {
+        const logger = { debug: jest.fn() };
+
+        const result = transformKeys({}, logger);
+
+        expect(result.chargingCable).toBe('UNKNOWN');
+        expect(logger.debug).not.toHaveBeenCalled();
+      });
+
+      it('should_leaveTheLossyChargerConnectedUntouched_when_chargingPortStatusMissing', () => {
+        // isChargerConnected collapses "never reported" into false; the new field must not
+        const result = transformKeys({
+          [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(80),
+        });
+
+        expect(result.electric?.isChargerConnected).toBe(false);
+        expect(result.chargingCable).toBe('UNKNOWN');
+      });
+
+      it('should_reportTheCable_when_thereIsNoBatteryData', () => {
+        const result = transformKeys({
+          [TelematicKey.VEHICLE_BODY_CHARGINGPORT_STATUS]: createDataPoint('CONNECTED'),
+        });
+
+        expect(result.electric).toBeUndefined();
+        expect(result.chargingCable).toBe('CONNECTED');
+      });
+    });
+
+    describe('climateActivity', () => {
+      it.each([
+        ['HEATING', 'HEATING'],
+        ['COOLING', 'COOLING'],
+        ['VENTILATION', 'VENTILATION'],
+        ['INACTIVE', 'INACTIVE'],
+        ['heating', 'HEATING'],
+        ['PRECONDITIONING_HEAT', 'HEATING'],
+        ['ACTIVE_COOL', 'COOLING'],
+        ['VENTILATING', 'VENTILATION'],
+        ['OFF', 'INACTIVE'],
+        ['FALSE', 'INACTIVE'],
+        [false, 'INACTIVE'],
+      ])('should_mapActivity_%p_to_%s', (value, expected) => {
+        const result = transformKeys({
+          [TelematicKey.VEHICLE_VEHICLE_PRECONDITIONING_ACTIVITY]: createDataPoint(value),
+        });
+
+        expect(result.climateActivity).toBe(expected);
+      });
+
+      it.each(['UNKNOWN', 'STANDBY', '', 5])(
+        'should_mapToUnknownAndLogAtDebug_when_activityIsUnexpected_%p',
+        (value) => {
+          const logger = { debug: jest.fn() };
+
+          const result = transformKeys(
+            { [TelematicKey.VEHICLE_VEHICLE_PRECONDITIONING_ACTIVITY]: createDataPoint(value) },
+            logger
+          );
+
+          expect(result.climateActivity).toBe('UNKNOWN');
+          expect(logger.debug).toHaveBeenCalledTimes(1);
+          expect(logger.debug).toHaveBeenCalledWith(
+            expect.stringContaining('climate activity'),
+            expect.objectContaining({
+              key: TelematicKey.VEHICLE_VEHICLE_PRECONDITIONING_ACTIVITY,
+              value,
+            })
+          );
+        }
+      );
+
+      it('should_mapToUnknownWithoutLogging_when_activityMissing', () => {
+        const logger = { debug: jest.fn() };
+
+        const result = transformKeys({}, logger);
+
+        expect(result.climateActivity).toBe('UNKNOWN');
+        expect(logger.debug).not.toHaveBeenCalled();
+      });
+
+      it('should_mapToUnknownWhileClimateStaysInactive_when_onlyComfortStatePresent', () => {
+        // The existing climate.activity collapses "never reported" into INACTIVE and keeps doing
+        // so; the new field must not
+        const result = transformKeys({
+          [TelematicKey.VEHICLE_CABIN_HVAC_PRECONDITIONING_STATUS_COMFORTSTATE]:
+            createDataPoint('COMFORT_REACHED'),
+        });
+
+        expect(result.climate?.activity).toBe('INACTIVE');
+        expect(result.climateActivity).toBe('UNKNOWN');
+      });
+
+      it('should_keepClimateActivityAndClimateActivityStateConsistent_when_heating', () => {
+        const result = transformKeys({
+          [TelematicKey.VEHICLE_VEHICLE_PRECONDITIONING_ACTIVITY]: createDataPoint('HEATING'),
+        });
+
+        expect(result.climate?.activity).toBe('HEATING');
+        expect(result.climateActivity).toBe('HEATING');
+      });
+    });
+
+    it('should_mapAllStatesIndependently_when_allKeysPresent', () => {
+      const result = transformKeys({
+        [TelematicKey.VEHICLE_CABIN_DOOR_STATUS]: createDataPoint('UNLOCKED'),
+        [TelematicKey.VEHICLE_BODY_FLAP_ISLOCKED]: createDataPoint(true),
+        [TelematicKey.VEHICLE_BODY_CHARGINGPORT_STATUS]: createDataPoint('DISCONNECTED'),
+        [TelematicKey.VEHICLE_VEHICLE_PRECONDITIONING_ACTIVITY]: createDataPoint('COOLING'),
+      });
+
+      expect(result.carLock).toBe('UNLOCKED');
+      expect(result.chargingFlap).toBe('LOCKED');
+      expect(result.chargingCable).toBe('DISCONNECTED');
+      expect(result.climateActivity).toBe('COOLING');
+    });
+
+    it('should_readUnknown_when_cacheHoldsNoneOfTheKeys', () => {
+      // A cache persisted by an older version of the app has none of these keys
+      const result = transformKeys({
+        [TelematicKey.VEHICLE_VEHICLE_TRAVELLEDDISTANCE]: createDataPoint(15000, 'km'),
+      });
+
+      expect(result.carLock).toBe('UNKNOWN');
+      expect(result.chargingFlap).toBe('UNKNOWN');
+      expect(result.chargingCable).toBe('UNKNOWN');
+      expect(result.climateActivity).toBe('UNKNOWN');
+    });
+
+    it('should_neverReturnUndefined_when_dataIsEmpty', () => {
+      const result = transformKeys({});
+
+      expect(result.carLock).toBe('UNKNOWN');
+      expect(result.chargingFlap).toBe('UNKNOWN');
+      expect(result.chargingCable).toBe('UNKNOWN');
+      expect(result.climateActivity).toBe('UNKNOWN');
+    });
+  });
+
   describe('Electric Vehicle Data Extraction', () => {
     it('should_extractBatteryLevel_when_electricVehicle', () => {
       // Arrange
@@ -462,6 +780,121 @@ describe('TelematicDataTransformer', () => {
     });
   });
 
+  describe('Charging status', () => {
+    const transformCharging = (value: number | string | boolean | undefined) =>
+      TelematicDataTransformer.transform(TEST_VIN, DriveTrainType.ELECTRIC, {
+        [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(60),
+        ...(value === undefined
+          ? {}
+          : {
+              [TelematicKey.VEHICLE_DRIVETRAIN_ELECTRICENGINE_CHARGING_STATUS]:
+                createDataPoint(value),
+            }),
+      }).electric?.chargingStatus;
+
+    it.each([
+      ['CHARGINGACTIVE', 'CHARGING'],
+      ['CHARGINGPAUSED', 'PAUSED'],
+      ['CHARGINGENDED', 'COMPLETE'],
+      ['NOCHARGING', 'NOT_CHARGING'],
+      ['INITIALIZATION', 'INITIALIZING'],
+      ['CHARGINGERROR', 'ERROR'],
+    ])('should_mapTheDocumentedBmwValue_%s_to_%s', (value, expected) => {
+      expect(transformCharging(value)).toBe(expected);
+    });
+
+    it.each([
+      ['chargingactive', 'CHARGING'],
+      [' CHARGINGPAUSED ', 'PAUSED'],
+      ['ChargingEnded', 'COMPLETE'],
+      ['noCharging', 'NOT_CHARGING'],
+    ])('should_matchTheDocumentedBmwValueIgnoringCaseAndSpaces_%p_to_%s', (value, expected) => {
+      expect(transformCharging(value)).toBe(expected);
+    });
+
+    it('should_notMapPausedOrErrorToCharging_when_theValueContainsTheWordCharging', () => {
+      // The fuzzy match used to turn these two into CHARGING
+      expect(transformCharging('CHARGINGPAUSED')).not.toBe('CHARGING');
+      expect(transformCharging('CHARGINGERROR')).not.toBe('CHARGING');
+    });
+
+    it('should_notMapInitializationToUnknown', () => {
+      expect(transformCharging('INITIALIZATION')).not.toBe('UNKNOWN');
+    });
+
+    it.each([
+      ['CHARGING', 'CHARGING'],
+      ['NOT_CHARGING', 'NOT_CHARGING'],
+      ['NOT CHARGING', 'NOT_CHARGING'],
+      ['COMPLETE', 'COMPLETE'],
+      ['FINISHED', 'COMPLETE'],
+      ['FINISHED_FULLY_CHARGED', 'COMPLETE'],
+    ])('should_stillMapOtherSpellingsOf_%s_to_%s', (value, expected) => {
+      expect(transformCharging(value)).toBe(expected);
+    });
+
+    it.each([
+      ['CHARGING_PAUSED', 'PAUSED'],
+      ['PAUSED', 'PAUSED'],
+      ['CHARGING_PAUSE', 'PAUSED'],
+      ['CHARGING_ERROR', 'ERROR'],
+      ['ERROR', 'ERROR'],
+      ['FAULT', 'ERROR'],
+      ['CHARGING_FAULT', 'ERROR'],
+    ])('should_checkErrorAndPauseBeforeTheGenericChargingMatch_%s_to_%s', (value, expected) => {
+      expect(transformCharging(value)).toBe(expected);
+    });
+
+    it.each(['SOMETHING_NEW', '', 'INVALID', 'UNKNOWN', 7, true])(
+      'should_mapToUnknown_when_theValueIs_%p',
+      (value) => {
+        expect(transformCharging(value)).toBe('UNKNOWN');
+      }
+    );
+
+    it('should_mapToUnknown_when_theChargingStatusPointIsMissing', () => {
+      expect(transformCharging(undefined)).toBe('UNKNOWN');
+    });
+  });
+
+  describe('Battery level', () => {
+    const transformBattery = (data: Record<string, TelematicDataPoint>) =>
+      TelematicDataTransformer.transform(TEST_VIN, DriveTrainType.ELECTRIC, data).electric;
+
+    it('should_keepZeroAsAValidLevel_when_theHeaderIsZero', () => {
+      const electric = transformBattery({
+        [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(0),
+      });
+
+      expect(electric?.chargeLevelPercent).toBe(0);
+    });
+
+    it('should_leaveTheLevelUndefined_when_theHeaderIsMissing', () => {
+      // Only the range is known: the electric state exists, the battery level is not known
+      const electric = transformBattery({
+        [TelematicKey.VEHICLE_DRIVETRAIN_ELECTRICENGINE_KOMBIREMAININGELECTRICRANGE]:
+          createDataPoint(280, 'km'),
+      });
+
+      expect(electric).toBeDefined();
+      expect(electric?.chargeLevelPercent).toBeUndefined();
+      expect(electric?.range).toBe(280);
+    });
+
+    it.each(['85', 'unknown', true, Number.NaN, Number.POSITIVE_INFINITY])(
+      'should_leaveTheLevelUndefined_when_theHeaderIs_%p',
+      (value) => {
+        const electric = transformBattery({
+          [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(value),
+          [TelematicKey.VEHICLE_DRIVETRAIN_ELECTRICENGINE_KOMBIREMAININGELECTRICRANGE]:
+            createDataPoint(280, 'km'),
+        });
+
+        expect(electric?.chargeLevelPercent).toBeUndefined();
+      }
+    );
+  });
+
   describe('Combustion Vehicle Data Extraction', () => {
     it('should_extractFuelLevel_when_combustionVehicle', () => {
       // Arrange
@@ -532,6 +965,77 @@ describe('TelematicDataTransformer', () => {
 
       // Assert
       expect(result.currentMileage).toBe(0);
+    });
+  });
+
+  describe('Distance units', () => {
+    // A UK car: the stream reports kilometres, the REST API the same values in miles
+    it('should_convertMilesToKilometres_when_apiReportsMiles', () => {
+      const telematicData: Record<string, TelematicDataPoint> = {
+        [TelematicKey.VEHICLE_VEHICLE_TRAVELLEDDISTANCE]: createDataPoint(62534.77, 'miles'),
+        [TelematicKey.VEHICLE_DRIVETRAIN_LASTREMAININGRANGE]: createDataPoint(168.39, 'miles'),
+        [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(88, '%'),
+        [TelematicKey.VEHICLE_DRIVETRAIN_ELECTRICENGINE_KOMBIREMAININGELECTRICRANGE]:
+          createDataPoint(168.39, 'miles'),
+      };
+
+      const result = TelematicDataTransformer.transform(
+        TEST_VIN,
+        DriveTrainType.ELECTRIC,
+        telematicData
+      );
+
+      expect(result.currentMileage).toBe(100639.96);
+      expect(result.range).toBe(271);
+      expect(result.electric?.range).toBe(271);
+    });
+
+    it('should_keepKilometres_when_streamReportsKilometres', () => {
+      const telematicData: Record<string, TelematicDataPoint> = {
+        [TelematicKey.VEHICLE_VEHICLE_TRAVELLEDDISTANCE]: createDataPoint(100640, 'km'),
+        [TelematicKey.VEHICLE_DRIVETRAIN_LASTREMAININGRANGE]: createDataPoint(271, 'km'),
+      };
+
+      const result = TelematicDataTransformer.transform(
+        TEST_VIN,
+        DriveTrainType.ELECTRIC,
+        telematicData
+      );
+
+      expect(result.currentMileage).toBe(100640);
+      expect(result.range).toBe(271);
+    });
+
+    it('should_readKilometres_when_noUnitGiven', () => {
+      const telematicData: Record<string, TelematicDataPoint> = {
+        [TelematicKey.VEHICLE_VEHICLE_TRAVELLEDDISTANCE]: createDataPoint(100640),
+        [TelematicKey.VEHICLE_DRIVETRAIN_BATTERYMANAGEMENT_HEADER]: createDataPoint(88),
+        [TelematicKey.VEHICLE_DRIVETRAIN_ELECTRICENGINE_KOMBIREMAININGELECTRICRANGE]:
+          createDataPoint(271),
+      };
+
+      const result = TelematicDataTransformer.transform(
+        TEST_VIN,
+        DriveTrainType.ELECTRIC,
+        telematicData
+      );
+
+      expect(result.currentMileage).toBe(100640);
+      expect(result.electric?.range).toBe(271);
+    });
+
+    it.each(['mi', 'Miles', ' MILE '])('should_recogniseMiles_when_unitIs_%s', (unit) => {
+      const telematicData: Record<string, TelematicDataPoint> = {
+        [TelematicKey.VEHICLE_DRIVETRAIN_LASTREMAININGRANGE]: createDataPoint(100, unit),
+      };
+
+      const result = TelematicDataTransformer.transform(
+        TEST_VIN,
+        DriveTrainType.ELECTRIC,
+        telematicData
+      );
+
+      expect(result.range).toBe(160.93);
     });
   });
 

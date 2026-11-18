@@ -26,6 +26,13 @@
                     }
                 },
                 {
+                    "id": "plugged_in_paused",
+                    "title": {
+                        "en": "Plugged in, charging paused",
+                        "nl": "Aangesloten, laden gepauzeerd"
+                    }
+                },
+                {
                     "id": "plugged_in",
                     "title": {
                         "en": "Plugged in (not charging)",

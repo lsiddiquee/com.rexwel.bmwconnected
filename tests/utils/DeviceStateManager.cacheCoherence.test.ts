@@ -292,6 +292,84 @@ describe('DeviceStateManager - cache coherence', () => {
     expect(after).toEqual(before);
   });
 
+  describe('lock, charging cable and climate states', () => {
+    const point = (value: string | boolean, timestamp: string) => ({
+      timestamp,
+      value,
+      source: 'api' as const,
+    });
+
+    it('keeps the last known states when a later update lacks their keys', async () => {
+      await manager.updateFromApi({
+        'vehicle.cabin.door.status': point('UNLOCKED', '2026-11-04T10:00:00.000Z'),
+        'vehicle.body.flap.isLocked': point(true, '2026-11-04T10:00:00.000Z'),
+        'vehicle.body.chargingPort.status': point('CONNECTED', '2026-11-04T10:00:00.000Z'),
+        'vehicle.vehicle.preConditioning.activity': point('HEATING', '2026-11-04T10:00:00.000Z'),
+      });
+
+      // A later update that only carries something else
+      const status = await manager.updateFromApi({
+        'vehicle.vehicle.travelledDistance': point('15000', '2026-11-04T10:05:00.000Z'),
+      });
+
+      expect(status.carLock).toBe('UNLOCKED');
+      expect(status.chargingFlap).toBe('LOCKED');
+      expect(status.chargingCable).toBe('CONNECTED');
+      expect(status.climateActivity).toBe('HEATING');
+      expect(stateUpdateDelegate).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          carLock: 'UNLOCKED',
+          chargingFlap: 'LOCKED',
+          chargingCable: 'CONNECTED',
+          climateActivity: 'HEATING',
+        })
+      );
+    });
+
+    it('reads every state as UNKNOWN from a cache persisted before these keys were used', () => {
+      mockStore[STORE_KEY_DEVICE_STATE] = {
+        telematicCache: {
+          'vehicle.vehicle.travelledDistance': point('15000', '2026-10-01T10:00:00.000Z'),
+        },
+        vin: 'VIN123',
+        driveTrain: DriveTrainType.ELECTRIC,
+      } satisfies DeviceStoreData;
+      const restored = new DeviceStateManager(
+        mockDevice,
+        'VIN123',
+        stateUpdateDelegate,
+        mockLogger
+      );
+
+      const status = restored.getVehicleStatus();
+
+      expect(status.carLock).toBe('UNKNOWN');
+      expect(status.chargingFlap).toBe('UNKNOWN');
+      expect(status.chargingCable).toBe('UNKNOWN');
+      expect(status.climateActivity).toBe('UNKNOWN');
+    });
+
+    it('reads every state as UNKNOWN for a new device without any data', () => {
+      const status = manager.getVehicleStatus();
+
+      expect(status.carLock).toBe('UNKNOWN');
+      expect(status.chargingFlap).toBe('UNKNOWN');
+      expect(status.chargingCable).toBe('UNKNOWN');
+      expect(status.climateActivity).toBe('UNKNOWN');
+    });
+
+    it('reports unexpected values at debug level through its logger', async () => {
+      await manager.updateFromApi({
+        'vehicle.cabin.door.status': point('AJAR', '2026-11-04T10:00:00.000Z'),
+      });
+
+      expect(mockLogger.debug).toHaveBeenCalledWith(
+        expect.stringContaining('car lock'),
+        expect.objectContaining({ value: 'AJAR' })
+      );
+    });
+  });
+
   it('updates drive train when explicitly set', async () => {
     await manager.setDriveTrain(DriveTrainType.PLUGIN_HYBRID);
     const store = getStore();

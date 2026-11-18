@@ -60,6 +60,8 @@ This app displays the following data in Homey:
 - Range (total remaining range)
 - Location (GPS map view)
 - Alarm (generic alarm status) (Door lock and/ir secured)
+- Car data stream (Live, Connecting, Reconnecting, Off or Unavailable)
+- Last car data (when the car measured its newest data)
 
 **Electric Vehicles (BEV/PHEV):**
 
@@ -86,6 +88,12 @@ This app displays the following data in Homey:
 - Charging status changed (electric/hybrid)
 - Refueling detected (combustion/hybrid)
 - Trip completed (vehicle stopped after movement)
+- Car locked / unlocked
+- Charging flap locked / unlocked
+- Charging cable plugged in / unplugged
+- Battery level rose above X%
+- Climate started / stopped / status changed
+- Car data stream changed
 
 **Conditions:**
 
@@ -93,10 +101,20 @@ This app displays the following data in Homey:
 - Fuel level is above/below X%
 - Vehicle is charging (yes/no)
 - Vehicle is inside geofence (specific location)
+- Car is locked
+- Charging cable is plugged in
+- Car data stream is live
+- Car data was updated in the last X minutes
+
+Triggers fire only on a real change between two known states, not on the first data after a restart. If a condition's data isn't known yet, the flow stops with an error instead of guessing. The charging flap cards need `vehicle.body.flap.isLocked` in the stream.
 
 **Actions:**
 
 - None (read-only API)
+
+### Dashboard Widget
+
+**Car battery** shows a car's battery level, charging state, range and data age. Pick the car, a style (battery, circle or large number) and a light or dark background.
 
 ## Data Delivery: MQTT Streaming vs API Polling
 
@@ -153,6 +171,8 @@ To configure streaming in the BMW portal:
 4. Credentials will be visible for use
 
 **Status:** Automatically enabled if streaming subscription is active.
+
+**Recovery:** the stream renews the BMW login before the hourly token expires and retries a failed start or reconnect (30 s, 1, 2, 4, 8 min, then every 15 min). A once-a-minute check restarts it if it stopped.
 
 ### REST API Polling (Fallback)
 

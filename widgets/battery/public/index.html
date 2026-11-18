@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* The widget is "transparent": the page draws nothing, the card draws its own background. */
+  html, body { margin: 0; padding: 0; background: transparent; overflow: hidden; }
+  [hidden] { display: none !important; }
+
+  .card {
+    box-sizing: border-box; width: 100%;
+    font-family: -apple-system, BlinkMacSystemFont, Roboto, 'Segoe UI', sans-serif;
+    background: var(--bg); color: var(--fg);
+    border: 1px solid var(--edge); border-radius: 22px;
+    display: flex;
+    -webkit-text-size-adjust: 100%;
+  }
+  .card.dark  { --bg: #16191d; --fg: #f2f4f7; --muted: #a3abb5; --track: #2a2f36; --shell: #4a515b; --edge: #16191d; }
+  .card.light { --bg: #ffffff; --fg: #14171a; --muted: #5a6370; --track: #e4e7eb; --shell: #9aa2ad; --edge: #d5d9de; }
+
+  /* Shared pieces */
+  .name {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--muted);
+  }
+  .status { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; flex: none; white-space: nowrap; }
+  .status .bolt { width: 14px; height: 14px; flex: none; }
+  .status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+  .bolt path { stroke: var(--accent); }
+  .num { font-variant-numeric: tabular-nums; line-height: 1; }
+  .unit { color: var(--muted); letter-spacing: 0; }
+  .detail, .range { font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .range { white-space: nowrap; }
+  .foot { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+  .foot .detail { min-width: 0; }
+  .top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+
+  /* 1 Battery */
+  .card.battery { flex-direction: column; gap: 14px; padding: 20px 22px; }
+  .battery .mid { display: flex; align-items: center; gap: 16px; }
+  .battery .num { flex: none; width: 92px; font-size: 40px; font-weight: 650; letter-spacing: -1.5px; }
+  .battery .unit { font-size: 18px; font-weight: 500; }
+  .battery .gauge { flex: 1; min-width: 0; display: flex; align-items: center; }
+  .battery .shell {
+    box-sizing: border-box; flex: 1; min-width: 0; height: 46px; padding: 4px;
+    border: 2px solid var(--shell); border-radius: 11px;
+  }
+  .battery .fill { height: 100%; border-radius: 6px; background: var(--accent); transition: width 0.4s ease; }
+  .battery .nub { flex: none; width: 5px; height: 18px; border-radius: 0 3px 3px 0; background: var(--shell); }
+
+  /* 2 Circle */
+  .card.circle {
+    --pad: 22px; --gap: 22px;
+    /* Ring diameter: 140px when there is room, shrinks so the text column keeps ~130px */
+    --d: clamp(76px, calc(100vw - 134px - 2 * var(--pad) - var(--gap)), 140px);
+    box-sizing: border-box; align-items: center; gap: var(--gap); padding: var(--pad);
+    min-height: calc(var(--d) + 56px);
+  }
+  .circle .ring { position: relative; flex: none; width: var(--d); height: var(--d); border-radius: 50%; background: var(--track); }
+  .circle .hole {
+    position: absolute; top: calc(var(--d) * 0.093); left: calc(var(--d) * 0.093); right: calc(var(--d) * 0.093); bottom: calc(var(--d) * 0.093); border-radius: 50%; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .circle .num { font-size: calc(var(--d) * 0.3); font-weight: 650; letter-spacing: -0.0357em; white-space: nowrap; }
+  .circle .unit { font-size: calc(var(--d) * 0.129); font-weight: 500; }
+  .circle .text { display: flex; flex-direction: column; gap: 7px; min-width: 0; flex: 1; }
+  .circle .status { font-size: 16px; }
+  .circle .status .bolt { width: 16px; height: 16px; }
+  .circle .status .dot { width: 8px; height: 8px; }
+
+  /* 3 Large number */
+  .card.number { flex-direction: column; gap: 10px; padding: 20px 22px 22px; }
+  .number .num { font-size: clamp(56px, 23vw, 80px); font-weight: 300; letter-spacing: -0.05em; line-height: 0.95; white-space: nowrap; }
+  .number .unit { font-size: 0.4em; font-weight: 400; }
+  .number .bar { height: 6px; border-radius: 3px; background: var(--track); overflow: hidden; }
+  .number .fill { height: 100%; border-radius: 3px; background: var(--accent); transition: width 0.4s ease; }
+
+  /* Narrow dashboards */
+  @media (max-width: 300px) {
+    .card.battery { padding: 16px; gap: 12px; }
+    .card.number { padding: 16px 16px 18px; }
+    .card.circle { --pad: 16px; --gap: 14px; }
+    .battery .mid { gap: 12px; }
+    .battery .num { width: 84px; font-size: 36px; }
+    .battery .unit { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Three card styles share the same hook classes; only the one chosen in the widget settings is shown. -->
+
+<div class="card battery dark" id="card-battery" hidden>
+  <div class="top">
+    <div class="name"></div>
+    <div class="status" hidden>
+      <svg class="bolt" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"></path></svg>
+      <span class="dot"></span>
+      <span class="status-text"></span>
+    </div>
+  </div>
+  <div class="mid">
+    <div class="num"><span class="num-text">–</span><span class="unit">%</span></div>
+    <div class="gauge">
+      <div class="shell"><div class="fill"></div></div>
+      <div class="nub"></div>
+    </div>
+  </div>
+  <div class="foot">
+    <span class="detail"></span>
+    <span class="range"></span>
+  </div>
+</div>
+
+<div class="card circle dark" id="card-circle" hidden>
+  <div class="ring">
+    <div class="hole">
+      <div class="num"><span class="num-text">–</span><span class="unit">%</span></div>
+    </div>
+  </div>
+  <div class="text">
+    <div class="name"></div>
+    <div class="status" hidden>
+      <svg class="bolt" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"></path></svg>
+      <span class="dot"></span>
+      <span class="status-text"></span>
+    </div>
+    <div class="detail"></div>
+    <div class="range"></div>
+  </div>
+</div>
+
+<div class="card number dark" id="card-number" hidden>
+  <div class="top">
+    <div class="name"></div>
+    <div class="status" hidden>
+      <svg class="bolt" viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 2 4 14h7l-1 8 9-12h-7l1-8z"></path></svg>
+      <span class="dot"></span>
+      <span class="status-text"></span>
+    </div>
+  </div>
+  <div class="num"><span class="num-text">–</span><span class="unit">%</span></div>
+  <div class="bar"><div class="fill"></div></div>
+  <div class="foot">
+    <span class="detail"></span>
+    <span class="range"></span>
+  </div>
+</div>
+
+<script type="text/javascript">
+  var FALLBACK_HEIGHT = { battery: 150, circle: 196, number: 200 };
+  var LEVEL_LOW = '#f0573c';
+  var LEVEL_MID = '#f2a630';
+  var LEVEL_HIGH = '#3d82ff';
+  var NBSP = ' ';
+
+  var homeyRef = null;
+  var style = 'battery';
+  var card = null;               // the visible card element
+  var selectedCar = null;        // { id, name } from the widget settings, or null
+  var lastDeviceId = null;       // deviceId of the last state the API returned
+  var fetchSeq = 0;              // only the newest fetch may update the view
+
+  // What the card currently shows. kind is one of:
+  //   LOADING      nothing fetched yet
+  //   STATE        a car state (model.state)
+  //   NO_CAR       the API answered with state: null
+  //   UNREACHABLE  the API call failed and there is no earlier state to keep showing
+  var model = { kind: 'LOADING', state: null };
+
+  // ---- formatting helpers -------------------------------------------------
+
+  function hasPercent(state) {
+    return !!state && typeof state.percent === 'number' && isFinite(state.percent);
+  }
+
+  function clampPercent(p) {
+    return Math.max(0, Math.min(100, Math.round(p)));
+  }
+
+  function levelColour(percent) {
+    if (percent < 20) return LEVEL_LOW;
+    if (percent < 50) return LEVEL_MID;
+    return LEVEL_HIGH;
+  }
+
+  // Status line, first match wins. Returns null when the line should be hidden.
+  function statusFor(state) {
+    if (state.charge === 'CHARGING') return { icon: 'bolt', text: 'Charging' };
+    if (state.charge === 'PLUGGED_IN') return { icon: 'dot', text: 'Plugged in' };
+    if (hasPercent(state) && state.percent < 20) return { icon: 'dot', text: 'Low battery' };
+    if (state.charge === 'NOT_PLUGGED_IN') return { icon: 'dot', text: 'Parked' };
+    return null;
+  }
+
+  function relativeAge(ms, now) {
+    var minutes = Math.floor((now - ms) / 60000);
+    if (minutes < 1) return 'just now';
+    if (minutes < 60) return minutes + ' min ago';
+    var hours = Math.floor(minutes / 60);
+    if (hours < 48) return hours + ' h ago';
+    return Math.floor(hours / 24) + ' days ago';
+  }
+
+  function detailFor(state, now) {
+    if (!hasPercent(state) || typeof state.updatedAt !== 'number') return 'Waiting for car data';
+    if (state.charge === 'CHARGING' && typeof state.fullAt === 'number') {
+      return 'Full by ' + new Date(state.fullAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return 'Updated ' + relativeAge(state.updatedAt, now);
+  }
+
+  function rangeFor(state) {
+    if (typeof state.range !== 'number' || !isFinite(state.range)) return '';
+    return Math.round(state.range) + ' ' + (state.rangeUnit === 'mi' ? 'mi' : 'km');
+  }
+
+  // Turns the model into plain display values.
+  function viewFor(m, now) {
+    var carName = selectedCar && selectedCar.name ? selectedCar.name : '';
+    if (m.kind === 'STATE') {
+      var s = m.state;
+      var known = hasPercent(s);
+      var pct = known ? clampPercent(s.percent) : 0;
+      return {
+        name: s.name || carName,
+        known: known,
+        pct: pct,
+        accent: known ? levelColour(pct) : 'var(--muted)',
+        status: statusFor(s),
+        detail: detailFor(s, now),
+        range: rangeFor(s)
+      };
+    }
+    var detail = m.kind === 'NO_CAR' ? 'No car found' : m.kind === 'UNREACHABLE' ? "Can't reach the car data" : '';
+    return { name: carName, known: false, pct: 0, accent: 'var(--muted)', status: null, detail: detail, range: '' };
+  }
+
+  // ---- rendering ------------------------------------------------------------
+
+  function q(sel) { return card.querySelector(sel); }
+
+  function render() {
+    if (!card) return;
+    var v = viewFor(model, Date.now());
+
+    card.style.setProperty('--accent', v.accent);
+    q('.name').textContent = v.name;
+
+    var status = q('.status');
+    status.hidden = !v.status;
+    if (v.status) {
+      q('.bolt').style.display = v.status.icon === 'bolt' ? '' : 'none';
+      q('.dot').style.display = v.status.icon === 'dot' ? '' : 'none';
+      q('.status-text').textContent = v.status.text;
+    }
+
+    q('.num-text').textContent = v.known ? String(v.pct) : '–';
+    q('.unit').hidden = !v.known;
+
+    var fill = q('.fill');
+    if (fill) fill.style.width = v.pct + '%';
+    var ring = q('.ring');
+    if (ring) {
+      ring.style.background = 'conic-gradient(var(--accent) 0 ' + v.pct + '%, var(--track) ' + v.pct + '% 100%)';
+    }
+
+    q('.detail').textContent = v.detail || NBSP;
+    var range = q('.range');
+    range.textContent = v.range;
+    range.hidden = !v.range;
+
+    fitHeight();
+  }
+
+  var lastHeight = 0;
+  function fitHeight() {
+    requestAnimationFrame(function () {
+      if (!homeyRef || !card) return;
+      var h = Math.ceil(card.getBoundingClientRect().height);
+      if (h > 0 && h !== lastHeight) {
+        lastHeight = h;
+        homeyRef.setHeight(h);
+      }
+    });
+  }
+
+  // ---- data -----------------------------------------------------------------
+
+  function load() {
+    var seq = ++fetchSeq;
+    var id = selectedCar && selectedCar.id;
+    var path = '/state' + (id ? '?deviceId=' + encodeURIComponent(id) : '');
+    Promise.resolve().then(function () {
+      return homeyRef.api('GET', path);
+    }).then(function (res) {
+      if (!res || typeof res !== 'object') throw new Error('Bad response');
+      return res;
+    }).then(function (res) {
+      if (seq !== fetchSeq) return;
+      if (res.state) {
+        lastDeviceId = res.state.deviceId || null;
+        model = { kind: 'STATE', state: res.state };
+      } else {
+        lastDeviceId = null;
+        model = { kind: 'NO_CAR', state: null };
+      }
+      render();
+    }, function () {
+      if (seq !== fetchSeq) return;
+      // Keep showing the last state if there is one.
+      if (model.kind !== 'STATE') model = { kind: 'UNREACHABLE', state: null };
+      render();
+    });
+  }
+
+  function onPush(state) {
+    if (!state || typeof state !== 'object' || !state.deviceId) return;
+    var wanted = selectedCar && selectedCar.id ? selectedCar.id : lastDeviceId;
+    if (!wanted || state.deviceId !== wanted) return;
+    lastDeviceId = state.deviceId;
+    model = { kind: 'STATE', state: state };
+    render();
+  }
+
+  // ---- startup ----------------------------------------------------------------
+
+  function onHomeyReady(Homey) {
+    homeyRef = Homey;
+    var settings = Homey.getSettings() || {};
+    selectedCar = settings.car && settings.car.id ? settings.car : null;
+    style = settings.style === 'circle' || settings.style === 'number' ? settings.style : 'battery';
+    var background = settings.background === 'light' ? 'light' : 'dark';
+
+    var names = ['battery', 'circle', 'number'];
+    for (var i = 0; i < names.length; i++) {
+      document.getElementById('card-' + names[i]).hidden = names[i] !== style;
+    }
+    card = document.getElementById('card-' + style);
+    card.className = 'card ' + style + ' ' + background;
+
+    render();
+    Homey.ready({ height: FALLBACK_HEIGHT[style] });
+    fitHeight();
+    load();
+
+    Homey.on('battery-widget:update', onPush);
+
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) load();
+    });
+    setInterval(function () { if (!document.hidden) load(); }, 5 * 60 * 1000);
+    // Keeps "Updated N min ago" and the colour current without hitting the API.
+    setInterval(function () { if (!document.hidden) render(); }, 30 * 1000);
+  }
+</script>
+</body>
+</html>
