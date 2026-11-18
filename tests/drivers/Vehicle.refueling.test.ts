@@ -27,6 +27,7 @@ describe('Vehicle Refueling Flow', () => {
   let setCapabilityValueSafeSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    jest.useFakeTimers();
     // Create vehicle instance using helper
     const result = createMockedVehicle({
       refuellingTriggerThreshold: 5, // 5 liter threshold
@@ -85,10 +86,71 @@ describe('Vehicle Refueling Flow', () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     jest.restoreAllMocks();
   });
 
   describe('Refueling Detection', () => {
+    describe('Debounce', () => {
+      const fuelStatus = (fuelLevelLiters: number): VehicleStatus => ({
+        vin: 'WBA12345678901234',
+        driveTrain: DriveTrainType.COMBUSTION,
+        lastUpdatedAt: new Date(),
+        combustion: { fuelLevelLiters },
+      });
+
+      beforeEach(() => {
+        vehicle.currentVehicleState = fuelStatus(10);
+      });
+
+      it('should_triggerOnce_when_smallIncreasesCombineIntoOneFill', async () => {
+        await vehicle['updateCapabilitiesFromStatus'](fuelStatus(13));
+        await jest.advanceTimersByTimeAsync(4000);
+        await vehicle['updateCapabilitiesFromStatus'](fuelStatus(16));
+        await jest.advanceTimersByTimeAsync(1000);
+
+        expect(setCapabilityValueSafeSpy).toHaveBeenLastCalledWith(Capabilities.REMAINING_FUEL, 16);
+        expect(mockRefuelledFlowCard.trigger).not.toHaveBeenCalled();
+
+        await jest.advanceTimersByTimeAsync(3000);
+        await vehicle['updateCapabilitiesFromStatus'](fuelStatus(16));
+        await jest.advanceTimersByTimeAsync(1000);
+        expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledTimes(1);
+        expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledWith(
+          vehicle,
+          { FuelBeforeRefuelling: 10, FuelAfterRefuelling: 16, RefuelledLiters: 6, Location: '' },
+          {}
+        );
+      });
+
+      it('should_notTrigger_when_fuelSpikeRevertsBeforeSettling', async () => {
+        await vehicle['updateCapabilitiesFromStatus'](fuelStatus(18));
+        await vehicle['updateCapabilitiesFromStatus'](fuelStatus(10));
+        await jest.runAllTimersAsync();
+
+        expect(mockRefuelledFlowCard.trigger).not.toHaveBeenCalled();
+      });
+
+      it('should_triggerTwice_when_fillsSettleInSeparateWindows', async () => {
+        await vehicle['updateCapabilitiesFromStatus'](fuelStatus(18));
+        expect(mockRefuelledFlowCard.trigger).not.toHaveBeenCalled();
+        await jest.runAllTimersAsync();
+
+        await vehicle['updateCapabilitiesFromStatus'](fuelStatus(26));
+        await jest.runAllTimersAsync();
+
+        expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledTimes(2);
+      });
+
+      it('should_cancelPendingTrigger_when_deviceIsDeleted', async () => {
+        await vehicle['updateCapabilitiesFromStatus'](fuelStatus(18));
+        vehicle.onDeleted();
+        await jest.runAllTimersAsync();
+
+        expect(mockRefuelledFlowCard.trigger).not.toHaveBeenCalled();
+      });
+    });
+
     it('should_triggerRefuelledFlow_when_fuelIncreasesAboveThreshold', async () => {
       // Arrange - Set initial state with low fuel
       vehicle.currentVehicleState = {
@@ -133,6 +195,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert - Verify refuelled flow was triggered
       expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledTimes(1);
@@ -181,6 +244,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert - Verify refuelled flow was NOT triggered
       expect(mockRefuelledFlowCard.trigger).not.toHaveBeenCalled();
@@ -216,6 +280,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert - Verify refuelled flow was NOT triggered
       expect(mockRefuelledFlowCard.trigger).not.toHaveBeenCalled();
@@ -248,6 +313,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert — flow must fire even though oldFuelValue was 0
       expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledTimes(1);
@@ -281,6 +347,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert - Verify refuelled flow was NOT triggered (no baseline)
       expect(mockRefuelledFlowCard.trigger).not.toHaveBeenCalled();
@@ -333,6 +400,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert - Verify location was included in flow card tokens
       // Note: Location comes from stateManager.getLastLocation() (persisted location)
@@ -375,6 +443,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert - Verify refuelled flow was triggered with empty string location
       expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledWith(
@@ -395,6 +464,7 @@ describe('Vehicle Refueling Flow', () => {
         refuellingTriggerThreshold: 10, // 10 liter threshold
       });
       const customVehicle = customResult.vehicle;
+      customVehicle.homey = vehicle.homey;
 
       // Setup mocks for custom vehicle
       customVehicle['stateManager'] = vehicle['stateManager'];
@@ -426,6 +496,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (customVehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert - Verify refuelled flow was NOT triggered (below 10L threshold)
       expect(mockRefuelledFlowCard.trigger).not.toHaveBeenCalled();
@@ -458,6 +529,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert - Verify refuelled flow was NOT triggered
       expect(mockRefuelledFlowCard.trigger).not.toHaveBeenCalled();
@@ -490,6 +562,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert - Verify refuelled flow WAS triggered (>= threshold)
       expect(mockRefuelledFlowCard.trigger).toHaveBeenCalledTimes(1);
@@ -550,6 +623,7 @@ describe('Vehicle Refueling Flow', () => {
 
       // Act
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
+      await jest.runAllTimersAsync();
 
       // Assert - Verify resolveAddress was called to fetch missing address
       expect(resolveAddressSpy).toHaveBeenCalledTimes(1);
