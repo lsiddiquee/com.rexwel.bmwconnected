@@ -59,6 +59,8 @@ export class Vehicle extends Device {
 
   // API polling timer for periodic state updates
   private _apiPollingTimer?: NodeJS.Timeout;
+  private pendingRefuelling?: { before: number; after: number; timer: NodeJS.Timeout };
+  private static readonly REFUELLING_DEBOUNCE_WINDOW_MS = 5000;
 
   // Trip session debouncing
   private _tripDebounceTimer?: NodeJS.Timeout;
@@ -192,6 +194,7 @@ export class Vehicle extends Device {
    * @public Used by onInit and ConnectedDriver repair flow
    */
   async initializeVehicleDataAndServices(): Promise<void> {
+    this.cancelPendingRefuelling();
     // Cleanup existing connections (safe to call even if nothing running)
     if (this._mqttClient) {
       await this._mqttClient.disconnect();
@@ -666,29 +669,10 @@ export class Vehicle extends Device {
           newFuelValue ? UnitConverter.ConvertFuel(newFuelValue, settings.fuelUnit) : null
         );
 
-        const oldFuelValue = this.currentVehicleState?.combustion?.fuelLevelLiters;
-        // Trigger refuelled flow if fuel level increased beyond threshold
-        if (
-          oldFuelValue !== undefined &&
-          newFuelValue - oldFuelValue >= this.settings.refuellingTriggerThreshold
-        ) {
-          const refuelledFlowCard = this.homey.flow.getDeviceTriggerCard(Flows.REFUELLED);
-          const location = this.stateManager.getLastLocation();
-          if (location && !location.address) {
-            await this.resolveAddress(location);
-            await this.stateManager.setLastLocation(location);
-          }
-          await refuelledFlowCard.trigger(
-            this,
-            {
-              FuelBeforeRefuelling: oldFuelValue,
-              FuelAfterRefuelling: newFuelValue,
-              RefuelledLiters: newFuelValue - oldFuelValue,
-              Location: location?.address ?? '',
-            },
-            {}
-          );
-        }
+        this.debounceRefuelling(
+          this.currentVehicleState?.combustion?.fuelLevelLiters,
+          newFuelValue
+        );
       }
     }
 
@@ -700,6 +684,52 @@ export class Vehicle extends Device {
     this.currentVehicleState = status;
 
     this.logger?.info(`Updated capabilities from status for vehicle ${status.vin}`);
+  }
+
+  private debounceRefuelling(previous: number | undefined, after: number): void {
+    const pending = this.pendingRefuelling;
+    const last = pending?.after ?? previous;
+    if (last === undefined || last === after || (!pending && after <= last)) {
+      return;
+    }
+
+    const before = pending?.before ?? last;
+    this.cancelPendingRefuelling();
+    const timer = setTimeout(() => {
+      this.pendingRefuelling = undefined;
+      if (after - before >= this.settings.refuellingTriggerThreshold) {
+        void this.triggerRefuelled(before, after).catch((error: unknown) => {
+          this.logger?.error(`Failed to trigger refuelled flow: ${String(error)}`);
+        });
+      }
+    }, Vehicle.REFUELLING_DEBOUNCE_WINDOW_MS);
+    this.pendingRefuelling = { before, after, timer };
+  }
+
+  private cancelPendingRefuelling(): void {
+    if (this.pendingRefuelling) {
+      clearTimeout(this.pendingRefuelling.timer);
+      this.pendingRefuelling = undefined;
+    }
+  }
+
+  private async triggerRefuelled(before: number, after: number): Promise<void> {
+    const refuelledFlowCard = this.homey.flow.getDeviceTriggerCard(Flows.REFUELLED);
+    const location = this.stateManager.getLastLocation();
+    if (location && !location.address) {
+      await this.resolveAddress(location);
+      await this.stateManager.setLastLocation(location);
+    }
+    await refuelledFlowCard.trigger(
+      this,
+      {
+        FuelBeforeRefuelling: before,
+        FuelAfterRefuelling: after,
+        RefuelledLiters: after - before,
+        Location: location?.address ?? '',
+      },
+      {}
+    );
   }
 
   async migrate_device_capabilities() {
@@ -921,6 +951,7 @@ export class Vehicle extends Device {
    */
   onDeleted() {
     this.logger?.info('Vehicle has been deleted');
+    this.cancelPendingRefuelling();
 
     // Stop MQTT streaming
     if (this._mqttClient) {

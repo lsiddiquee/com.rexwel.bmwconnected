@@ -493,6 +493,9 @@ describe('Flow Trigger - Undefined/Null Prevention', () => {
   // ==================================================================================
 
   describe('refuelled trigger', () => {
+    beforeEach(() => jest.useFakeTimers());
+    afterEach(() => jest.useRealTimers());
+
     it('should_NOT_pass_undefined_when_location_address_is_missing', async () => {
       // Arrange - Set initial fuel level LOW to trigger refueling
       vehicle.currentVehicleState = {
@@ -532,6 +535,7 @@ describe('Flow Trigger - Undefined/Null Prevention', () => {
       await (vehicle as any).updateCapabilitiesFromStatus(newStatus);
 
       // Assert - Flow triggered with empty string, NOT undefined
+      await jest.runAllTimersAsync();
       const flowCard = mockFlowCards.get('refuelled');
       expect(flowCard?.trigger).toHaveBeenCalled();
 
