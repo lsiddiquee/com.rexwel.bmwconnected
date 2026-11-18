@@ -1,4 +1,7 @@
 {
+  "1.0.26": {
+    "en": "The Refuelled Flow now waits for the fuel reading to settle, so brief spikes no longer trigger it and nearby increases count as one fill."
+  },
   "1.0.25": {
     "en": "Defer container provisioning from pairing to first API poll. Fixes 'Could not find that PairSession' errors during pairing (#108) and lets MQTT streaming start immediately. Container is created lazily and re-provisioned automatically on 404."
   },
